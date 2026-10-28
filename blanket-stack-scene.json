@@ -1,7 +1,7 @@
 {
   "format": "army3-blanket-scene",
   "schemaVersion": 1,
-  "exportedAt": "2026-10-28T23:14:28.178Z",
+  "exportedAt": "2026-10-28T23:26:28.252Z",
   "sceneId": "blanket-main-camp",
   "sceneName": "操場棉被疊疊樂",
   "foundationId": "blanket-base",
@@ -18,9 +18,9 @@
     "groundStyle": "main-game"
   },
   "stackCenter": {
-    "x": -0.18,
+    "x": 0.48978247391610985,
     "y": 0,
-    "z": 0.16
+    "z": 1.3824527367473327
   },
   "totalObjects": 798,
   "items": [
@@ -7488,9 +7488,9 @@
       "category": "blanket",
       "quality": "high",
       "name": "第一層棉被／地基",
-      "x": -0.18,
+      "x": 0.48978247391610985,
       "y": 0,
-      "z": 0.16,
+      "z": 1.3824527367473327,
       "rot": 0,
       "scale": 1.55,
       "size": [

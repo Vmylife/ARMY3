@@ -1,4 +1,4 @@
-// ARMY3 v1.51 — preserve pre-fall layers, add restrained cloth compression / recovery to folded military blankets.
+// ARMY3 v1.53 — preserve scene damage across cleanups; continuous stacking without showcase pauses.
 import {makeEnvironment as makeOriginalCampGround} from './src/map/ground103.js?v=103';
 import {loadGlb} from './src/core/glb111.js?v=111';
 import {RigAnimator} from './src/characters/rigAnimator.js';
@@ -305,26 +305,35 @@ let state='loading',round=1,roundResults=[],collapsingAt=0,collapseDir=[1,0],col
 let collapseAngle=0,collapseSpeed=0,collapseStage='hinge',collapseAxis=[0,1],collapseReleased=0;
 let totalCrushed=0,totalBuildings=0,totalMines=0,roundCrushed=0,roundBuildings=0,roundMines=0;
 let angleChoice=0,camYaw=.12,camDist=17.5,camPitch=.88,camTargetHeight=1.0,camFocus={x:-20.8,z:-2};
-let showcaseClock=0,showcaseDuration=2.05,lastRisk={value:0,dx:0,dz:0},dangerStrikes=0,landingKick=0,cinematicYaw=0,outlineFlash=0;
+let lastRisk={value:0,dx:0,dz:0},dangerStrikes=0,landingKick=0,outlineFlash=0;
 let ready=false,last=performance.now(),gameTime=0,pendingCelebration=null,messageEnds=0;
 let audioContext=null;
 const originalFoundation=()=>({...foundation,y:foundation.y||0,tiltX:0,tiltZ:0});
 const tierHeight=()=>foundation.size[1]*foundation.scale;
-function setState(next){state=next;document.body.classList.toggle('tower-showcase',next==='showcase');const active=next!=='loading'&&next!=='intro'&&next!=='result';$('hud').hidden=!active;$('actions').hidden=!active;
+function setState(next){state=next;const active=next!=='loading'&&next!=='intro'&&next!=='result';$('hud').hidden=!active;$('actions').hidden=!active;
  $('cleanup').disabled=!(next==='flying'||next==='collapseDone');$('cleanup').textContent=next==='collapseDone'?'收拾倒塌棉被':'收拾棉被';syncHUD()}
 function syncHUD(){$('round').textContent=String(round);$('left').textContent=String(4-round);$('layers').textContent=String(state==='collapsing'||state==='collapseDone'?collapseSavedLayers:stack.length)}
 function say(message,seconds=1.25){$('message').textContent=message;$('message').classList.add('show');messageEnds=performance.now()+seconds*1000}
-function startRound(){
- for(const o of things){
-  if(o.startX===undefined){o.startX=o.x;o.startZ=o.z;o.startY=o.y??o.sourceY??0}
-  o.x=o.startX;o.z=o.startZ;o.y=o.startY;o.crushed=false;o.broken=false;
-  o.fragments=[];o.fragmentsReady=false;o.breakEpoch=(o.breakEpoch||0)+1;
-  o.flyAnim=null;o.flyClock=undefined;o.flyVX=0;o.flyVZ=0;o.flyVY=0;
-  o.tiltX=0;o.tiltZ=0;o.tiltAngle=undefined;o.tiltAxis=undefined;o.model=o.originalModel||o.model
+function startRound(resetWorld=false){
+ // 收拾只清掉棉被塔；被擊飛的友軍、破碎建築、引爆過的地雷與碎片都留在現場。
+ // Only the first round of an entirely new game (or the "play again" button)
+ // may restore the camp.  Otherwise the three rounds share ONE damaged world.
+ if(resetWorld){
+  for(const o of things){
+   if(o.startX===undefined){o.startX=o.x;o.startZ=o.z;o.startY=o.y??o.sourceY??0}
+   o.x=o.startX;o.z=o.startZ;o.y=o.startY;o.crushed=false;o.broken=false;
+   o.fragments=[];o.fragmentsReady=false;o.breakEpoch=(o.breakEpoch||0)+1;
+   o.flyAnim=null;o.flyClock=undefined;o.flyVX=0;o.flyVZ=0;o.flyVY=0;
+   o.tiltX=0;o.tiltZ=0;o.tiltAngle=undefined;o.tiltAxis=undefined;o.model=o.originalModel||o.model;
+  }
+  for(const m of mines){m.ignited=false;m.queued=0}
+  activeFragments=0;blasts=[];
  }
- for(const m of mines){m.ignited=false;m.queued=0}
- activeFragments=0;stack=[originalFoundation()];flying=null;falling=null;blasts=[];roundCrushed=0;roundBuildings=0;roundMines=0;collapseSavedLayers=1;
- camFocus={x:foundation.x,z:foundation.z};camTargetHeight=1.2;camDist=17.5;camPitch=.88;showcaseClock=0;landingKick=0;outlineFlash=0;lastRisk={value:0,dx:0,dz:0};dangerStrikes=0;
+ // Reset only the tower and this round's score. Keep the world simulation
+ // running, including already triggered chain explosions and flying NPCs.
+ stack=[originalFoundation()];flying=null;falling=null;
+ roundCrushed=0;roundBuildings=0;roundMines=0;collapseSavedLayers=1;
+ camFocus={x:foundation.x,z:foundation.z};camTargetHeight=1.2;camDist=17.5;camPitch=.88;landingKick=0;outlineFlash=0;lastRisk={value:0,dx:0,dz:0};dangerStrikes=0;
  spawnFlying();setState('flying');
 }
 function spawnFlying(){
@@ -415,9 +424,8 @@ function landBlanket(){
  }
  if(accuracy<.24&&stack.length>2)say('PERFECT！',.85);
  if(risk.value>.62)playCreak(risk.value);
- spawnFlying();
- if(stack.length>=5&&stack.length%5===0){showcaseClock=showcaseDuration;cinematicYaw=camYaw;setState('showcase');say(stack.length+' 層！',1.25)}
- else setState('flying');
+ // The next blanket immediately enters: no five-layer cinematic pause.
+ spawnFlying();setState('flying');
 }
 function beginCollapse(risk,failedPlacement=false){
  // A blanket that CAUSED the collapse never counts as successfully stacked.
@@ -564,24 +572,20 @@ function updateGame(dt){
  }
  const collapsing=state==='collapsing'||state==='collapseDone';
  const height=stack.length*tierHeight();
- // Play: tilted enough to see growing height; yellow target remains readable.
- // Every five layers: a short, non-interactive SIDE reveal showing the entire tower.
- // The incoming blanket freezes so the cinematic never costs an attempt.
+ // Continuous, tilted stacking view: smoothly track the growing tower.
+ // There is no scheduled camera cut, frozen blanket, or forced milestone pause.
  outlineFlash=Math.max(0,outlineFlash-dt);
- const showing=state==='showcase';
- if(showing){showcaseClock=Math.max(0,showcaseClock-dt);if(showcaseClock<=0)setState('flying')}
- const pitchGoal=collapsing?.48:showing?.34:cap(.91-stack.length*.004,.75,.89);
- camPitch=mix(camPitch,pitchGoal,Math.min(1,dt*(showing?2.8:1.9)));
- const desired=collapsing?Math.max(30,26+height*1.40):showing?Math.max(27,23+height*1.22):16.8+height*.68;
+ const pitchGoal=collapsing?.48:cap(.91-stack.length*.004,.75,.89);
+ camPitch=mix(camPitch,pitchGoal,Math.min(1,dt*1.9));
+ const desired=collapsing?Math.max(30,26+height*1.40):16.8+height*.68;
  landingKick=Math.max(0,landingKick-dt);
- camDist=mix(camDist,desired-(landingKick>0?1.2*Math.sin(landingKick/.24*Math.PI):0),Math.min(1,dt*(showing?3.0:2.2)));
- const targetHeight=collapsing?height*.26:showing?height*.42:Math.max(.9,height*.68);
+ camDist=mix(camDist,desired-(landingKick>0?1.2*Math.sin(landingKick/.24*Math.PI):0),Math.min(1,dt*2.2));
+ const targetHeight=collapsing?height*.26:Math.max(.9,height*.68);
  camTargetHeight=mix(camTargetHeight,targetHeight,Math.min(1,dt*2.5));
  const move=collapsing?Math.min(height*.45,12):0;
  camFocus.x=mix(camFocus.x,foundation.x+collapseDir[0]*move,Math.min(1,dt*1.7));
  camFocus.z=mix(camFocus.z,foundation.z+collapseDir[1]*move,Math.min(1,dt*1.7));
- if(showing)camYaw=cinematicYaw+Math.sin((showcaseDuration-showcaseClock)*.68)*.23;
- else camYaw=mix(camYaw,.12,Math.min(1,dt*.75));
+ camYaw=mix(camYaw,.12,Math.min(1,dt*.75));
 }
 function finishRound(){
  if(!['flying','collapseDone'].includes(state))return;
@@ -600,7 +604,7 @@ function showResult(){setState('result');$('actions').hidden=true;$('hud').hidde
  const result=document.createElement('div');result.id='scores';result.innerHTML=roundResults.map((r,i)=>`<div><small>第 ${i+1} 輪</small>${r.layers} 層</div>`).join('');t.append(result);
  if(totalCrushed||totalBuildings||totalMines){const p=document.createElement('p');p.textContent=`友軍 ${totalCrushed}　建築 ${totalBuildings}　地雷 ${totalMines}`;t.append(p)}
  const back=document.createElement('button');back.textContent='返回軍營';back.onclick=()=>returnToCamp();t.append(back);
- const again=document.createElement('button');again.className='secondary';again.textContent='再玩一次';again.onclick=()=>{round=1;roundResults=[];totalCrushed=0;totalBuildings=0;totalMines=0;$('overlay').hidden=true;startRound()};t.append(again);
+ const again=document.createElement('button');again.className='secondary';again.textContent='再玩一次';again.onclick=()=>{round=1;roundResults=[];totalCrushed=0;totalBuildings=0;totalMines=0;$('overlay').hidden=true;startRound(true)};t.append(again);
  $('overlay').hidden=false;
 }
 function worldToScreen(x,y,z,vp){
@@ -724,7 +728,7 @@ function fatal(e){$('reason').textContent=String(e?.message||e);$('fatal').hidde
 async function boot(){
  if(!gl){fatal(new Error('此裝置無法使用 WebGL2'));return}
  try{
-  const resp=await fetch('./blanket-stack-scene.json?v=152',{cache:'no-cache'});
+  const resp=await fetch('./blanket-stack-scene.json?v=153',{cache:'no-cache'});
   if(!resp.ok)throw Error('無法下載玩家設定的棉被場景：HTTP '+resp.status);
   scene=await resp.json();
   if(scene.format!=='army3-blanket-scene'||scene.schemaVersion!==1||!Array.isArray(scene.items))throw Error('棉被場景 JSON 格式不相容');
@@ -757,7 +761,7 @@ async function boot(){
   void ensureModel({model:SOLDIER_LOD_PATH,assetId:'lowSoldier'});
   stack=[originalFoundation()];state='intro';ready=true;
   $('loadingText').textContent='';$('loadLine').hidden=true;$('play').disabled=false;$('play').textContent='開始挑戰';$('loadBar').style.width='100%';
-  $('play').onclick=()=>{$('overlay').hidden=true;round=1;roundResults=[];totalCrushed=0;totalBuildings=0;totalMines=0;startRound()};
+  $('play').onclick=()=>{$('overlay').hidden=true;round=1;roundResults=[];totalCrushed=0;totalBuildings=0;totalMines=0;startRound(true)};
   // Draw a real WebGL frame before unlocking start.
   draw();
  }catch(e){console.error('棉被遊戲初始化失敗',e);fatal(e)}
