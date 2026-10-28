@@ -431,7 +431,12 @@ $('returnCamp').addEventListener('click',()=>{
   // Scores and achievements have already been saved by the result screen.
   try{sessionStorage.removeItem(CRAFT_KEY)}catch(e){}
   if(embeddedMode)sendToWorkshop('ARMY_GRENADE_HOME');
-  else window.location.assign(new URL('./index.html',window.location.href).href);
+  else import('./src/systems/campSession.js?v=144')
+    .then(({returnToCamp})=>returnToCamp())
+    .catch(error=>{
+      console.error('返回軍營模組載入失敗',error);
+      window.location.replace(new URL('./index.html?armyResume=1&v=144',window.location.href));
+    });
 });
 function nextThrow(){
  if(phase!=='blast'||throwsUsed>=MAX_THROWS||world.counter.red>=9)return;

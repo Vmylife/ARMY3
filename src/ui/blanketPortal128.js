@@ -43,17 +43,22 @@ function makeGroundRing(renderer,position){
   };
 }
 
-function createPortalMenu({position,panelId,startId,cancelId,destination}){
+function createPortalMenu({position,panelId,startId,cancelId,destination,onStart,initialDismissed=false}){
   const panel=document.getElementById(panelId);
   const start=document.getElementById(startId);
   const cancel=document.getElementById(cancelId);
   if(!panel||!start||!cancel){
     throw new Error(`Missing portal menu elements for ${panelId}`);
   }
-  let dismissed=false,wasNear=false;
+  let dismissed=initialDismissed,wasNear=false;
   cancel.addEventListener('click',()=>{dismissed=true;panel.hidden=true});
   start.addEventListener('click',()=>{
-    window.location.assign(new URL(destination,window.location.href).href);
+    // Save position/camera before leaving. A failed checkpoint must not silently reset the game.
+    try { onStart?.(); } catch (error) { console.error('軍營進度儲存失敗',error); alert('目前無法保存軍營位置，請重試。'); return; }
+    dismissed=true;panel.hidden=true;
+    const url=new URL(destination,window.location.href);
+    url.searchParams.set('fromCamp','1');
+    window.location.assign(url.href);
   });
   return {
     update(playerPos,blocked=false){
@@ -68,13 +73,13 @@ function createPortalMenu({position,panelId,startId,cancelId,destination}){
 }
 
 // Preserve the original API so src/main111.js and all existing game systems stay unchanged.
-export function createBlanketPortal(renderer){
+export function createBlanketPortal(renderer,{onTrainingStart=()=>{},resuming=false}={}){
   const blanketDraw=makeGroundRing(renderer,BLANKET_PORTAL);
   const grenadeDraw=makeGroundRing(renderer,GRENADE_PORTAL);
   const grenade=createPortalMenu({
     position:GRENADE_PORTAL,
     panelId:'grenadePortalMenu',startId:'grenadePortalStart',cancelId:'grenadePortalCancel',
-    destination:'./grenade-workshop-test.html'
+    destination:'./grenade-workshop-test.html',onStart:()=>onTrainingStart('grenade'),initialDismissed:resuming
   });
   return {
     draw(){blanketDraw();grenadeDraw();},

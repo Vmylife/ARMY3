@@ -1,3 +1,4 @@
+import {getReturningCampSession} from './systems/campSession.js?v=144';
 // v0.10.10: render homepage immediately; start importing/constructing the world only on tap.
 const $ = id => document.getElementById(id);
 const button = $('armyStart'), loading = $('armyLoading'), bar = $('armyBar');
@@ -27,11 +28,20 @@ window.armyLoadFailure = err => {
 };
 button.addEventListener('click',async()=>{
   button.disabled=true;button.hidden=true;
-  window.armySetLoading(0,1,'建立軍營場景…');
+  window.armySetLoading(0,1,getReturningCampSession()?'正在恢復軍營進度…':'建立軍營場景…');
   try {
     // Separate map versioned modules are intentional: both must share the editor changes.
     await import('./map/activeCampLayout116.js?v=126');
     await import('./lighting96.js?v=096');
-    await import('./main111.js?v=129');
+    await import('./main111.js?v=144');
   }catch(error){console.error('軍營載入錯誤',error);window.armyLoadFailure(error);}
 },{once:true});
+
+// If Safari evicted the original camp page, load models automatically and
+// restore the saved position instead of asking the player to start a new game.
+if(getReturningCampSession()){
+  $('armyHome').querySelector('h1').textContent='返回軍營';
+  $('armyHome').querySelector('.army-home__tagline').textContent='正在恢復你剛剛的位置';
+  button.hidden=true;
+  queueMicrotask(()=>{button.hidden=false;button.click();});
+}

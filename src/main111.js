@@ -11,6 +11,7 @@ import {CAMP} from './map/camp.js?v=093';
 import {movePlayer} from './map/navCollision109.js?v=124';
 import {createNavDebugger} from './ui/navDebug109.js?v=109';
 import {createBlanketPortal} from './ui/blanketPortal128.js?v=128';
+import {saveCampSession,getReturningCampSession,clearCampSession} from './systems/campSession.js?v=144';
 import {drawMinimap} from './ui/minimap.js?v=093';
 import {initWorldMap} from './ui/worldMap.js?v=093';
 import {setupInput} from './ui/input.js?v=062';
@@ -103,11 +104,34 @@ async function boot(){
   await Promise.all(Array.from({length:Math.min(2,jobs.length)},worker));
   progress('模型完成，正在準備第一個畫面…');
 
+  const returnSnapshot=getReturningCampSession();
   step='建立主角骨架';const player={pos:{...CAMP.spawn},angle:0,anim:new RigAnimator(heroGlb)};
+  if(returnSnapshot?.player){
+    player.pos={x:returnSnapshot.player.x,z:returnSnapshot.player.z};
+    player.angle=Number.isFinite(returnSnapshot.player.angle)?returnSnapshot.player.angle:0;
+  }
   delete player.anim.clips.Jump_Over_Obstacle_2;
   player.anim.setClip('Idle');player.anim.evaluate(0);
   const npcs=createCampNPCs(npcGlb);
-  const blanketPortal=createBlanketPortal(renderer);
+  if(returnSnapshot?.npcs){
+    // Cold-resume fallback: preserve the visible crowd positions as well as the player.
+    const savedNPCs=new Map(returnSnapshot.npcs.map(n=>[n.id,n]));
+    for(const npc of npcs){
+      const saved=savedNPCs.get(npc.id);
+      if(saved&&Number.isFinite(saved.x)&&Number.isFinite(saved.z)){
+        npc.pos={x:saved.x,z:saved.z};
+        if(Number.isFinite(saved.angle))npc.angle=saved.angle;
+      }
+    }
+  }
+  const blanketPortal=createBlanketPortal(renderer,{
+    resuming:!!returnSnapshot,
+    onTrainingStart:(trainingId)=>saveCampSession({
+      player:{x:player.pos.x,z:player.pos.z,angle:player.angle},
+      camera:{yaw:camYaw,pitch:camPitch,zoom:cameraZoom,targetZoom},
+      npcs:npcs.map(n=>({id:n.id,x:n.pos.x,z:n.pos.z,angle:n.angle}))
+    },trainingId)
+  });
   progress('35 名 NPC：5 支小隊＋10 名自由活動士兵已就位…');
   const showNavDebug=debug?createNavDebugger():null;
   // The new cross-legged clip drops the hips below the original standing root.
@@ -133,6 +157,13 @@ async function boot(){
   let camYaw=options.cameraYaw,camPitch=options.cameraPitch;
   const minZoom=options.zoom,maxZoom=minZoom*2;
   let cameraZoom=minZoom,targetZoom=minZoom;
+  if(returnSnapshot?.camera){
+    const saved=returnSnapshot.camera;
+    if(Number.isFinite(saved.yaw))camYaw=saved.yaw;
+    if(Number.isFinite(saved.pitch))camPitch=Math.max(.32,Math.min(1.12,saved.pitch));
+    if(Number.isFinite(saved.zoom))cameraZoom=Math.max(minZoom,Math.min(maxZoom,saved.zoom));
+    if(Number.isFinite(saved.targetZoom))targetZoom=Math.max(minZoom,Math.min(maxZoom,saved.targetZoom));
+  }
   const input=setupInput($('world'),
     (dx,dy)=>{if(!worldMap.isOpen()){camYaw+=dx;camPitch=Math.max(.32,Math.min(1.12,camPitch+dy))}},
     ratio=>{if(!worldMap.isOpen()&&Number.isFinite(ratio)&&ratio>0)targetZoom=Math.max(minZoom,Math.min(maxZoom,targetZoom*ratio))}
@@ -142,6 +173,18 @@ async function boot(){
 
   let fpsFrames=0,fpsSince=last,measuredFps=0;
   let mapYaw=camYaw,mapFacing=Math.PI-player.angle+mapYaw;
+  window.addEventListener('pageshow',event=>{
+    if(!event.persisted)return;
+    const pending=getReturningCampSession();
+    if(!pending)return;
+    // Safari normally restores the exact world, NPC decisions, and camera from BFCache.
+    // If it has discarded the WebGL context, use the saved cold-resume state instead.
+    if(renderer.gl.isContextLost()){
+      location.replace(new URL('./index.html?armyResume=1&v=144',location.href));
+    }else{
+      clearCampSession();last=performance.now();
+    }
+  });
   status('');
   let audition=null,entered=false;
   if(debug){
@@ -195,7 +238,9 @@ async function boot(){
     }
     if(debug&&now-lastDebug>150){$('debug').hidden=false;$('debug').textContent=`fps: ${measuredFps}\nNPC: ${npcs.length} (10自由＋5x5小隊)\n${squadDebug().map(s=>`隊${s.squad}: ${s.stage} ${s.phase} (${s.done}/5)`).join('\n')}\nmode: ${m.clip}\npos: ${player.pos.x.toFixed(2)},${player.pos.z.toFixed(2)}\ninput: ${stick.magnitude.toFixed(2)}\nzoom: ${cameraZoom.toFixed(2)}\nrenderer: webgl2`;lastDebug=now}
     // First frame (including ground + ALL models) must complete before reveal.
-    if(!entered){entered=true;window.armyLoadComplete?.();last=now;}
+    if(!entered){entered=true;window.armyLoadComplete?.();last=now;
+      if(returnSnapshot)clearCampSession();
+    }
     requestAnimationFrame(tick);
    }catch(error){console.error('遊戲迴圈錯誤',error);errorMessage('遊戲迴圈：'+String(error.stack||error));}
   }
