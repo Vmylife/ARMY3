@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#12281d"><title>棉被疊疊樂｜地圖編輯器</title>
+<link rel="stylesheet" href="./blanket-scene-editor.css?v=1">
+</head><body>
+<header class="topbar"><div><b>🛏️ 棉被疊疊樂 · 地圖編輯器</b></div><div class="topactions"><a href="./index.html">軍營</a><button id="togglePanel">收合工具</button></div></header>
+<main id="stage"><canvas id="world" aria-label="3D 場景編輯器"></canvas><div id="loading">正在載入軍營與棉被…</div><div id="camHelp" aria-hidden="true"></div>
+ <div class="camera"><button id="moveSelected">移動選取：關</button><button id="camOrbit">旋轉視角：關</button><button id="zoomIn">＋</button><button id="zoomOut">－</button><button id="homeCamera">回操場</button></div></main>
+<aside id="panel">
+ <div class="sceneLine"><label>場景<select id="scenes"></select></label><button id="newScene" class="warm">＋ 新增</button><button id="renameScene">改名</button><button id="deleteScene" class="danger">刪除</button></div>
+ <div class="section"><div class="sectionTitle"><b>放置模型</b><span id="objectCount"></span></div>
+  <div class="two"><label>分類<select id="category"><option value="blanket">棉被</option><option value="soldier">士兵</option><option value="building">建築</option><option value="prop">器材與環境</option><option value="ground">地面區塊</option></select></label><label>模型<select id="template"></select></label></div>
+  <div class="btnRow"><button id="add" class="primary">＋ 新增</button><button id="duplicate">複製</button><button id="remove" class="danger">刪除選取</button></div>
+  <details><summary>物件清單</summary><select id="objectList" size="6" style="margin-top:8px"></select></details>
+ </div>
+ <div class="section editFields"><div class="sectionTitle"><b id="chosen">選取模型</b><span id="selectionInfo"></span></div>
+  <div id="selectedQualityWrap" class="qualitySwitch" hidden><label>畫質<select id="selectedQuality"><option value="low">低畫質</option><option value="high">高畫質</option></select></label></div>
+  <div class="fields"><label>X<input type="number" id="fieldX" step="0.1"></label><label>Z<input type="number" id="fieldZ" step="0.1"></label>
+  <label>高度 Y<input type="number" id="fieldY" step="0.1"></label><label>角度°<input type="number" id="fieldRot" step="5"></label>
+  <label>縮放<input type="number" id="fieldScale" step="0.05" min="0.1" max="12"></label>
+  <label id="widthWrap" hidden>寬<input type="number" id="fieldWidth" step="1"></label><label id="depthWrap" hidden>長<input type="number" id="fieldDepth" step="1"></label></div>
+  <div class="btnRow"><button data-nudge="x-">←</button><button data-nudge="z+">↑</button><button data-nudge="z-">↓</button><button data-nudge="x+">→</button><button data-nudge="rot-">↶ 15°</button><button data-nudge="rot+">15° ↷</button></div>
+  <details><summary>批次排列</summary><div class="fields"><label>橫向數量<input id="batchCols" type="number" min="1" max="40" value="3"></label><label>縱向數量<input id="batchRows" type="number" min="1" max="40" value="3"></label><label>橫向間距<input id="batchDx" type="number" min="0.1" max="100" value="3"></label><label>縱向間距<input id="batchDz" type="number" min="0.1" max="100" value="3"></label></div><button id="batchAdd" class="warm full">批次複製</button></details>
+ </div>
+ <div class="section last"><div class="btnRow"><button id="undo">復原</button><button id="redo">重做</button><button id="export" class="primary">匯出 JSON</button><button id="import">匯入 JSON</button><button id="importMainCamp" class="warm">重置原版軍營</button><input type="file" id="importFile" accept=".json,application/json" hidden></div><div id="message" role="status"></div></div>
+</aside><script type="module" src="./blanket-scene-editor.js?v=1"></script></body></html>
