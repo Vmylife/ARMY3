@@ -1,4 +1,4 @@
-// ARMY3 v1.48 — height reveal, progressive danger, animated knockback and grenade-style mine effects.
+// ARMY3 v1.49 — closer three-quarter stacking camera + genuine GLB fragment physics + new 11-mine map.
 import {makeEnvironment as makeOriginalCampGround} from './src/map/ground103.js?v=103';
 import {loadGlb} from './src/core/glb111.js?v=111';
 import {RigAnimator} from './src/characters/rigAnimator.js';
@@ -13,6 +13,7 @@ const canvas=$('field');
 let gl=canvas.getContext('webgl2',{antialias:true,alpha:false,depth:true,powerPreference:'high-performance'});
 let program=null,skinProgram=null,flatProgram=null,blastFX=null;
 const cache=new Map(),pending=new Map(),failed=new Set();
+const fractureCache=new Map(),fracturePending=new Map(),fractureFailed=new Set(),fractureDataCache=new Map();
 let npcIdle=null,npcDown=null;
 // WebGL matrices: column-major, original ARMY3 renderer coordinate conventions.
 const dot=(a,b)=>a.reduce((s,v,i)=>s+v*b[i],0),sub=(a,b)=>a.map((v,i)=>v-b[i]);
@@ -41,9 +42,9 @@ const BY={}; // asset lookup for shared editor shader routines
 
 function shader(gl,t,src){const s=gl.createShader(t);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s}
 function makeProgram(vs,fs){const p=gl.createProgram();gl.attachShader(p,shader(gl,gl.VERTEX_SHADER,vs));gl.attachShader(p,shader(gl,gl.FRAGMENT_SHADER,fs));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));return p}
-const VS=`#version 300 es\nprecision highp float;layout(location=0)in vec3 p;layout(location=1)in vec3 n;layout(location=2)in vec2 uv;uniform mat4 uVP,uModel;out vec2 vUV;out vec3 vN;void main(){gl_Position=uVP*uModel*vec4(p,1.);vUV=uv;vN=normalize(mat3(uModel)*n);}`;
-const SKINVS=`#version 300 es\nprecision highp float;layout(location=0)in vec3 p;layout(location=1)in vec3 n;layout(location=2)in vec2 uv;layout(location=3)in vec4 j;layout(location=4)in vec4 w;uniform mat4 uVP,uModel,uBones[44];out vec2 vUV;out vec3 vN;void main(){ivec4 ji=ivec4(j+.5);mat4 m=uBones[ji.x]*w.x+uBones[ji.y]*w.y+uBones[ji.z]*w.z+uBones[ji.w]*w.w;gl_Position=uVP*uModel*m*vec4(p,1.);vUV=uv;vN=normalize(mat3(uModel)*mat3(m)*n);}`;
-const FS=`#version 300 es\nprecision highp float;in vec2 vUV;in vec3 vN;uniform sampler2D uTex;uniform vec3 uTint;uniform float uRed;out vec4 outColor;void main(){vec3 col=texture(uTex,vUV).rgb;float cloth=smoothstep(.025,.10,col.g-col.r)*smoothstep(.055,.13,col.g-col.b);vec3 redCloth=vec3(min(1.,col.g*1.58),col.g*.47,col.g*.38);col=mix(col,redCloth,uRed*cloth);float light=.76+.29*max(0.,dot(normalize(vN),normalize(vec3(-.45,1.,.60))));outColor=vec4(col*uTint*light,1.);}`;
+const VS=`#version 300 es\nprecision highp float;layout(location=0)in vec3 p;layout(location=1)in vec3 n;layout(location=2)in vec2 uv;layout(location=5)in float cap;uniform mat4 uVP,uModel;out vec2 vUV;out vec3 vN;out float vCap;void main(){gl_Position=uVP*uModel*vec4(p,1.);vUV=uv;vCap=cap;vN=normalize(mat3(uModel)*n);}`;
+const SKINVS=`#version 300 es\nprecision highp float;layout(location=0)in vec3 p;layout(location=1)in vec3 n;layout(location=2)in vec2 uv;layout(location=3)in vec4 j;layout(location=4)in vec4 w;layout(location=5)in float cap;uniform mat4 uVP,uModel,uBones[44];out vec2 vUV;out vec3 vN;out float vCap;void main(){ivec4 ji=ivec4(j+.5);mat4 m=uBones[ji.x]*w.x+uBones[ji.y]*w.y+uBones[ji.z]*w.z+uBones[ji.w]*w.w;gl_Position=uVP*uModel*m*vec4(p,1.);vUV=uv;vCap=cap;vN=normalize(mat3(uModel)*mat3(m)*n);}`;
+const FS=`#version 300 es\nprecision highp float;in vec2 vUV;in vec3 vN;in float vCap;uniform sampler2D uTex;uniform vec3 uTint,uInnerColor;uniform float uRed;out vec4 outColor;void main(){vec3 col=texture(uTex,vUV).rgb;float cloth=smoothstep(.025,.10,col.g-col.r)*smoothstep(.055,.13,col.g-col.b);vec3 redCloth=vec3(min(1.,col.g*1.58),col.g*.47,col.g*.38);col=mix(col,redCloth,uRed*cloth);col=mix(col,uInnerColor,clamp(vCap,0.,1.));float light=.76+.29*max(0.,dot(normalize(vN),normalize(vec3(-.45,1.,.60))));outColor=vec4(col*uTint*light,1.);}`;
 const FLATVS=`#version 300 es\nprecision highp float;layout(location=0)in vec3 p;uniform mat4 uVP,uModel;void main(){gl_Position=uVP*uModel*vec4(p,1.);}`;
 const FLATFS=`#version 300 es\nprecision highp float;uniform vec3 uColor;out vec4 outColor;void main(){outColor=vec4(uColor,1.);}`;
 const cube=[];function face(a,b,c,d){for(const q of [a,b,c,a,c,d])cube.push(...q)}
@@ -94,9 +95,9 @@ function initGL(){if(!gl){msg('目前瀏覽器沒有 WebGL2，使用平面編輯
  program=makeProgram(VS,FS);skinProgram=makeProgram(SKINVS,FS);flatProgram=makeProgram(FLATVS,FLATFS);gl.enable(gl.DEPTH_TEST);gl.enable(gl.CULL_FACE);gl.cullFace(gl.BACK);
  cubeVAO=gl.createVertexArray();gl.bindVertexArray(cubeVAO);const arr=new Float32Array(cube),buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,arr,gl.STATIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);gl.bindVertexArray(null);
  white=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,white);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([255,255,255,255]));gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);initOriginalGround();blastFX=createGrenadeStyleBlastFX(gl)}
-function gpuAsset(gltf){const a=gltf.json.meshes[0].primitives[0],pr=a.attributes;
+function gpuAsset(gltf,primitive=null){const a=primitive||gltf.json.meshes[0].primitives[0],pr=a.attributes;
  const mesh=gl.createVertexArray();gl.bindVertexArray(mesh);
- for(const [key,i,sz] of [['POSITION',0,3],['NORMAL',1,3],['TEXCOORD_0',2,2],['JOINTS_0',3,4],['WEIGHTS_0',4,4]]){
+ for(const [key,i,sz] of [['POSITION',0,3],['NORMAL',1,3],['TEXCOORD_0',2,2],['JOINTS_0',3,4],['WEIGHTS_0',4,4],['_CAP',5,1]]){
   if(pr[key]===undefined)continue;const arr=gltf.read(pr[key]),idx=gltf.json.accessors[pr[key]],b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,arr,gl.STATIC_DRAW);gl.enableVertexAttribArray(i);gl.vertexAttribPointer(i,sz,idx.componentType,!!idx.normalized,0,0)}
  const inds=gltf.read(a.indices),b=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,b);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,inds,gl.STATIC_DRAW);gl.bindVertexArray(null);
  const ac=gltf.json.accessors[pr.POSITION];const positions=gltf.read(pr.POSITION);let lo=ac.min,hi=ac.max;
@@ -157,7 +158,7 @@ function drawModel(o,vp,overridePath=null){
  gl.uniformMatrix4fv(u('uVP'),false,vp);
  gl.uniformMatrix4fv(u('uModel'),false,modelMatrix(o,m.geo));
  const tint=o.crushed?[.72,.74,.70]:o.broken?[.67,.62,.57]:[1,1,1];
- gl.uniform3fv(u('uTint'),tint);gl.uniform1f(u('uRed'),o.team==='enemy'?1:0);
+ gl.uniform3fv(u('uTint'),tint);gl.uniform3fv(u('uInnerColor'),[.42,.41,.38]);gl.uniform1f(u('uRed'),o.team==='enemy'?1:0);
  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,m.tex);gl.uniform1i(u('uTex'),0);
  if(m.geo.skin){
   const animator=o.flyAnim||((o.crushed&&npcDown)?npcDown:m.animator);
@@ -168,6 +169,96 @@ function drawModel(o,vp,overridePath=null){
  return true;
 }
 function flatDraw(vp,model,color){gl.useProgram(flatProgram);lastUsed=flatProgram;const u=n=>gl.getUniformLocation(flatProgram,n);gl.uniformMatrix4fv(u('uVP'),false,vp);gl.uniformMatrix4fv(u('uModel'),false,model);gl.uniform3fv(u('uColor'),color);gl.bindVertexArray(cubeVAO);gl.disable(gl.CULL_FACE);gl.drawArrays(gl.TRIANGLES,0,cube.length/3);gl.enable(gl.CULL_FACE)}
+// Each fractured GLB contains separate meshes/nodes. Draw and animate those
+// chunks individually, as the grenade game does. A fractured GLB is NOT a single object.
+async function ensureFracture(o){
+ const path=cleanPath(o.destructible?.fracturedModel);
+ if(!path||fractureFailed.has(path))return null;
+ if(fractureCache.has(path))return fractureCache.get(path);
+ if(fracturePending.has(path))return fracturePending.get(path);
+ const job=(async()=>{try{
+  const gltf=await (fractureDataCache.get(path)||loadGlb(path,{timeoutMs:65000}));
+  fractureDataCache.delete(path);
+  const pieces=[];
+  for(const n of gltf.json.nodes||[]){
+   if(n.mesh===undefined)continue;
+   const mesh=gltf.json.meshes[n.mesh];
+   for(const prim of mesh.primitives||[]){
+    const geo=gpuAsset(gltf,prim);
+    pieces.push({geo,node:n.translation||[0,0,0],innerColor:mesh.extras?.innerColor||[.42,.41,.38]});
+   }
+  }
+  if(!pieces.length)throw Error('破壞模型沒有分離碎塊: '+path);
+  const result={pieces,path};fractureCache.set(path,result);return result;
+ }catch(e){console.warn('破壞碎片載入失敗:',path,e);fractureFailed.add(path);return null}
+ finally{fracturePending.delete(path)}})();
+ fracturePending.set(path,job);return job;
+}
+const applyMatrixPoint=(m,p)=>({x:m[0]*p[0]+m[4]*p[1]+m[8]*p[2]+m[12],y:m[1]*p[0]+m[5]*p[1]+m[9]*p[2]+m[13],z:m[2]*p[0]+m[6]*p[1]+m[10]*p[2]+m[14]});
+const fragmentScale=m=>[Math.hypot(m[0],m[1],m[2]),Math.hypot(m[4],m[5],m[6]),Math.hypot(m[8],m[9],m[10])];
+let activeFragments=0;
+function spawnFractures(o,asset,impactX,impactZ,isBlast=false){
+ if(!o.broken||o.fragments?.length||!asset)return;
+ const intact=cache.get(modelPath(o));if(!intact){
+  // A mine can hit an object before its intact GLB has completed loading.
+  const epoch=o.breakEpoch;
+  void ensureModel(o).then(loaded=>{if(!o.broken||o.breakEpoch!==epoch)return;
+   if(loaded)spawnFractures(o,asset,impactX,impactZ,isBlast);
+   else o.fragmentsReady=true;
+  });
+  return;
+ }
+ const world=modelMatrix(o,intact.geo),scale=fragmentScale(world),rotation=(o.rot||0)*Math.PI/180;
+ const budget=o.category==='building'?Math.max(0,620-activeFragments):Math.max(0,300-activeFragments);
+ if(budget<=0){o.fragmentsReady=true;return}
+ o.fragments=[];o.fragmentsReady=true;
+ const stride=Math.max(1,Math.ceil(asset.pieces.length/budget));
+ for(let i=0;i<asset.pieces.length;i+=stride){
+  const piece=asset.pieces[i],pos=applyMatrixPoint(world,piece.node);
+  const dx=pos.x-impactX,dz=pos.z-impactZ,phi=Math.atan2(dz,dx)+(i%5-2)*.15;
+  const force=(isBlast?5.8:3.8)+(i%7)*.52;
+  o.fragments.push({piece,x:pos.x,y:Math.max(.15,pos.y),z:pos.z,
+   vx:Math.cos(phi)*force,vz:Math.sin(phi)*force,vy:(isBlast?5:3.5)+(i%8)*.56,
+   rotY:rotation,rotX:0,rotZ:0,spinX:(i%7-3)*.93,spinZ:(i%5-2)*.8,
+   scale});activeFragments++;
+ }
+}
+function breakObject(o,x,z,blast=false){
+ if(o.broken||!o.destructible?.fracturedModel)return;
+ o.broken=true;o.fragments=[];o.fragmentsReady=false;
+ o.breakOriginX=x;o.breakOriginZ=z;
+ if(o.category==='building'){roundBuildings++;totalBuildings++}
+ const epoch=o.breakEpoch;
+ void ensureFracture(o).then(asset=>{if(o.broken&&o.breakEpoch===epoch){
+  if(asset)spawnFractures(o,asset,o.breakOriginX,o.breakOriginZ,blast);
+  else o.fragmentsReady=true; // Keep the intact building if downloading failed.
+ }});
+}
+function drawFragments(o,vp){
+ const m=cache.get(modelPath(o));if(!m)return;
+ for(const f of o.fragments||[]){
+  const p=program;if(lastUsed!==p){gl.useProgram(p);lastUsed=p}
+  const u=n=>uniform(p,n);
+  const transform=mul(T(f.x,f.y,f.z),mul(ry(f.rotY),mul(rx(f.rotX),mul(rz(f.rotZ),S(...f.scale)))));
+  gl.uniformMatrix4fv(u('uVP'),false,vp);gl.uniformMatrix4fv(u('uModel'),false,transform);
+  gl.uniform3fv(u('uTint'),[1,1,1]);gl.uniform3fv(u('uInnerColor'),f.piece.innerColor);
+  gl.uniform1f(u('uRed'),0);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,m.tex);
+  gl.uniform1i(u('uTex'),0);
+  gl.bindVertexArray(f.piece.geo.mesh);gl.disable(gl.CULL_FACE);
+  gl.drawElements(gl.TRIANGLES,f.piece.geo.count,f.piece.geo.itype,0);
+  gl.enable(gl.CULL_FACE);
+ }
+}
+function updateFragments(dt){
+ for(const o of things){if(!o.fragments?.length)continue;
+  for(const f of o.fragments){
+   f.x+=f.vx*dt;f.z+=f.vz*dt;f.y+=f.vy*dt;f.vy-=17*dt;
+   f.rotX+=f.spinX*dt;f.rotZ+=f.spinZ*dt;
+   if(f.y<.18){f.y=.18;f.vy=f.vy<-.8?-f.vy*.22:0;
+    const drag=Math.exp(-3.5*dt);f.vx*=drag;f.vz*=drag;f.spinX*=drag;f.spinZ*=drag;}
+  }
+ }
+}
 let ringVAO=null,ringCount=0;
 function initRings(){const segments=48,vertices=[];for(let i=0;i<segments;i++){const a=i*TAU/segments,b=(i+1)*TAU/segments;const p=(t,r)=>[Math.cos(t)*r,0,Math.sin(t)*r];vertices.push(...p(a,.965),...p(a,1.035),...p(b,1.035),...p(a,.965),...p(b,1.035),...p(b,.965));}
  ringCount=vertices.length/3;ringVAO=gl.createVertexArray();gl.bindVertexArray(ringVAO);const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(vertices),gl.STATIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);gl.bindVertexArray(null)
@@ -196,11 +287,11 @@ function drawTopOutline(vp){
  gl.bindVertexArray(topOutlineVAO);gl.disable(gl.CULL_FACE);
  gl.drawArrays(gl.TRIANGLES,0,topOutlineCount);gl.enable(gl.CULL_FACE);gl.bindVertexArray(null);
 }
-let scene=null,foundation=null,things=[],mines=[],soldiers=[],buildings=[],stack=[],flying=null,falling=null,blasts=[];
+let scene=null,foundation=null,things=[],mines=[],soldiers=[],buildings=[],props=[],stack=[],flying=null,falling=null,blasts=[];
 let state='loading',round=1,roundResults=[],collapsingAt=0,collapseDir=[1,0],collapseImpactTime=0;
 let collapseAngle=0,collapseSpeed=0,collapseStage='hinge',collapseAxis=[0,1],collapseReleased=0;
 let totalCrushed=0,totalBuildings=0,totalMines=0,roundCrushed=0,roundBuildings=0,roundMines=0;
-let angleChoice=0,camYaw=.12,camDist=25,camPitch=1.25,camTargetHeight=1.0,camFocus={x:-20.8,z:-2};
+let angleChoice=0,camYaw=.12,camDist=17.5,camPitch=.88,camTargetHeight=1.0,camFocus={x:-20.8,z:-2};
 let showcaseClock=0,showcaseDuration=2.05,lastRisk={value:0,dx:0,dz:0},landingKick=0,cinematicYaw=0,outlineFlash=0;
 let ready=false,last=performance.now(),gameTime=0,pendingCelebration=null,messageEnds=0;
 let audioContext=null;
@@ -214,12 +305,13 @@ function startRound(){
  for(const o of things){
   if(o.startX===undefined){o.startX=o.x;o.startZ=o.z;o.startY=o.y??o.sourceY??0}
   o.x=o.startX;o.z=o.startZ;o.y=o.startY;o.crushed=false;o.broken=false;
+  o.fragments=[];o.fragmentsReady=false;o.breakEpoch=(o.breakEpoch||0)+1;
   o.flyAnim=null;o.flyClock=undefined;o.flyVX=0;o.flyVZ=0;o.flyVY=0;
   o.tiltX=0;o.tiltZ=0;o.tiltAngle=undefined;o.tiltAxis=undefined;o.model=o.originalModel||o.model
  }
  for(const m of mines){m.ignited=false;m.queued=0}
- stack=[originalFoundation()];flying=null;falling=null;blasts=[];roundCrushed=0;roundBuildings=0;roundMines=0;
- camFocus={x:foundation.x,z:foundation.z};camTargetHeight=1.2;camDist=25;camPitch=1.25;showcaseClock=0;landingKick=0;outlineFlash=0;lastRisk={value:0,dx:0,dz:0};
+ activeFragments=0;stack=[originalFoundation()];flying=null;falling=null;blasts=[];roundCrushed=0;roundBuildings=0;roundMines=0;
+ camFocus={x:foundation.x,z:foundation.z};camTargetHeight=1.2;camDist=17.5;camPitch=.88;showcaseClock=0;landingKick=0;outlineFlash=0;lastRisk={value:0,dx:0,dz:0};
  spawnFlying();setState('flying');
 }
 function spawnFlying(){
@@ -284,10 +376,7 @@ function hitSoldier(o,originX=foundation.x,originZ=foundation.z,blast=false){
  }
  roundCrushed++;totalCrushed++;
 }
-function hitBuilding(o){if(o.broken)return;o.broken=true;roundBuildings++;totalBuildings++;
- const fracture=cleanPath(o.destructible?.fracturedModel);
- if(fracture){o.originalModel=o.originalModel||o.model;o.model=fracture;void ensureModel(o)}
-}
+function hitBuilding(o,x=foundation.x,z=foundation.z,blast=false){breakObject(o,x,z,blast)}
 function distanceToSegment(x,z,ax,az,bx,bz){
  const dx=bx-ax,dz=bz-az,t=cap(((x-ax)*dx+(z-az)*dz)/(dx*dx+dz*dz||1),0,1);
  return Math.hypot(x-(ax+dx*t),z-(az+dz*t));
@@ -302,7 +391,12 @@ function impactSweep(ax,az,bx,bz,r,canHitMines=true){
  for(const o of buildings){if(o.broken)continue;
   const br=Math.hypot(o.size?.[0]||1,o.size?.[2]||1)*.40*(o.scale||1);
   if(Math.hypot(o.x-midX,o.z-midZ)>reach+br+1)continue;
-  if(distanceToSegment(o.x,o.z,ax,az,bx,bz)<=r+br*.75)hitBuilding(o);
+  if(distanceToSegment(o.x,o.z,ax,az,bx,bz)<=r+br*.75)hitBuilding(o,(ax+bx)*.5,(az+bz)*.5);
+ }
+ for(const o of props){if(o.broken||!o.destructible?.fracturedModel)continue;
+  const pr=Math.hypot(o.size?.[0]||1,o.size?.[2]||1)*.38*(o.scale||1);
+  if(Math.hypot(o.x-midX,o.z-midZ)>reach+pr+1)continue;
+  if(distanceToSegment(o.x,o.z,ax,az,bx,bz)<=r+pr*.7)breakObject(o,(ax+bx)*.5,(az+bz)*.5);
  }
  if(canHitMines)for(const m of mines){if(m.ignited||m.queued)continue;
   if(distanceToSegment(m.x,m.z,ax,az,bx,bz)<=r+.40)detonateMine(m);
@@ -310,7 +404,8 @@ function impactSweep(ax,az,bx,bz,r,canHitMines=true){
 }
 function squashPoint(x,z,r,reason='blanket'){
  for(const o of soldiers){if(!o.crushed&&Math.hypot(o.x-x,o.z-z)<=r)hitSoldier(o,x,z,reason==='mine')}
- for(const o of buildings){if(!o.broken&&Math.hypot(o.x-x,o.z-z)<=r+Math.hypot(o.size[0],o.size[2])*.31)hitBuilding(o)}
+ for(const o of buildings){if(!o.broken&&Math.hypot(o.x-x,o.z-z)<=r+Math.hypot(o.size[0],o.size[2])*.31)hitBuilding(o,x,z,reason==='mine')}
+ for(const o of props){if(!o.broken&&o.destructible?.fracturedModel&&Math.hypot(o.x-x,o.z-z)<=r+Math.hypot(o.size?.[0]||1,o.size?.[2]||1)*.25)breakObject(o,x,z,reason==='mine')}
 }
 function detonateMine(m){if(m.ignited)return;m.ignited=true;m.queued=0;roundMines++;totalMines++;const radius=9.5;
  blasts.push({x:m.x,z:m.z,time:0,radius,seed:Math.random()*TAU});playBlast();squashPoint(m.x,m.z,radius,'mine');
@@ -379,6 +474,7 @@ function updateGame(dt){
  }else if(state==='collapsing')updateFall(dt);
  for(const m of mines){if(m.queued&&gameTime>=m.queued){m.queued=0;detonateMine(m)}}
  blasts=blasts.filter(b=>(b.time+=dt)<3.7);
+ updateFragments(dt);
  for(const o of soldiers){if(!o.crushed||o.flyClock===undefined||o.flyClock>o.flyLife+1)continue;
   o.flyClock+=dt;o.flyAnim?.evaluate(dt);
   if(o.flyClock<=o.flyLife){o.flyVY-=17*dt;o.x+=o.flyVX*dt;o.z+=o.flyVZ*dt;o.y+=o.flyVY*dt;
@@ -395,12 +491,12 @@ function updateGame(dt){
  outlineFlash=Math.max(0,outlineFlash-dt);
  const showing=state==='showcase';
  if(showing){showcaseClock=Math.max(0,showcaseClock-dt);if(showcaseClock<=0)setState('flying')}
- const pitchGoal=collapsing?.53:showing?.39:cap(1.30-stack.length*.015,.91,1.28);
+ const pitchGoal=collapsing?.48:showing?.34:cap(.91-stack.length*.004,.75,.89);
  camPitch=mix(camPitch,pitchGoal,Math.min(1,dt*(showing?2.8:1.9)));
- const desired=collapsing?Math.max(29,25+height*1.42):showing?Math.max(29,23+height*1.32):23+height*.84;
+ const desired=collapsing?Math.max(30,26+height*1.40):showing?Math.max(27,23+height*1.22):16.8+height*.68;
  landingKick=Math.max(0,landingKick-dt);
  camDist=mix(camDist,desired-(landingKick>0?1.2*Math.sin(landingKick/.24*Math.PI):0),Math.min(1,dt*(showing?3.0:2.2)));
- const targetHeight=collapsing?height*.26:showing?height*.42:Math.max(1.0,height*.57);
+ const targetHeight=collapsing?height*.26:showing?height*.42:Math.max(.9,height*.68);
  camTargetHeight=mix(camTargetHeight,targetHeight,Math.min(1,dt*2.5));
  const move=collapsing?Math.min(height*.45,12):0;
  camFocus.x=mix(camFocus.x,foundation.x+collapseDir[0]*move,Math.min(1,dt*1.7));
@@ -434,7 +530,7 @@ function worldToScreen(x,y,z,vp){
 }
 let firstRender=false;
 function camera(){const w=Math.max(1,canvas.clientWidth),h=Math.max(1,canvas.clientHeight),ratio=w/h,portrait=ratio<.8;
- const pitch=camPitch; // evolving 74° → 52° gameplay, brief 22° milestone view
+ const pitch=camPitch; // close three-quarter gameplay, brief dramatic side reveal
  const target=[camFocus.x,camTargetHeight,camFocus.z];
  const shake=blasts.length?Math.max(...blasts.map(b=>Math.exp(-b.time*3)*.30)):0;
  const eye=[target[0]+camDist*Math.sin(camYaw)*Math.cos(pitch)+Math.sin(gameTime*72)*shake,target[1]+camDist*Math.sin(pitch)+Math.sin(gameTime*103)*shake*.52,target[2]+camDist*Math.cos(camYaw)*Math.cos(pitch)];
@@ -453,11 +549,17 @@ function draw(){
  // For mid/far soldiers, reuse a low-poly mesh instead of drawing 275 high-poly rigs.
  for(const o of things){
   if(o.category==='mine'&&o.ignited)continue;
-  if(Math.hypot(o.x-camFocus.x,o.z-camFocus.z)>far)continue;
+  const fragmented=o.broken&&o.fragmentsReady&&o.fragments?.length>0;
+  if(Math.hypot(o.x-camFocus.x,o.z-camFocus.z)>far+(fragmented?18:0))continue;
   const ndc=worldToScreen(o.x,Math.min(1.2,(o.size?.[1]||1)*.4),o.z,vp);
-  if(!ndc||Math.abs(ndc.x)>1.4||Math.abs(ndc.y)>1.38)continue;
+  if(!ndc||Math.abs(ndc.x)>(fragmented?1.9:1.4)||Math.abs(ndc.y)>(fragmented?1.85:1.38))continue;
   const low=o.category==='soldier'&&!o.crushed&&Math.hypot(o.x-camFocus.x,o.z-camFocus.z)>11&&cache.has(SOLDIER_LOD_PATH);
   if(!cache.has(low?SOLDIER_LOD_PATH:modelPath(o)))continue;
+  if(fragmented){drawFragments(o,vp);continue}
+  if(o.broken&&o.fragmentsReady&&!o.fragments?.length){
+   // Download unavailable: keep a visibly damaged tilted silhouette rather than vanishing.
+   o.tiltZ=.28;
+  }
   drawModel(o,vp,low?SOLDIER_LOD_PATH:null);
  }
  for(let i=0;i<stack.length;i++){const o=stack[i];
@@ -534,14 +636,14 @@ function fatal(e){$('reason').textContent=String(e?.message||e);$('fatal').hidde
 async function boot(){
  if(!gl){fatal(new Error('此裝置無法使用 WebGL2'));return}
  try{
-  const resp=await fetch('./blanket-stack-scene.json?v=146',{cache:'no-cache'});
+  const resp=await fetch('./blanket-stack-scene.json?v=149',{cache:'no-cache'});
   if(!resp.ok)throw Error('無法下載玩家設定的棉被場景：HTTP '+resp.status);
   scene=await resp.json();
   if(scene.format!=='army3-blanket-scene'||scene.schemaVersion!==1||!Array.isArray(scene.items))throw Error('棉被場景 JSON 格式不相容');
   foundation=scene.items.find(o=>o.uid===scene.foundationId&&o.category==='blanket');
   if(!foundation)throw Error('找不到你指定的第一層棉被');
   things=scene.items.filter(o=>o.category!=='blanket').map(o=>({...o}));
-  for(const o of things){if(o.category==='mine')mines.push(o);else if(o.category==='soldier')soldiers.push(o);else if(o.category==='building')buildings.push(o)}
+  for(const o of things){if(o.category==='mine')mines.push(o);else if(o.category==='soldier')soldiers.push(o);else if(o.category==='building')buildings.push(o);else if(o.category==='prop')props.push(o)}
   camFocus={x:foundation.x,z:foundation.z};
   initGL();initRings();initTopOutline();
   // Keep the opening responsive: load the actual blanket first, then mines and soldiers.
@@ -556,6 +658,13 @@ async function boot(){
     .sort((a,b)=>Math.hypot(a.x-foundation.x,a.z-foundation.z)-Math.hypot(b.x-foundation.x,b.z-foundation.z));
   const launch=async()=>{let cursor=0;const worker=async()=>{while(cursor<group.length){const o=group[cursor++];await ensureModel(o);await new Promise(r=>setTimeout(r,35))}};await Promise.all([worker(),worker()])};
   void launch();
+  // Warm the six building fracture sources; a hit does not have to wait for a full download.
+  const fracturePaths=[...new Set(buildings.map(o=>cleanPath(o.destructible?.fracturedModel)).filter(Boolean))];
+  void (async()=>{for(const path of fracturePaths){try{
+   if(fractureCache.has(path))continue;
+   const job=loadGlb(path,{timeoutMs:65000});fractureDataCache.set(path,job);
+   await job;
+  }catch(e){fractureDataCache.delete(path);console.warn('破壞模型預載:',path,e)}}})();
   // The fallback remains the original hi-poly NPC if a low-poly asset is missing.
   void ensureModel({model:SOLDIER_LOD_PATH,assetId:'lowSoldier'});
   stack=[originalFoundation()];state='intro';ready=true;
@@ -573,4 +682,4 @@ window.addEventListener('pageshow',()=>{last=performance.now()});
 requestAnimationFrame(tick);
 void boot();
 // Exposed only for deterministic automated gameplay checks.
-window.__blanketTest={get state(){return state},get layers(){return stack.length},get cameraPitch(){return camPitch},get stabilityHidden(){return !document.getElementById('stability')},get round(){return round},get mines(){return roundMines},get soldiers(){return roundCrushed},get npcTotal(){return soldiers.length},get drawLimit(){return Infinity},get collapseStage(){return collapseStage},get maxReach(){return stack.length*tierHeight()},tap:dropFlying,cleanup:finishRound,collapse:(x=1,z=0)=>beginCollapse({dx:x,dz:z}),get scene(){return scene}};
+window.__blanketTest={get state(){return state},get layers(){return stack.length},get cameraPitch(){return camPitch},get stabilityHidden(){return !document.getElementById('stability')},get round(){return round},get mines(){return roundMines},get soldiers(){return roundCrushed},get npcTotal(){return soldiers.length},get drawLimit(){return Infinity},get collapseStage(){return collapseStage},get maxReach(){return stack.length*tierHeight()},get fracturedBuildings(){return buildings.filter(o=>o.broken&&o.fragmentsReady).length},get activeFragments(){return activeFragments},get propDestroyed(){return props.filter(o=>o.broken).length},tap:dropFlying,cleanup:finishRound,collapse:(x=1,z=0)=>beginCollapse({dx:x,dz:z}),get scene(){return scene}};

@@ -1,7 +1,7 @@
 {
   "format": "army3-blanket-scene",
   "schemaVersion": 1,
-  "exportedAt": "2026-10-28T21:49:47.146Z",
+  "exportedAt": "2026-10-28T22:27:51.223Z",
   "sceneId": "blanket-main-camp",
   "sceneName": "操場棉被疊疊樂",
   "foundationId": "blanket-base",
@@ -22,7 +22,7 @@
     "y": 0,
     "z": -2
   },
-  "totalObjects": 529,
+  "totalObjects": 536,
   "items": [
     {
       "uid": "main-building-barracks",
@@ -13083,6 +13083,181 @@
       "quality": "high",
       "x": -15.526348566856896,
       "z": 7.405091328104984,
+      "rot": 0,
+      "scale": 1,
+      "y": 0,
+      "category": "mine",
+      "name": "骷髏地雷",
+      "model": "./assets/mines/skull-mine.glb",
+      "destructible": null,
+      "team": null,
+      "size": [
+        1.15,
+        0.32,
+        1.05
+      ],
+      "hazard": {
+        "kind": "mine",
+        "trigger": "blanket-collapse-contact",
+        "effect": "explosion"
+      }
+    },
+    {
+      "uid": "g10576",
+      "assetId": "skullMine",
+      "quality": "high",
+      "x": -30.580794000077113,
+      "z": -2.887258921243639,
+      "rot": 0,
+      "scale": 1,
+      "y": 0,
+      "category": "mine",
+      "name": "骷髏地雷",
+      "model": "./assets/mines/skull-mine.glb",
+      "destructible": null,
+      "team": null,
+      "size": [
+        1.15,
+        0.32,
+        1.05
+      ],
+      "hazard": {
+        "kind": "mine",
+        "trigger": "blanket-collapse-contact",
+        "effect": "explosion"
+      }
+    },
+    {
+      "uid": "g10577",
+      "assetId": "skullMine",
+      "quality": "high",
+      "x": -24.153429964334684,
+      "z": 9.546807336788813,
+      "rot": 0,
+      "scale": 1,
+      "y": 0,
+      "category": "mine",
+      "name": "骷髏地雷",
+      "model": "./assets/mines/skull-mine.glb",
+      "destructible": null,
+      "team": null,
+      "size": [
+        1.15,
+        0.32,
+        1.05
+      ],
+      "hazard": {
+        "kind": "mine",
+        "trigger": "blanket-collapse-contact",
+        "effect": "explosion"
+      }
+    },
+    {
+      "uid": "g10578",
+      "assetId": "skullMine",
+      "quality": "high",
+      "x": -16.607719825165372,
+      "z": -14.8742427466304,
+      "rot": 0,
+      "scale": 1,
+      "y": 0,
+      "category": "mine",
+      "name": "骷髏地雷",
+      "model": "./assets/mines/skull-mine.glb",
+      "destructible": null,
+      "team": null,
+      "size": [
+        1.15,
+        0.32,
+        1.05
+      ],
+      "hazard": {
+        "kind": "mine",
+        "trigger": "blanket-collapse-contact",
+        "effect": "explosion"
+      }
+    },
+    {
+      "uid": "g10579",
+      "assetId": "skullMine",
+      "quality": "high",
+      "x": -10.365083070710654,
+      "z": 7.442934022829096,
+      "rot": 0,
+      "scale": 1,
+      "y": 0,
+      "category": "mine",
+      "name": "骷髏地雷",
+      "model": "./assets/mines/skull-mine.glb",
+      "destructible": null,
+      "team": null,
+      "size": [
+        1.15,
+        0.32,
+        1.05
+      ],
+      "hazard": {
+        "kind": "mine",
+        "trigger": "blanket-collapse-contact",
+        "effect": "explosion"
+      }
+    },
+    {
+      "uid": "g10580",
+      "assetId": "skullMine",
+      "quality": "high",
+      "x": -33.26815735035896,
+      "z": 3.9511585745131867,
+      "rot": 0,
+      "scale": 1,
+      "y": 0,
+      "category": "mine",
+      "name": "骷髏地雷",
+      "model": "./assets/mines/skull-mine.glb",
+      "destructible": null,
+      "team": null,
+      "size": [
+        1.15,
+        0.32,
+        1.05
+      ],
+      "hazard": {
+        "kind": "mine",
+        "trigger": "blanket-collapse-contact",
+        "effect": "explosion"
+      }
+    },
+    {
+      "uid": "g10581",
+      "assetId": "skullMine",
+      "quality": "high",
+      "x": -36.80396600395652,
+      "z": 3.493995094922017,
+      "rot": 0,
+      "scale": 1,
+      "y": 0,
+      "category": "mine",
+      "name": "骷髏地雷",
+      "model": "./assets/mines/skull-mine.glb",
+      "destructible": null,
+      "team": null,
+      "size": [
+        1.15,
+        0.32,
+        1.05
+      ],
+      "hazard": {
+        "kind": "mine",
+        "trigger": "blanket-collapse-contact",
+        "effect": "explosion"
+      }
+    },
+    {
+      "uid": "g10582",
+      "assetId": "skullMine",
+      "quality": "high",
+      "x": -37.753657211414094,
+      "z": -0.23091731529150294,
       "rot": 0,
       "scale": 1,
       "y": 0,
