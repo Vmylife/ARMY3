@@ -724,7 +724,7 @@ function fatal(e){$('reason').textContent=String(e?.message||e);$('fatal').hidde
 async function boot(){
  if(!gl){fatal(new Error('此裝置無法使用 WebGL2'));return}
  try{
-  const resp=await fetch('./blanket-stack-scene.json?v=149',{cache:'no-cache'});
+  const resp=await fetch('./blanket-stack-scene.json?v=152',{cache:'no-cache'});
   if(!resp.ok)throw Error('無法下載玩家設定的棉被場景：HTTP '+resp.status);
   scene=await resp.json();
   if(scene.format!=='army3-blanket-scene'||scene.schemaVersion!==1||!Array.isArray(scene.items))throw Error('棉被場景 JSON 格式不相容');
