@@ -10,7 +10,7 @@
 <aside id="panel">
  <div class="sceneLine"><label>場景<select id="scenes"></select></label><button id="newScene" class="warm">＋ 新增</button><button id="renameScene">改名</button><button id="deleteScene" class="danger">刪除</button></div>
  <div class="section"><div class="sectionTitle"><b>放置模型</b><span id="objectCount"></span></div>
-  <div class="two"><label>分類<select id="category"><option value="blanket">棉被</option><option value="soldier">士兵</option><option value="building">建築</option><option value="prop">器材與環境</option><option value="ground">地面區塊</option></select></label><label>模型<select id="template"></select></label></div>
+  <div class="two"><label>分類<select id="category"><option value="blanket">棉被</option><option value="mine">地雷</option><option value="soldier">士兵</option><option value="building">建築</option><option value="prop">器材與環境</option><option value="ground">地面區塊</option></select></label><label>模型<select id="template"></select></label></div>
   <div class="btnRow"><button id="add" class="primary">＋ 新增</button><button id="duplicate">複製</button><button id="remove" class="danger">刪除選取</button></div>
   <details><summary>物件清單</summary><select id="objectList" size="6" style="margin-top:8px"></select></details>
  </div>
@@ -24,4 +24,4 @@
   <details><summary>批次排列</summary><div class="fields"><label>橫向數量<input id="batchCols" type="number" min="1" max="40" value="3"></label><label>縱向數量<input id="batchRows" type="number" min="1" max="40" value="3"></label><label>橫向間距<input id="batchDx" type="number" min="0.1" max="100" value="3"></label><label>縱向間距<input id="batchDz" type="number" min="0.1" max="100" value="3"></label></div><button id="batchAdd" class="warm full">批次複製</button></details>
  </div>
  <div class="section last"><div class="btnRow"><button id="undo">復原</button><button id="redo">重做</button><button id="export" class="primary">匯出 JSON</button><button id="import">匯入 JSON</button><button id="importMainCamp" class="warm">重置原版軍營</button><input type="file" id="importFile" accept=".json,application/json" hidden></div><div id="message" role="status"></div></div>
-</aside><script type="module" src="./blanket-scene-editor.js?v=1"></script></body></html>
+</aside><script type="module" src="./blanket-scene-editor.js?v=2"></script></body></html>
