@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#173228">
+<title>國軍模擬器｜棉被疊疊樂</title>
+<style>
+[hidden]{display:none!important}
+:root{font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;color:#f6f1d9;background:#162b22}*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden}button{font:inherit;cursor:pointer;touch-action:manipulation}button:disabled{opacity:.4;pointer-events:none}
+#field{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;background:linear-gradient(#9abed0 8%,#c0d0b0 70%,#a7c4a1)}
+#hud{position:fixed;z-index:5;top:calc(env(safe-area-inset-top) + 14px);left:12px;right:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;pointer-events:none}
+.pill{background:#122a21e8;border:1px solid #e5d49b72;border-radius:14px;padding:10px 14px;box-shadow:0 5px 18px #101e1466;white-space:nowrap;font-weight:850;font-size:15px;color:#f6edc7}
+#layers{font-size:26px;font-variant-numeric:tabular-nums;letter-spacing:.3px}.pill small{font-size:12px;color:#c8c9b1;font-weight:700}
+#actions{position:fixed;z-index:6;left:14px;right:14px;bottom:calc(env(safe-area-inset-bottom) + 17px);display:flex;justify-content:center;pointer-events:none}
+#cleanup{pointer-events:auto;min-width:min(88vw,285px);height:58px;border:1px solid #eee0a5;border-radius:16px;background:linear-gradient(#efd78f,#e6bd65);color:#2a3327;font-size:20px;font-weight:950;box-shadow:0 8px 20px #15261980}
+#message{position:fixed;top:calc(env(safe-area-inset-top) + 85px);left:50%;transform:translateX(-50%);text-align:center;z-index:5;font-size:21px;font-weight:900;text-shadow:0 3px 9px #183222de;pointer-events:none;white-space:nowrap;opacity:0;transition:opacity .22s}#message.show{opacity:1}
+#overlay{position:fixed;inset:0;z-index:15;display:flex;align-items:center;justify-content:center;padding:20px;background:#0d2016aa;backdrop-filter:blur(4px)}#overlay[hidden]{display:none}
+.panel{width:min(400px,100%);max-height:90vh;overflow:auto;border-radius:22px;background:#f3f1e4;color:#1d392d;padding:25px 24px 23px;text-align:center;box-shadow:0 17px 60px #02100daa}
+.panel h1{font-size:30px;line-height:1.2;margin:8px 0 22px;font-weight:950}.panel .big{font-size:48px;font-weight:950;line-height:1.2;margin:10px 0}.panel p{font-size:15px;margin:8px 0 20px;color:#496154}.panel button{width:100%;padding:15px 12px;min-height:52px;border:0;border-radius:14px;font-size:18px;font-weight:900;background:#305b48;color:#fff6db}.panel button.secondary{background:#d9ddca;color:#315344;margin-top:10px}
+#scores{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:18px 0}#scores div{border:1px solid #c1ceba;border-radius:11px;padding:12px 4px;font-weight:950;font-size:23px}#scores small{display:block;margin-bottom:5px;font-weight:750;font-size:12px;color:#617466}
+#loadLine{display:block;height:5px;border-radius:99px;background:#d8e0d5;margin:17px 0;overflow:hidden}#loadBar{display:block;background:#678c61;height:100%;width:0;transition:width .2s}
+#boomFlash{position:fixed;z-index:4;pointer-events:none;width:240px;height:240px;border-radius:50%;opacity:0;transform:translate(-50%,-50%);background:radial-gradient(circle,#fff6bc 0%,#ffd74f 13%,#f47b23 34%,#bb3f154d 52%,transparent 73%);filter:blur(6px)}
+#fatal{position:fixed;z-index:30;inset:0;background:#173027;color:#fffbe7;display:flex;align-items:center;justify-content:center;text-align:center;padding:22px}#fatal[hidden]{display:none}#fatal div{max-width:430px}#fatal button{margin-top:18px;background:#e8d18a;color:#243d2b;border:0;border-radius:12px;padding:15px 30px;font-weight:900}
+@media(max-width:390px){#hud{left:8px;right:8px}.pill{font-size:13px;padding:10px 10px}#layers{font-size:23px}}
+</style>
+</head>
+<body>
+<canvas id="field" aria-label="3D 操場棉被疊疊樂"></canvas>
+<div id="boomFlash"></div>
+<div id="hud" hidden><div class="pill">第 <span id="round">1</span> / 3 輪</div><div class="pill"><span id="layers">1</span> <small>層</small></div><div class="pill">收拾 <span id="left">3</span> 次</div></div>
+<div id="message" aria-live="polite"></div>
+<div id="actions" hidden><button id="cleanup" type="button">收拾棉被</button></div>
+<div id="overlay"><div class="panel" id="modal"><h1>🛏️ 棉被疊疊樂</h1><p id="loadingText">正在載入操場…</p><span id="loadLine"><span id="loadBar"></span></span><button id="play" disabled>準備中…</button></div></div>
+<div id="fatal" hidden><div><h2>無法載入棉被疊疊樂</h2><p id="reason"></p><button id="reload">重新載入</button></div></div>
+<script type="module" src="./blanket-stack.js?v=146"></script>
+</body></html>

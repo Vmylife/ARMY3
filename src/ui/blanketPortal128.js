@@ -1,5 +1,5 @@
 // Ground-based activity portals in the live army camp.
-// The blanket ring remains as a placeholder for a future replacement minigame.
+// The blanket ring launches the blanket stacking game.
 // Do NOT open the discontinued blanket HTML; those files have been removed.
 // Positions are X/Z coordinates exported from the in-game editor.
 export const BLANKET_PORTAL = Object.freeze({x:-36.37,z:1.49});
@@ -76,6 +76,11 @@ function createPortalMenu({position,panelId,startId,cancelId,destination,onStart
 export function createBlanketPortal(renderer,{onTrainingStart=()=>{},resuming=false}={}){
   const blanketDraw=makeGroundRing(renderer,BLANKET_PORTAL);
   const grenadeDraw=makeGroundRing(renderer,GRENADE_PORTAL);
+  const blanket=createPortalMenu({
+    position:BLANKET_PORTAL,
+    panelId:'blanketPortalMenu',startId:'blanketPortalStart',cancelId:'blanketPortalCancel',
+    destination:'./blanket-stack.html',onStart:()=>onTrainingStart('blanket'),initialDismissed:resuming
+  });
   const grenade=createPortalMenu({
     position:GRENADE_PORTAL,
     panelId:'grenadePortalMenu',startId:'grenadePortalStart',cancelId:'grenadePortalCancel',
@@ -84,6 +89,7 @@ export function createBlanketPortal(renderer,{onTrainingStart=()=>{},resuming=fa
   return {
     draw(){blanketDraw();grenadeDraw();},
     update(playerPos,blocked=false){
+      blanket.update(playerPos,blocked);
       grenade.update(playerPos,blocked);
     }
   };

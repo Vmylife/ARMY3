@@ -16,6 +16,8 @@
 .training-portal-detail{font-size:13px;line-height:1.4;margin:7px 0 13px;color:#e6e8c9}
 .training-portal-buttons{display:grid;grid-template-columns:1.65fr 1fr;gap:9px}
 .training-portal-buttons button{border:1px solid #f6e8a4;border-radius:12px;min-height:49px;font-weight:900;touch-action:manipulation}
+#blanketPortalStart{background:linear-gradient(145deg,#f3df7d,#e5aa38);color:#433014}
+#blanketPortalCancel{background:#425f4b;color:#f4f5df;border-color:#a8bd98}
 #grenadePortalStart{background:linear-gradient(145deg,#f3df7d,#e5aa38);color:#433014}
 #grenadePortalCancel{background:#425f4b;color:#f4f5df;border-color:#a8bd98}
 </style>
@@ -27,6 +29,13 @@
   <div class="world-map-panel">
     <header class="world-map-header"><div><strong>🗺️ 新兵訓練營地圖</strong><small>固定營區方位 · 藍色箭頭為士兵面向</small></div><button id="closeWorldMap" type="button" aria-label="關閉大地圖">✕</button></header>
     <div class="world-map-body"><div class="map-canvas-holder"><canvas id="worldMapCanvas" aria-label="完整軍營地圖，顯示所有地點和自身方向"></canvas></div></div>
+  </div>
+</section>
+<section id="blanketPortalMenu" class="training-portal-menu" aria-label="棉被疊疊樂互動選單" hidden>
+  <div class="training-portal-title">🛏️ 棉被疊疊樂</div>
+  <div class="training-portal-buttons" style="margin-top:12px">
+    <button id="blanketPortalStart" type="button">開始挑戰</button>
+    <button id="blanketPortalCancel" type="button">稍後再說</button>
   </div>
 </section>
 <section id="grenadePortalMenu" class="training-portal-menu" aria-label="手榴彈投擲訓練互動選單" hidden>
@@ -57,7 +66,7 @@
 <div id="debug" hidden></div>
 <!-- Army 3D Clean v0.11.1: refined collision, road-priority navigation, and NPC spacing. -->
 <script type="importmap">
-{"imports":{"./src/map/campGeometry.js?v=092":"./src/map/ground103.js?v=124","./src/map/mapDrawing.js?v=093":"./src/map/drawMap95.js?v=095","./src/map/roadMesh.js?v=071":"./src/map/roadMesh104.js?v=125","./src/ui/blanketPortal128.js?v=128":"./src/ui/blanketPortal128.js?v=144"}}
+{"imports":{"./src/map/campGeometry.js?v=092":"./src/map/ground103.js?v=124","./src/map/mapDrawing.js?v=093":"./src/map/drawMap95.js?v=095","./src/map/roadMesh.js?v=071":"./src/map/roadMesh104.js?v=125","./src/ui/blanketPortal128.js?v=128":"./src/ui/blanketPortal128.js?v=146"}}
 </script>
 <script type="module" src="./src/bootstrap111.js?v=144"></script>
 </body>
