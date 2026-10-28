@@ -1,4 +1,4 @@
-// ARMY3 v1.49 — closer three-quarter stacking camera + genuine GLB fragment physics + new 11-mine map.
+// ARMY3 v1.50 — recoverable tower balance; accurate placements never cause unfair instant collapse.
 import {makeEnvironment as makeOriginalCampGround} from './src/map/ground103.js?v=103';
 import {loadGlb} from './src/core/glb111.js?v=111';
 import {RigAnimator} from './src/characters/rigAnimator.js';
@@ -292,7 +292,7 @@ let state='loading',round=1,roundResults=[],collapsingAt=0,collapseDir=[1,0],col
 let collapseAngle=0,collapseSpeed=0,collapseStage='hinge',collapseAxis=[0,1],collapseReleased=0;
 let totalCrushed=0,totalBuildings=0,totalMines=0,roundCrushed=0,roundBuildings=0,roundMines=0;
 let angleChoice=0,camYaw=.12,camDist=17.5,camPitch=.88,camTargetHeight=1.0,camFocus={x:-20.8,z:-2};
-let showcaseClock=0,showcaseDuration=2.05,lastRisk={value:0,dx:0,dz:0},landingKick=0,cinematicYaw=0,outlineFlash=0;
+let showcaseClock=0,showcaseDuration=2.05,lastRisk={value:0,dx:0,dz:0},dangerStrikes=0,landingKick=0,cinematicYaw=0,outlineFlash=0;
 let ready=false,last=performance.now(),gameTime=0,pendingCelebration=null,messageEnds=0;
 let audioContext=null;
 const originalFoundation=()=>({...foundation,y:foundation.y||0,tiltX:0,tiltZ:0});
@@ -311,7 +311,7 @@ function startRound(){
  }
  for(const m of mines){m.ignited=false;m.queued=0}
  activeFragments=0;stack=[originalFoundation()];flying=null;falling=null;blasts=[];roundCrushed=0;roundBuildings=0;roundMines=0;
- camFocus={x:foundation.x,z:foundation.z};camTargetHeight=1.2;camDist=17.5;camPitch=.88;showcaseClock=0;landingKick=0;outlineFlash=0;lastRisk={value:0,dx:0,dz:0};
+ camFocus={x:foundation.x,z:foundation.z};camTargetHeight=1.2;camDist=17.5;camPitch=.88;showcaseClock=0;landingKick=0;outlineFlash=0;lastRisk={value:0,dx:0,dz:0};dangerStrikes=0;
  spawnFlying();setState('flying');
 }
 function spawnFlying(){
@@ -324,27 +324,75 @@ function spawnFlying(){
  flying={obj,dir:u,side:v,targetX:target.x,targetZ:target.z,lane,dist:-range,range,speed:4.3+Math.min(5.5,stack.length*.18),bob:0};
 }
 function dropFlying(){if(state!=='flying'||!flying)return;playTap();falling={o:{...flying.obj},velocity:0,landingY:stack.length*tierHeight(),time:0};flying=null;setState('dropping')}
+// Recoverable arcade balance: weight the RECENT upper tower most strongly.
+// The old test examined each lower support against ALL blocks above it and
+// amplified the result with height. One old offset therefore became almost
+// impossible to correct, and even a perfectly aligned next blanket could fall.
+// This model still punishes drifting away from the foundation, but shifting
+// the next few blankets toward the opposite side genuinely restores balance.
 function stackRisk(){
- const halfX=foundation.size[0]*foundation.scale*.5,halfZ=foundation.size[2]*foundation.scale*.5;
- let worst=0,mx=0,mz=0;
- for(let i=0;i<stack.length-1;i++){
-  const above=stack.slice(i+1),cx=above.reduce((sum,o)=>sum+o.x,0)/above.length,cz=above.reduce((sum,o)=>sum+o.z,0)/above.length;
-  const dx=(cx-stack[i].x)/Math.max(.3,halfX*.91),dz=(cz-stack[i].z)/Math.max(.3,halfZ*.91);
-  const risk=Math.hypot(dx,dz)*(1+Math.min(.31,(stack.length-i-1)*.013));
-  if(risk>worst){worst=risk;mx=cx-stack[i].x;mz=cz-stack[i].z}
+ const halfX=Math.max(.3,foundation.size[0]*foundation.scale*.5);
+ const halfZ=Math.max(.3,foundation.size[2]*foundation.scale*.5);
+ const base=stack[0];
+ let sumX=0,sumZ=0,sumWeight=0,wholeX=0,wholeZ=0;
+ const first=Math.max(1,stack.length-7);
+ for(let i=1;i<stack.length;i++){
+  const o=stack[i];wholeX+=o.x;wholeZ+=o.z;
+  if(i>=first){
+   // More weight on recent placements => an opposite correction works.
+   const age=stack.length-1-i,w=1/(1+age*.42);
+   sumX+=o.x*w;sumZ+=o.z*w;sumWeight+=w;
+  }
  }
- const lastLayer=stack[stack.length-1],below=stack[stack.length-2];
- if(below){const dx=Math.abs(lastLayer.x-below.x),dz=Math.abs(lastLayer.z-below.z);if(dx>halfX*1.6||dz>halfZ*1.6)worst=2}
- return {value:worst,dx:mx,dz:mz};
+ const n=Math.max(1,stack.length-1);
+ const recentX=sumWeight?sumX/sumWeight:base.x,recentZ=sumWeight?sumZ/sumWeight:base.z;
+ const overallX=wholeX/n,overallZ=wholeZ/n;
+ const dx=(recentX-base.x)*.86+(overallX-base.x)*.14;
+ const dz=(recentZ-base.z)*.86+(overallZ-base.z)*.14;
+ // Height makes a leaning tower slightly more sensitive; a STRAIGHT tower
+ // never becomes unstable merely because it has many layers.
+ const heightFactor=1+Math.min(.10,Math.max(0,stack.length-5)*.004);
+ const lean=Math.hypot(dx/(halfX*1.12),dz/(halfZ*1.12))*heightFactor;
+ const top=stack[stack.length-1],below=stack[stack.length-2];
+ let contact=0,contactX=0,contactZ=0;
+ if(below){
+  contactX=top.x-below.x;contactZ=top.z-below.z;
+  // Physically unsupported: an almost entirely missed mattress must fall.
+  contact=Math.max(Math.abs(contactX)/(halfX*1.75),Math.abs(contactZ)/(halfZ*1.75));
+ }
+ return {
+  value:Math.max(lean,contact*.76),dx:Math.abs(dx)+Math.abs(dz)>.015?dx:contactX,
+  dz:Math.abs(dx)+Math.abs(dz)>.015?dz:contactZ,contact
+ };
 }
 function landBlanket(){
- const landed=falling.o;landed.y=stack.length*tierHeight();landed.tiltX=0;landed.tiltZ=0;stack.push(landed);falling=null;
+ const previous=stack[stack.length-1];
+ const before=lastRisk.value;
+ const landed=falling.o;
+ landed.y=stack.length*tierHeight();landed.tiltX=0;landed.tiltZ=0;
+ stack.push(landed);falling=null;
  const risk=stackRisk();lastRisk=risk;landingKick=.24;outlineFlash=.28;
- const previous=stack[stack.length-2],accuracy=previous?Math.hypot(landed.x-previous.x,landed.z-previous.z):3;
+ const accuracy=previous?Math.hypot(landed.x-previous.x,landed.z-previous.z):3;
  playStackImpact(accuracy,stack.length);
- if(risk.value>=1){beginCollapse(risk);return}
+ // A dangerous placement gets a chance for a recovery on the next drop.
+ // Precise landings cannot suddenly destroy an otherwise surviving tower.
+ const unsupported=risk.contact>=1;
+ const extreme=risk.value>=1.60;
+ const worsening=risk.value>before+.045;
+ if(risk.value>1.08&&worsening&&accuracy>.28){
+  dangerStrikes+=risk.value>1.35?1.5:1;
+ }else if(risk.value<.97||accuracy<.28||risk.value<before-.045){
+  dangerStrikes=Math.max(0,dangerStrikes-1);
+ }else{
+  dangerStrikes=Math.max(0,dangerStrikes-.25);
+ }
+ // Only a severe unsupported overhang, an extreme overall lean or two
+ // *worsening* risky placements in a row can cause a real collapse.
+ if(unsupported||(accuracy>.28&&(extreme||(risk.value>=1.08&&worsening&&dangerStrikes>=2)))){
+  beginCollapse(risk);return;
+ }
  if(accuracy<.24&&stack.length>2)say('PERFECT！',.85);
- if(risk.value>.64)playCreak(risk.value);
+ if(risk.value>.62)playCreak(risk.value);
  spawnFlying();
  if(stack.length>=5&&stack.length%5===0){showcaseClock=showcaseDuration;cinematicYaw=camYaw;setState('showcase');say(stack.length+' 層！',1.25)}
  else setState('flying');
@@ -682,4 +730,4 @@ window.addEventListener('pageshow',()=>{last=performance.now()});
 requestAnimationFrame(tick);
 void boot();
 // Exposed only for deterministic automated gameplay checks.
-window.__blanketTest={get state(){return state},get layers(){return stack.length},get cameraPitch(){return camPitch},get stabilityHidden(){return !document.getElementById('stability')},get round(){return round},get mines(){return roundMines},get soldiers(){return roundCrushed},get npcTotal(){return soldiers.length},get drawLimit(){return Infinity},get collapseStage(){return collapseStage},get maxReach(){return stack.length*tierHeight()},get fracturedBuildings(){return buildings.filter(o=>o.broken&&o.fragmentsReady).length},get activeFragments(){return activeFragments},get propDestroyed(){return props.filter(o=>o.broken).length},tap:dropFlying,cleanup:finishRound,collapse:(x=1,z=0)=>beginCollapse({dx:x,dz:z}),get scene(){return scene}};
+window.__blanketTest={get state(){return state},get layers(){return stack.length},get cameraPitch(){return camPitch},get stabilityHidden(){return !document.getElementById('stability')},get danger(){return lastRisk.value},get dangerStrikes(){return dangerStrikes},get round(){return round},get mines(){return roundMines},get soldiers(){return roundCrushed},get npcTotal(){return soldiers.length},get drawLimit(){return Infinity},get collapseStage(){return collapseStage},get maxReach(){return stack.length*tierHeight()},get fracturedBuildings(){return buildings.filter(o=>o.broken&&o.fragmentsReady).length},get activeFragments(){return activeFragments},get propDestroyed(){return props.filter(o=>o.broken).length},tap:dropFlying,cleanup:finishRound,collapse:(x=1,z=0)=>beginCollapse({dx:x,dz:z}),get scene(){return scene}};
