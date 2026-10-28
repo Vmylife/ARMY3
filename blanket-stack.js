@@ -1,4 +1,4 @@
-// ARMY3 v1.46 — Blanket Bloxx. Uses the player's exported ARMY3 scene verbatim.
+// ARMY3 v1.47 — overhead stacking, outlined target, kinetic tower collapse, full NPC count.
 import {makeEnvironment as makeOriginalCampGround} from './src/map/ground103.js?v=103';
 import {loadGlb} from './src/core/glb111.js?v=111';
 import {RigAnimator} from './src/characters/rigAnimator.js';
@@ -25,6 +25,13 @@ const S=(x,y,z)=>new Float32Array([x,0,0,0,0,y,0,0,0,0,z,0,0,0,0,1]);
 function ry(a){const c=Math.cos(a),s=Math.sin(a);return new Float32Array([c,0,-s,0,0,1,0,0,s,0,c,0,0,0,0,1])}
 function rx(a){const c=Math.cos(a),s=Math.sin(a);return new Float32Array([1,0,0,0,0,c,s,0,0,-s,c,0,0,0,0,1])}
 function rz(a){const c=Math.cos(a),s=Math.sin(a);return new Float32Array([c,s,0,0,-s,c,0,0,0,0,1,0,0,0,0,1])}
+// Rotate the entire tower about an axis perpendicular to its fall direction.
+function rAxis(x,y,z,a){const c=Math.cos(a),s=Math.sin(a),t=1-c;return new Float32Array([
+ t*x*x+c,t*x*y+s*z,t*x*z-s*y,0,
+ t*x*y-s*z,t*y*y+c,t*y*z+s*x,0,
+ t*x*z+s*y,t*y*z-s*x,t*z*z+c,0,
+ 0,0,0,1]);}
+const SOLDIER_LOD_PATH='./assets/grenade-low/grenade-soldier-low.glb';
 const ASSET_FALLBACK={blanket:'./assets/blanket/folded-blanket.glb',skullMine:'./assets/mines/skull-mine.glb',friendly:'./assets/characters/cadet/cadet-green.glb'};
 const cleanPath=p=>{if(typeof p!=='string')return '';const b=p.split('?')[0];return /^\.\/assets\/[\w\-\/]+\.glb$/i.test(b)?b:''};
 const modelPath=o=>cleanPath(o?.model||ASSET_FALLBACK[o?.assetId]);
@@ -99,8 +106,8 @@ async function texture(gltf,source){if(source==null)return white;const blob=gltf
  const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,img);gl.generateMipmap(gl.TEXTURE_2D);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);return t}
 
 // Batch and cache per model; draw the supplied 529 editable objects at their exported coordinates.
-async function ensureModel(o){
- const path=modelPath(o);
+async function ensureModel(o,overridePath=null){
+ const path=overridePath||modelPath(o);
  if(!path||!gl||failed.has(path))return null;
  if(cache.has(path))return cache.get(path);
  if(pending.has(path))return pending.get(path);
@@ -132,16 +139,20 @@ function modelMatrix(o,geo){
   sx=sz0=uni;
  }
  let m=mul(T(o.x,o.y??o.sourceY??0,o.z),ry((o.rot||0)*Math.PI/180));
- if(o.tiltX)m=mul(m,rx(o.tiltX));
- if(o.tiltZ)m=mul(m,rz(o.tiltZ));
+ if(o.tiltAxis&&Number.isFinite(o.tiltAngle))m=mul(m,rAxis(o.tiltAxis[0],0,o.tiltAxis[1],o.tiltAngle));
+ else{if(o.tiltX)m=mul(m,rx(o.tiltX));if(o.tiltZ)m=mul(m,rz(o.tiltZ));}
  return mul(m,mul(S(sx,sy,sz0),T(-midX,-lo[1],-midZ)));
 }
 let lastUsed=null;
-function drawModel(o,vp){
- const path=modelPath(o),m=cache.get(path);if(!m)return false;
+// Cache program uniform locations: 275 soldiers × 6 lookups each frame is wasteful.
+const uniformCache=new WeakMap();
+function uniform(p,name){let c=uniformCache.get(p);if(!c){c=new Map();uniformCache.set(p,c)}
+ if(!c.has(name))c.set(name,gl.getUniformLocation(p,name));return c.get(name)}
+function drawModel(o,vp,overridePath=null){
+ const path=overridePath||modelPath(o),m=cache.get(path);if(!m)return false;
  const p=m.geo.skin?skinProgram:program;
  if(lastUsed!==p){gl.useProgram(p);lastUsed=p}
- const u=n=>gl.getUniformLocation(p,n);
+ const u=n=>uniform(p,n);
  gl.uniformMatrix4fv(u('uVP'),false,vp);
  gl.uniformMatrix4fv(u('uModel'),false,modelMatrix(o,m.geo));
  const tint=o.crushed?[.54,.56,.52]:o.broken?[.67,.62,.57]:[1,1,1];
@@ -161,10 +172,34 @@ function initRings(){const segments=48,vertices=[];for(let i=0;i<segments;i++){c
  ringCount=vertices.length/3;ringVAO=gl.createVertexArray();gl.bindVertexArray(ringVAO);const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(vertices),gl.STATIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);gl.bindVertexArray(null)
 }
 function drawRing(vp,x,z,r,c,y=.23){gl.useProgram(flatProgram);lastUsed=flatProgram;gl.uniformMatrix4fv(gl.getUniformLocation(flatProgram,'uVP'),false,vp);gl.uniformMatrix4fv(gl.getUniformLocation(flatProgram,'uModel'),false,mul(T(x,y,z),S(r,1,r)));gl.uniform3fv(gl.getUniformLocation(flatProgram,'uColor'),c);gl.bindVertexArray(ringVAO);gl.disable(gl.CULL_FACE);gl.drawArrays(gl.TRIANGLES,0,ringCount);gl.enable(gl.CULL_FACE)}
+// Render a visible, unbroken gold rectangle ON TOP OF the last landed blanket.
+// Four 3D strips (not a screen-space box) precisely follow its rotation/scale.
+let topOutlineVAO=null,topOutlineCount=0;
+function initTopOutline(){
+ const v=[];const q=(x0,z0,x1,z1)=>v.push(x0,1.023,z0,x1,1.023,z0,x1,1.023,z1,x0,1.023,z0,x1,1.023,z1,x0,1.023,z1);
+ const t=.024;
+ q(-.5,-.5,.5,-.5+t);q(-.5,.5-t,.5,.5);
+ q(-.5,-.5+t,-.5+t,.5-t);q(.5-t,-.5+t,.5,.5-t);
+ topOutlineCount=v.length/3;topOutlineVAO=gl.createVertexArray();gl.bindVertexArray(topOutlineVAO);
+ const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(v),gl.STATIC_DRAW);
+ gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);gl.bindVertexArray(null);
+}
+function drawTopOutline(vp){
+ if(!topOutlineVAO||!stack.length||!['flying','dropping'].includes(state))return;
+ const o=stack[stack.length-1],sz=o.size||foundation.size,k=o.scale||1;
+ const m=mul(T(o.x,o.y,o.z),mul(ry((o.rot||0)*Math.PI/180),S(sz[0]*k,sz[1]*k,sz[2]*k)));
+ gl.useProgram(flatProgram);lastUsed=flatProgram;
+ gl.uniformMatrix4fv(gl.getUniformLocation(flatProgram,'uVP'),false,vp);
+ gl.uniformMatrix4fv(gl.getUniformLocation(flatProgram,'uModel'),false,m);
+ gl.uniform3f(gl.getUniformLocation(flatProgram,'uColor'),1,.78,.025);
+ gl.bindVertexArray(topOutlineVAO);gl.disable(gl.CULL_FACE);
+ gl.drawArrays(gl.TRIANGLES,0,topOutlineCount);gl.enable(gl.CULL_FACE);gl.bindVertexArray(null);
+}
 let scene=null,foundation=null,things=[],mines=[],soldiers=[],buildings=[],stack=[],flying=null,falling=null,blasts=[];
 let state='loading',round=1,roundResults=[],collapsingAt=0,collapseDir=[1,0],collapseImpactTime=0;
+let collapseAngle=0,collapseSpeed=0,collapseStage='hinge',collapseAxis=[0,1],collapseReleased=0;
 let totalCrushed=0,totalBuildings=0,totalMines=0,roundCrushed=0,roundBuildings=0,roundMines=0;
-let angleChoice=0,camYaw=.34,camDist=38,camTargetHeight=1.0,camFocus={x:-20.8,z:-2};
+let angleChoice=0,camYaw=.12,camDist=25,camTargetHeight=1.0,camFocus={x:-20.8,z:-2};
 let ready=false,last=performance.now(),gameTime=0,pendingCelebration=null,messageEnds=0;
 let audioContext=null;
 const originalFoundation=()=>({...foundation,y:foundation.y||0,tiltX:0,tiltZ:0});
@@ -174,10 +209,10 @@ function setState(next){state=next;const active=next!=='loading'&&next!=='intro'
 function syncHUD(){$('round').textContent=String(round);$('left').textContent=String(4-round);$('layers').textContent=String(state==='collapseDone'?0:stack.length)}
 function say(message,seconds=1.25){$('message').textContent=message;$('message').classList.add('show');messageEnds=performance.now()+seconds*1000}
 function startRound(){
- for(const o of things){o.crushed=false;o.broken=false;o.tiltX=0;o.tiltZ=0;o.model=o.originalModel||o.model}
+ for(const o of things){o.crushed=false;o.broken=false;o.tiltX=0;o.tiltZ=0;o.tiltAngle=undefined;o.tiltAxis=undefined;o.model=o.originalModel||o.model}
  for(const m of mines){m.ignited=false;m.queued=0}
  stack=[originalFoundation()];flying=null;falling=null;blasts=[];roundCrushed=0;roundBuildings=0;roundMines=0;
- camFocus={x:foundation.x,z:foundation.z};camTargetHeight=1.5;camDist=36;
+ camFocus={x:foundation.x,z:foundation.z};camTargetHeight=1.2;camDist=25;
  spawnFlying();setState('flying');
 }
 function spawnFlying(){
@@ -212,16 +247,45 @@ function landBlanket(){
  spawnFlying();setState('flying');
 }
 function beginCollapse(risk){
- for(const o of stack){o.baseX=o.x;o.baseZ=o.z;o.baseY=o.y}
- setState('collapsing');collapsingAt=0;collapseImpactTime=0;let dx=risk.dx,dz=risk.dz;
+ for(const o of stack){o.baseX=o.x;o.baseZ=o.z;o.baseY=o.y;o.tiltX=0;o.tiltZ=0;o.tiltAngle=0;o.vx=0;o.vy=0;o.vz=0;o.spin=0}
+ setState('collapsing');collapsingAt=0;collapseImpactTime=0;collapseAngle=0;collapseSpeed=.20;
+ collapseStage='hinge';collapseReleased=0;
+ let dx=risk.dx,dz=risk.dz;
  if(Math.hypot(dx,dz)<.2){dx=stack[stack.length-1].x-foundation.x;dz=stack[stack.length-1].z-foundation.z}
  if(Math.hypot(dx,dz)<.15){const a=Math.random()*TAU;dx=Math.cos(a);dz=Math.sin(a)}
  const d=Math.hypot(dx,dz)||1;collapseDir=[dx/d,dz/d];
+ // axis × UP = fall direction, so each block actually rotates toward the ground.
+ collapseAxis=[collapseDir[1],-collapseDir[0]];
  say('棉被塔倒塌！',2.4);playCollapse();
 }
+function hitSoldier(o){if(o.crushed)return;o.crushed=true;o.tiltZ=1.22;o.y=Math.max(0,(o.y||0)-.23);roundCrushed++;totalCrushed++}
+function hitBuilding(o){if(o.broken)return;o.broken=true;roundBuildings++;totalBuildings++;
+ const fracture=cleanPath(o.destructible?.fracturedModel);
+ if(fracture){o.originalModel=o.originalModel||o.model;o.model=fracture;void ensureModel(o)}
+}
+function distanceToSegment(x,z,ax,az,bx,bz){
+ const dx=bx-ax,dz=bz-az,t=cap(((x-ax)*dx+(z-az)*dz)/(dx*dx+dz*dz||1),0,1);
+ return Math.hypot(x-(ax+dx*t),z-(az+dz*t));
+}
+// Continuous collision: a fast falling blanket cannot tunnel THROUGH a soldier/mine
+// between rendered frames. Building footprints are checked separately from centers.
+function impactSweep(ax,az,bx,bz,r,canHitMines=true){
+ const midX=(ax+bx)*.5,midZ=(az+bz)*.5,reach=Math.hypot(bx-ax,bz-az)*.5+r;
+ for(const o of soldiers){if(o.crushed||Math.hypot(o.x-midX,o.z-midZ)>reach+2)continue;
+  if(distanceToSegment(o.x,o.z,ax,az,bx,bz)<=r+.46)hitSoldier(o);
+ }
+ for(const o of buildings){if(o.broken)continue;
+  const br=Math.hypot(o.size?.[0]||1,o.size?.[2]||1)*.40*(o.scale||1);
+  if(Math.hypot(o.x-midX,o.z-midZ)>reach+br+1)continue;
+  if(distanceToSegment(o.x,o.z,ax,az,bx,bz)<=r+br*.75)hitBuilding(o);
+ }
+ if(canHitMines)for(const m of mines){if(m.ignited||m.queued)continue;
+  if(distanceToSegment(m.x,m.z,ax,az,bx,bz)<=r+.40)detonateMine(m);
+ }
+}
 function squashPoint(x,z,r,reason='blanket'){
- for(const o of soldiers){if(o.crushed||Math.hypot(o.x-x,o.z-z)>r)continue;o.crushed=true;o.tiltZ=1.26;o.y=Math.max(0,(o.y||0)-.25);roundCrushed++;totalCrushed++;}
- for(const o of buildings){if(o.broken||Math.hypot(o.x-x,o.z-z)>r+Math.max(o.size[0],o.size[2])*.25)continue;o.broken=true;roundBuildings++;totalBuildings++;const fracture=cleanPath(o.destructible?.fracturedModel);if(fracture){o.originalModel=o.originalModel||o.model;o.model=fracture;void ensureModel(o)} }
+ for(const o of soldiers){if(!o.crushed&&Math.hypot(o.x-x,o.z-z)<=r)hitSoldier(o)}
+ for(const o of buildings){if(!o.broken&&Math.hypot(o.x-x,o.z-z)<=r+Math.hypot(o.size[0],o.size[2])*.31)hitBuilding(o)}
 }
 function detonateMine(m){if(m.ignited)return;m.ignited=true;m.queued=0;roundMines++;totalMines++;const radius=9.5;
  blasts.push({x:m.x,z:m.z,time:0,radius,seed:Math.random()*TAU});playBlast();squashPoint(m.x,m.z,radius,'mine');
@@ -229,22 +293,54 @@ function detonateMine(m){if(m.ignited)return;m.ignited=true;m.queued=0;roundMine
 }
 function updateFall(dt){
  collapsingAt+=dt;
- const h=tierHeight();let front=0;
- for(let i=0;i<stack.length;i++){
-  const o=stack[i],t=ease((collapsingAt-i*.025)/1.22),reach=i*h*.92*t;
-  o.x=mix(o.baseX,foundation.x+collapseDir[0]*i*h*.92,t);
-  o.z=mix(o.baseZ,foundation.z+collapseDir[1]*i*h*.92,t);
-  o.y=Math.max(.06,o.baseY*(1-t)*.96);
-  o.tiltZ=collapseDir[0]*t*1.48;o.tiltX=-collapseDir[1]*t*1.48;
-  front=Math.max(front,reach);
-  if(t>.63)squashPoint(o.x,o.z,1.55);
+ const h=tierHeight(),blanketWidth=Math.max(foundation.size[0],foundation.size[2])*foundation.scale;
+ if(collapseStage==='hinge'){
+  // A rigid tower first pivots from its base under accelerating gravity.
+  collapseSpeed+= (2.6+4.8*Math.sin(collapseAngle))*dt;
+  collapseAngle=Math.min(Math.PI*.475,collapseAngle+collapseSpeed*dt);
+  const a=collapseAngle,sa=Math.sin(a),ca=Math.cos(a);
+  for(let i=0;i<stack.length;i++){
+   const o=stack[i],previousX=o.x,previousZ=o.z;
+   // Each layer stays attached to the layer below until impact.
+   const along=i*h*sa,offsetX=o.baseX-foundation.x,offsetZ=o.baseZ-foundation.z;
+   o.x=foundation.x+collapseDir[0]*along+offsetX*ca;
+   o.z=foundation.z+collapseDir[1]*along+offsetZ*ca;
+   o.y=Math.max(.01,i*h*ca);o.tiltAxis=collapseAxis;o.tiltAngle=a;
+   // A tipped layer can hit soldiers when it reaches head height; mines
+   // only react once its physical lower edge is almost on the ground.
+   if(o.y<2.15)impactSweep(previousX,previousZ,o.x,o.z,blanketWidth*.40,o.y<.68);
+  }
+  if(collapseAngle>=Math.PI*.475){
+   collapseStage='scatter';collapseReleased=collapsingAt;
+   // After the column strikes the ground, loose layers bounce and slide.
+   for(let i=0;i<stack.length;i++){
+    const o=stack[i],f=i/Math.max(1,stack.length-1),side=(Math.random()-.5)*(.65+f*1.7);
+    o.vx=collapseDir[0]*(1.0+f*4.6)+-collapseDir[1]*side;
+    o.vz=collapseDir[1]*(1.0+f*4.6)+collapseDir[0]*side;
+    o.vy=.28+f*2.6;o.spin=(Math.random()-.5)*2.7;
+    // All layers make contact along their swept path at ground impact.
+    impactSweep(o.x-collapseDir[0]*h*.5,o.z-collapseDir[1]*h*.5,o.x+collapseDir[0]*h*.5,o.z+collapseDir[1]*h*.5,blanketWidth*.49,true);
+   }
+  }
+ }else{
+  for(let i=0;i<stack.length;i++){
+   const o=stack[i],px=o.x,pz=o.z;
+   o.vy-=18.5*dt;
+   o.x+=o.vx*dt;o.z+=o.vz*dt;o.y+=o.vy*dt;
+   if(o.y<.035){o.y=.035;if(o.vy<0)o.vy=-o.vy*.28;
+    if(Math.abs(o.vy)<.34)o.vy=0;
+    const drag=Math.exp(-3.5*dt);o.vx*=drag;o.vz*=drag;o.spin*=drag;
+   }
+   // Loose blankets settle flat after a few bounces instead of standing up like cards.
+   o.tiltAngle=cap(o.tiltAngle+o.spin*dt,-Math.PI*.62,Math.PI*.62);
+   if(o.y<.30)o.tiltAngle=mix(o.tiltAngle,0,Math.min(1,dt*2.2));
+   // Swept AABB on the floor: hit only what this moving layer actually touches.
+   if(o.y<1.6)impactSweep(px,pz,o.x,o.z,blanketWidth*.53,o.y<.50);
+  }
+  if(collapsingAt-collapseReleased>2.4+Math.min(1.5,stack.length*.035)){
+   setState('collapseDone');say('本輪 0 層',2.1);
+  }
  }
- // A blanket must physically sweep over a mine before it can detonate.
- for(const m of mines){if(m.ignited||m.queued)continue;
-  const dx=m.x-foundation.x,dz=m.z-foundation.z,along=dx*collapseDir[0]+dz*collapseDir[1],perp=Math.abs(dx*collapseDir[1]-dz*collapseDir[0]);
-  if(along>=0&&along<=front+1.2&&perp<=1.60)detonateMine(m);
- }
- if(collapsingAt>Math.max(2.8,stack.length*.03+2)){setState('collapseDone');say('本輪 0 層',2.1)}
 }
 function updateGame(dt){
  gameTime+=dt;
@@ -258,10 +354,17 @@ function updateGame(dt){
  }else if(state==='collapsing')updateFall(dt);
  for(const m of mines){if(m.queued&&gameTime>=m.queued){m.queued=0;detonateMine(m)}}
  blasts=blasts.filter(b=>(b.time+=dt)<1.65);
- const desired=state==='collapsing'||state==='collapseDone'?Math.max(45,22+stack.length*tierHeight()*1.6):Math.max(29,32+stack.length*tierHeight()*.64);
- camDist=mix(camDist,desired,Math.min(1,dt*1.65));
- const targetHeight=state==='collapsing'||state==='collapseDone'?stack.length*tierHeight()*.3:Math.max(1.5,stack.length*tierHeight()*.67);
- camTargetHeight=mix(camTargetHeight,targetHeight,Math.min(1,dt*2.2));
+ const collapsing=state==='collapsing'||state==='collapseDone';
+ const height=stack.length*tierHeight();
+ // Top-down gameplay camera stays close enough to read the real blanket outline.
+ const desired=collapsing?Math.max(29,27+height*1.35):21+height*.82;
+ camDist=mix(camDist,desired,Math.min(1,dt*(collapsing?1.65:2.2)));
+ const targetHeight=collapsing?height*.22:Math.max(1.0,height*.84);
+ camTargetHeight=mix(camTargetHeight,targetHeight,Math.min(1,dt*2.3));
+ // Follow the ACTUAL falling layers, not just the unchanged stack center.
+ const move=collapsing?Math.min(height*.45,12):0;
+ camFocus.x=mix(camFocus.x,foundation.x+collapseDir[0]*move,Math.min(1,dt*1.7));
+ camFocus.z=mix(camFocus.z,foundation.z+collapseDir[1]*move,Math.min(1,dt*1.7));
 }
 function finishRound(){
  if(!['flying','collapseDone'].includes(state))return;
@@ -289,10 +392,10 @@ function worldToScreen(x,y,z,vp){
 }
 let firstRender=false;
 function camera(){const w=Math.max(1,canvas.clientWidth),h=Math.max(1,canvas.clientHeight),ratio=w/h,portrait=ratio<.8;
- const pitch=state==='collapsing'||state==='collapseDone'?.48:.39;
+ const pitch=state==='collapsing'||state==='collapseDone'?1.24:1.38; // 79° overhead play; 71° overhead collapse
  const target=[camFocus.x,camTargetHeight,camFocus.z];
  const eye=[target[0]+camDist*Math.sin(camYaw)*Math.cos(pitch),target[1]+camDist*Math.sin(pitch),target[2]+camDist*Math.cos(camYaw)*Math.cos(pitch)];
- return mul(pers(portrait?50:53,ratio,.1,850),lookAt(eye,target));
+ return mul(pers(portrait?51:49,ratio,.1,850),lookAt(eye,target));
 }
 function draw(){
  if(!gl)return;
@@ -303,18 +406,19 @@ function draw(){
  const vp=camera();gl.useProgram(originalGroundProgram);lastUsed=originalGroundProgram;
  gl.uniformMatrix4fv(gl.getUniformLocation(originalGroundProgram,'uVP'),false,vp);gl.bindVertexArray(originalGroundVAO);gl.disable(gl.CULL_FACE);gl.drawArrays(gl.TRIANGLES,0,originalGroundCount);gl.enable(gl.CULL_FACE);
  const far=state==='collapsing'||state==='collapseDone'?105:Math.max(45,camDist*1.65);
- // Draw opaque static objects first; soldiers use the game's animated skinned model.
- let soldierDrawn=0;
+ // NO hard 115-person cap: all 275 placed NPCs are eligible for rendering.
+ // For mid/far soldiers, reuse a low-poly mesh instead of drawing 275 high-poly rigs.
  for(const o of things){
   if(o.category==='mine'&&o.ignited)continue;
   if(Math.hypot(o.x-camFocus.x,o.z-camFocus.z)>far)continue;
   const ndc=worldToScreen(o.x,Math.min(1.2,(o.size?.[1]||1)*.4),o.z,vp);
   if(!ndc||Math.abs(ndc.x)>1.4||Math.abs(ndc.y)>1.38)continue;
-  if(o.category==='soldier'&&++soldierDrawn>115)continue;
-  if(!cache.has(modelPath(o)))continue;
-  drawModel(o,vp);
+  const low=o.category==='soldier'&&Math.hypot(o.x-camFocus.x,o.z-camFocus.z)>11&&cache.has(SOLDIER_LOD_PATH);
+  if(!cache.has(low?SOLDIER_LOD_PATH:modelPath(o)))continue;
+  drawModel(o,vp,low?SOLDIER_LOD_PATH:null);
  }
  for(const o of stack)drawModel(o,vp);
+ drawTopOutline(vp);
  if(flying)drawModel(flying.obj,vp);
  if(falling)drawModel(falling.o,vp);
  for(const b of blasts){const t=b.time/1.65,r=b.radius*ease(Math.min(1,t*1.9));drawRing(vp,b.x,b.z,r,[1,.48+.24*t,.14],.24);
@@ -354,7 +458,7 @@ async function boot(){
   things=scene.items.filter(o=>o.category!=='blanket').map(o=>({...o}));
   for(const o of things){if(o.category==='mine')mines.push(o);else if(o.category==='soldier')soldiers.push(o);else if(o.category==='building')buildings.push(o)}
   camFocus={x:foundation.x,z:foundation.z};
-  initGL();initRings();
+  initGL();initRings();initTopOutline();
   // Keep the opening responsive: load the actual blanket first, then mines and soldiers.
   const priority=[foundation,mines[0],soldiers[0]].filter(Boolean);
   for(let i=0;i<priority.length;i++){
@@ -367,6 +471,8 @@ async function boot(){
     .sort((a,b)=>Math.hypot(a.x-foundation.x,a.z-foundation.z)-Math.hypot(b.x-foundation.x,b.z-foundation.z));
   const launch=async()=>{let cursor=0;const worker=async()=>{while(cursor<group.length){const o=group[cursor++];await ensureModel(o);await new Promise(r=>setTimeout(r,35))}};await Promise.all([worker(),worker()])};
   void launch();
+  // The fallback remains the original hi-poly NPC if a low-poly asset is missing.
+  void ensureModel({model:SOLDIER_LOD_PATH,assetId:'lowSoldier'});
   stack=[originalFoundation()];state='intro';ready=true;
   $('loadingText').textContent='';$('loadLine').hidden=true;$('play').disabled=false;$('play').textContent='開始挑戰';$('loadBar').style.width='100%';
   $('play').onclick=()=>{$('overlay').hidden=true;round=1;roundResults=[];totalCrushed=0;totalBuildings=0;totalMines=0;startRound()};
@@ -382,4 +488,4 @@ window.addEventListener('pageshow',()=>{last=performance.now()});
 requestAnimationFrame(tick);
 void boot();
 // Exposed only for deterministic automated gameplay checks.
-window.__blanketTest={get state(){return state},get layers(){return stack.length},get round(){return round},get mines(){return roundMines},get soldiers(){return roundCrushed},tap:dropFlying,cleanup:finishRound,collapse:()=>beginCollapse({dx:1,dz:0}),get scene(){return scene}};
+window.__blanketTest={get state(){return state},get layers(){return stack.length},get round(){return round},get mines(){return roundMines},get soldiers(){return roundCrushed},get npcTotal(){return soldiers.length},get drawLimit(){return Infinity},get collapseStage(){return collapseStage},get maxReach(){return stack.length*tierHeight()},tap:dropFlying,cleanup:finishRound,collapse:(x=1,z=0)=>beginCollapse({dx:x,dz:z}),get scene(){return scene}};
