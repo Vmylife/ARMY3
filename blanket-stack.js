@@ -1,4 +1,4 @@
-// ARMY3 v1.50 — recoverable tower balance; accurate placements never cause unfair instant collapse.
+// ARMY3 v1.51 — preserve pre-fall layers, add restrained cloth compression / recovery to folded military blankets.
 import {makeEnvironment as makeOriginalCampGround} from './src/map/ground103.js?v=103';
 import {loadGlb} from './src/core/glb111.js?v=111';
 import {RigAnimator} from './src/characters/rigAnimator.js';
@@ -37,6 +37,16 @@ const SOLDIER_LOD_PATH='./assets/grenade-low/grenade-soldier-low.glb';
 const ASSET_FALLBACK={blanket:'./assets/blanket/folded-blanket.glb',skullMine:'./assets/mines/skull-mine.glb',friendly:'./assets/characters/cadet/cadet-green.glb'};
 const cleanPath=p=>{if(typeof p!=='string')return '';const b=p.split('?')[0];return /^\.\/assets\/[\w\-\/]+\.glb$/i.test(b)?b:''};
 const modelPath=o=>cleanPath(o?.model||ASSET_FALLBACK[o?.assetId]);
+// Visual fabric response only. Physics and balance still use the original, rigid
+// blanket footprint, so the tiny squash never changes collision or scoring.
+function blanketClothShape(o){
+ if(o?.category!=='blanket'||!o.clothPower)return {x:1,y:1,z:1};
+ const t=Math.max(0,o.clothTime||0);
+ const motion=Math.sin(1.27+t*23)*Math.exp(-t*7.8)*o.clothPower;
+ // A military 'tofu blanket' is firm: max ~8% height compression,
+ // with a barely visible sideways bulge and one quick return bounce.
+ return {x:1+.022*motion,y:1-.077*motion,z:1+.025*motion};
+}
 const qualityOf=o=>o.quality==='high'?'high':'low';
 const BY={}; // asset lookup for shared editor shader routines
 
@@ -140,6 +150,8 @@ function modelMatrix(o,geo){
   const b=o.sourceFootprint,uni=Math.min(b.w*.91/Math.max(.0001,hi[0]-lo[0]),b.d*.91/Math.max(.0001,hi[2]-lo[2]))*1.14*oScale;
   sx=sz0=uni;
  }
+ const cloth=blanketClothShape(o);
+ sx*=cloth.x;sy*=cloth.y;sz0*=cloth.z;
  let m=mul(T(o.x+(o.swayX||0),o.y??o.sourceY??0,o.z+(o.swayZ||0)),ry((o.rot||0)*Math.PI/180));
  if(o.tiltAxis&&Number.isFinite(o.tiltAngle))m=mul(m,rAxis(o.tiltAxis[0],0,o.tiltAxis[1],o.tiltAngle));
  else{if(o.tiltX)m=mul(m,rx(o.tiltX));if(o.tiltZ)m=mul(m,rz(o.tiltZ));}
@@ -279,7 +291,8 @@ function initTopOutline(){
 function drawTopOutline(vp){
  if(!topOutlineVAO||!stack.length||!['flying','dropping'].includes(state))return;
  const o=stack[stack.length-1],sz=o.size||foundation.size,k=o.scale||1;
- const m=mul(T(o.x+(o.swayX||0),o.y,o.z+(o.swayZ||0)),mul(ry((o.rot||0)*Math.PI/180),S(sz[0]*k,sz[1]*k,sz[2]*k)));
+ const cloth=blanketClothShape(o);
+ const m=mul(T(o.x+(o.swayX||0),o.y,o.z+(o.swayZ||0)),mul(ry((o.rot||0)*Math.PI/180),S(sz[0]*k*cloth.x,sz[1]*k*cloth.y,sz[2]*k*cloth.z)));
  gl.useProgram(flatProgram);lastUsed=flatProgram;
  gl.uniformMatrix4fv(gl.getUniformLocation(flatProgram,'uVP'),false,vp);
  gl.uniformMatrix4fv(gl.getUniformLocation(flatProgram,'uModel'),false,m);
@@ -288,7 +301,7 @@ function drawTopOutline(vp){
  gl.drawArrays(gl.TRIANGLES,0,topOutlineCount);gl.enable(gl.CULL_FACE);gl.bindVertexArray(null);
 }
 let scene=null,foundation=null,things=[],mines=[],soldiers=[],buildings=[],props=[],stack=[],flying=null,falling=null,blasts=[];
-let state='loading',round=1,roundResults=[],collapsingAt=0,collapseDir=[1,0],collapseImpactTime=0;
+let state='loading',round=1,roundResults=[],collapsingAt=0,collapseDir=[1,0],collapseImpactTime=0,collapseSavedLayers=1;
 let collapseAngle=0,collapseSpeed=0,collapseStage='hinge',collapseAxis=[0,1],collapseReleased=0;
 let totalCrushed=0,totalBuildings=0,totalMines=0,roundCrushed=0,roundBuildings=0,roundMines=0;
 let angleChoice=0,camYaw=.12,camDist=17.5,camPitch=.88,camTargetHeight=1.0,camFocus={x:-20.8,z:-2};
@@ -299,7 +312,7 @@ const originalFoundation=()=>({...foundation,y:foundation.y||0,tiltX:0,tiltZ:0})
 const tierHeight=()=>foundation.size[1]*foundation.scale;
 function setState(next){state=next;document.body.classList.toggle('tower-showcase',next==='showcase');const active=next!=='loading'&&next!=='intro'&&next!=='result';$('hud').hidden=!active;$('actions').hidden=!active;
  $('cleanup').disabled=!(next==='flying'||next==='collapseDone');$('cleanup').textContent=next==='collapseDone'?'收拾倒塌棉被':'收拾棉被';syncHUD()}
-function syncHUD(){$('round').textContent=String(round);$('left').textContent=String(4-round);$('layers').textContent=String(state==='collapseDone'?0:stack.length)}
+function syncHUD(){$('round').textContent=String(round);$('left').textContent=String(4-round);$('layers').textContent=String(state==='collapsing'||state==='collapseDone'?collapseSavedLayers:stack.length)}
 function say(message,seconds=1.25){$('message').textContent=message;$('message').classList.add('show');messageEnds=performance.now()+seconds*1000}
 function startRound(){
  for(const o of things){
@@ -310,7 +323,7 @@ function startRound(){
   o.tiltX=0;o.tiltZ=0;o.tiltAngle=undefined;o.tiltAxis=undefined;o.model=o.originalModel||o.model
  }
  for(const m of mines){m.ignited=false;m.queued=0}
- activeFragments=0;stack=[originalFoundation()];flying=null;falling=null;blasts=[];roundCrushed=0;roundBuildings=0;roundMines=0;
+ activeFragments=0;stack=[originalFoundation()];flying=null;falling=null;blasts=[];roundCrushed=0;roundBuildings=0;roundMines=0;collapseSavedLayers=1;
  camFocus={x:foundation.x,z:foundation.z};camTargetHeight=1.2;camDist=17.5;camPitch=.88;showcaseClock=0;landingKick=0;outlineFlash=0;lastRisk={value:0,dx:0,dz:0};dangerStrikes=0;
  spawnFlying();setState('flying');
 }
@@ -369,10 +382,19 @@ function landBlanket(){
  const previous=stack[stack.length-1];
  const before=lastRisk.value;
  const landed=falling.o;
+ const dropSpeed=falling.velocity;
  landed.y=stack.length*tierHeight();landed.tiltX=0;landed.tiltZ=0;
  stack.push(landed);falling=null;
  const risk=stackRisk();lastRisk=risk;landingKick=.24;outlineFlash=.28;
  const accuracy=previous?Math.hypot(landed.x-previous.x,landed.z-previous.z):3;
+ // The newly landed blanket flattens for a split second; the supporting
+ // blankets respond with quickly diminishing micro-compression.
+ const impactEnergy=cap(.68+dropSpeed*.011,.72,1);
+ for(let i=stack.length-1;i>=Math.max(0,stack.length-5);i--){
+  const layer=stack[i],d=stack.length-1-i;
+  layer.clothPower=Math.max(layer.clothPower||0,impactEnergy*Math.pow(.49,d));
+  layer.clothTime=0;
+ }
  playStackImpact(accuracy,stack.length);
  // A dangerous placement gets a chance for a recovery on the next drop.
  // Precise landings cannot suddenly destroy an otherwise surviving tower.
@@ -389,7 +411,7 @@ function landBlanket(){
  // Only a severe unsupported overhang, an extreme overall lean or two
  // *worsening* risky placements in a row can cause a real collapse.
  if(unsupported||(accuracy>.28&&(extreme||(risk.value>=1.08&&worsening&&dangerStrikes>=2)))){
-  beginCollapse(risk);return;
+  beginCollapse(risk,true);return;
  }
  if(accuracy<.24&&stack.length>2)say('PERFECT！',.85);
  if(risk.value>.62)playCreak(risk.value);
@@ -397,7 +419,10 @@ function landBlanket(){
  if(stack.length>=5&&stack.length%5===0){showcaseClock=showcaseDuration;cinematicYaw=camYaw;setState('showcase');say(stack.length+' 層！',1.25)}
  else setState('flying');
 }
-function beginCollapse(risk){
+function beginCollapse(risk,failedPlacement=false){
+ // A blanket that CAUSED the collapse never counts as successfully stacked.
+ // If the tower falls from an external cause, retain all previously stacked layers.
+ collapseSavedLayers=Math.max(1,stack.length-(failedPlacement?1:0));
  for(const o of stack){o.baseX=o.x;o.baseZ=o.z;o.baseY=o.y;o.tiltX=0;o.tiltZ=0;o.tiltAngle=0;o.vx=0;o.vy=0;o.vz=0;o.spin=0}
  setState('collapsing');collapsingAt=0;collapseImpactTime=0;collapseAngle=0;collapseSpeed=.20;
  collapseStage='hinge';collapseReleased=0;
@@ -506,12 +531,18 @@ function updateFall(dt){
    if(o.y<1.6)impactSweep(px,pz,o.x,o.z,blanketWidth*.53,o.y<.50);
   }
   if(collapsingAt-collapseReleased>2.4+Math.min(1.5,stack.length*.035)){
-   setState('collapseDone');say('本輪 0 層',2.1);
+   setState('collapseDone');say('本輪 '+collapseSavedLayers+' 層',2.1);
   }
  }
 }
 function updateGame(dt){
  gameTime+=dt;
+ // Decay the impact deformation; it is deliberately not a physics impulse.
+ for(const o of stack){
+  if(o.clothPower){o.clothTime=(o.clothTime||0)+dt;
+   if(o.clothTime>.64){o.clothPower=0;o.clothTime=0}
+  }
+ }
  if(state==='flying'&&flying){
   const f=flying;f.dist+=f.speed*dt;if(f.dist>f.range)f.dist=-f.range;
   f.bob+=dt*4;f.obj.x=f.targetX+f.dir[0]*f.dist+f.side[0]*f.lane;f.obj.z=f.targetZ+f.dir[1]*f.dist+f.side[1]*f.lane;
@@ -554,7 +585,7 @@ function updateGame(dt){
 }
 function finishRound(){
  if(!['flying','collapseDone'].includes(state))return;
- const score=state==='collapseDone'?0:stack.length;
+ const score=state==='collapseDone'?collapseSavedLayers:stack.length;
  roundResults.push({layers:score,collapsed:state==='collapseDone',friends:roundCrushed,buildings:roundBuildings,mines:roundMines});
  if(round>=3){showResult();return}
  round++;startRound();say('第 '+round+' 輪',1.2);
@@ -636,10 +667,19 @@ function playCollapse(){playTap()}
 function playStackImpact(offset,layers){try{
  const C=window.AudioContext||window.webkitAudioContext;if(!C)return;audioContext=audioContext||new C();if(audioContext.state==='suspended')void audioContext.resume();
  const t=audioContext.currentTime,osc=audioContext.createOscillator(),gain=audioContext.createGain();
- osc.type='sine';osc.frequency.setValueAtTime(175+Math.min(120,layers*5),t);
- osc.frequency.exponentialRampToValueAtTime(48,t+.18);
- gain.gain.setValueAtTime(.18,t);gain.gain.exponentialRampToValueAtTime(.001,t+.25);
- osc.connect(gain);gain.connect(audioContext.destination);osc.start(t);osc.stop(t+.26);
+ // Low, short, muffled thud instead of a hard block-on-block clack.
+ osc.type='sine';osc.frequency.setValueAtTime(115+Math.min(60,layers*2.2),t);
+ osc.frequency.exponentialRampToValueAtTime(43,t+.16);
+ gain.gain.setValueAtTime(.15,t);gain.gain.exponentialRampToValueAtTime(.001,t+.22);
+ osc.connect(gain);gain.connect(audioContext.destination);osc.start(t);osc.stop(t+.24);
+ // Filtered rustle is the quick fabric surface making contact.
+ const length=Math.max(1,Math.floor(audioContext.sampleRate*.085));
+ const noise=audioContext.createBuffer(1,length,audioContext.sampleRate),ch=noise.getChannelData(0);
+ for(let i=0;i<length;i++){const decay=1-i/length;ch[i]=(Math.random()*2-1)*decay*decay;}
+ const fabric=audioContext.createBufferSource(),filter=audioContext.createBiquadFilter(),soft=audioContext.createGain();
+ fabric.buffer=noise;filter.type='lowpass';filter.frequency.setValueAtTime(490,t);
+ soft.gain.setValueAtTime(.13,t);soft.gain.exponentialRampToValueAtTime(.001,t+.09);
+ fabric.connect(filter);filter.connect(soft);soft.connect(audioContext.destination);fabric.start(t);fabric.stop(t+.1);
  if(offset<.24){const bell=audioContext.createOscillator(),g=audioContext.createGain();bell.type='triangle';
   bell.frequency.setValueAtTime(840,t+.04);bell.frequency.exponentialRampToValueAtTime(1180,t+.23);
   g.gain.setValueAtTime(.055,t+.04);g.gain.exponentialRampToValueAtTime(.001,t+.33);bell.connect(g);g.connect(audioContext.destination);bell.start(t+.04);bell.stop(t+.34)}
@@ -730,4 +770,4 @@ window.addEventListener('pageshow',()=>{last=performance.now()});
 requestAnimationFrame(tick);
 void boot();
 // Exposed only for deterministic automated gameplay checks.
-window.__blanketTest={get state(){return state},get layers(){return stack.length},get cameraPitch(){return camPitch},get stabilityHidden(){return !document.getElementById('stability')},get danger(){return lastRisk.value},get dangerStrikes(){return dangerStrikes},get round(){return round},get mines(){return roundMines},get soldiers(){return roundCrushed},get npcTotal(){return soldiers.length},get drawLimit(){return Infinity},get collapseStage(){return collapseStage},get maxReach(){return stack.length*tierHeight()},get fracturedBuildings(){return buildings.filter(o=>o.broken&&o.fragmentsReady).length},get activeFragments(){return activeFragments},get propDestroyed(){return props.filter(o=>o.broken).length},tap:dropFlying,cleanup:finishRound,collapse:(x=1,z=0)=>beginCollapse({dx:x,dz:z}),get scene(){return scene}};
+window.__blanketTest={get state(){return state},get layers(){return stack.length},get cameraPitch(){return camPitch},get stabilityHidden(){return !document.getElementById('stability')},get danger(){return lastRisk.value},get dangerStrikes(){return dangerStrikes},get round(){return round},get mines(){return roundMines},get soldiers(){return roundCrushed},get npcTotal(){return soldiers.length},get drawLimit(){return Infinity},get collapseStage(){return collapseStage},get collapseScore(){return collapseSavedLayers},get maxReach(){return stack.length*tierHeight()},get fracturedBuildings(){return buildings.filter(o=>o.broken&&o.fragmentsReady).length},get activeFragments(){return activeFragments},get propDestroyed(){return props.filter(o=>o.broken).length},tap:dropFlying,cleanup:finishRound,collapse:(x=1,z=0)=>beginCollapse({dx:x,dz:z}),get scene(){return scene}};

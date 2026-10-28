@@ -7,7 +7,7 @@
   "foundationId": "blanket-base",
   "stackRules": {
     "maxCleanups": 3,
-    "collapseRoundScore": 0,
+    "collapseRoundScore": "beforeCollapse",
     "collapseRequiresCleanup": true,
     "noStabilityHUD": true
   },
