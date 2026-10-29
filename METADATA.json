@@ -1,0 +1,20 @@
+{
+  "Blanket_Bedfold_Parade": {
+    "duration_s": 84.705875,
+    "peak": 0.5734861493110657,
+    "rms_db": -22.000149985884853,
+    "channels": 2,
+    "sample_rate": 32000,
+    "bpm": 136,
+    "bars": 48
+  },
+  "Grenade_Sneaky_Ordnance": {
+    "duration_s": 85.71428125,
+    "peak": 0.725340723991394,
+    "rms_db": -22.000178501364466,
+    "channels": 2,
+    "sample_rate": 32000,
+    "bpm": 112,
+    "bars": 40
+  }
+}
