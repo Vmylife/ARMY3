@@ -1,3 +1,4 @@
+import './grenadeGalleryFix.js?v=322';
 /* v1.90: Initialize the workshop audio BEFORE its heavy 3D throw arena finishes.
  * Uses the same gameplay effect code; does not autoplay without a real user tap.
  */

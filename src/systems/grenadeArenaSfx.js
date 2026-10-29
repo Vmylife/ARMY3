@@ -1,3 +1,4 @@
+import './grenadeGalleryFix.js?v=322';
 import './grenadeEnemyReview.js?v=321';
 /* ARMY3 grenade audio v3.16: cartoon B launched at real hand-release, reduced volume. */
 (()=>{'use strict';
