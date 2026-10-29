@@ -1,13 +1,13 @@
-import './grenadeArenaSfx.js?v=209';
 /* ARMY3 grenade workshop sound overlay v1. Works from the preloaded same-origin 3D iframe.
    Zero changes to crafting/aiming/scoring logic. All audio is original game-only FX. */
+import './grenadeArenaSfx.js?v=315';
 (()=>{'use strict';
 const host=window.parent!==window&&new URLSearchParams(location.search).get('embedded')==='1'?window.parent:window;
 let doc;
 try{doc=host.document;if(!doc.querySelector('#pourBtn')&&!doc.querySelector('#startBtn'))return}catch{return}
 // The 3D arena iframe can be re-created. Always unhook the previous instance first.
 try{host.__armyWorkshopAudioAgent?.dispose?.()}catch{}
-const FILES={pour:'01_fill_loop.mp3',settle:'02_fill_stop.mp3',pump:'03_press_start.mp3',good:'04_press_good.mp3',perfect:'05_press_perfect.mp3',bad:'06_press_bad.mp3',grab:'07_wheel_grab.mp3',tick:'08_wheel_ratchet_v2.mp3',done:'09_wheel_done.mp3',overflow:'10_overflow.mp3'};
+const FILES={pour:'01_fill_loop.mp3',settle:'02_fill_stop.mp3',pump:'03_press_start.mp3',good:'04_press_good.mp3',perfect:'05_press_perfect.mp3',bad:'06_press_bad.mp3',grab:'ratchet_4.mp3',tick:'ratchet_1.mp3',tick2:'ratchet_2.mp3',tick3:'ratchet_3.mp3',tick4:'ratchet_4.mp3',done:'aim_lock.mp3',overflow:'10_overflow.mp3'};
 const BASE=new URL('./assets/audio/grenade/',host.location.href).href;
 const buffers=new Map(),loading=new Map();const disposers=[];
 let context=null,master=null,pour=null,muted=false,angleAccum=0,lastTick=-1,drag=false,prevAngle=0,pouring=false;
@@ -26,16 +26,7 @@ function startPour(){unlock();if(pour||muted||!pouring)return;const c=context,b=
 function setMuted(v){muted=!!v;if(muted)stopPour(false);try{host.localStorage.setItem('ARMY3_grenade_sfx_muted_v1',muted?'1':'0')}catch{}if(context&&master)master.gain.setTargetAtTime(muted?0:.69,context.currentTime,.02);toggle.textContent=muted?'🔇':'🔊';toggle.title=muted?'開啟製作音效':'關閉製作音效'}
 function stopAll(){pouring=false;stopPour(false);drag=false;angleAccum=0}
 function pressResult(label){if(label==='PERFECT！'){play('good',.95);play('perfect',.75)}else if(label==='GREAT！'||label==='GOOD！')play('good',label==='GREAT！'?1:.82);else play('bad',label==='MISS！'?1:.78)}
-function wheelMove(delta){
- if(delta<=0||muted)return;
- // Ratchet clicks follow the wheel's real clockwise movement; not a continuous squeak.
- angleAccum=Math.min(.60,angleAccum+Math.min(1.3,delta));
- const t=host.performance.now();
- if(angleAccum>=.115 && t-lastTick>=56){
-  angleAccum-=.115;lastTick=t;
-  play('tick',.82,.955+Math.random()*.085);
- }
-}
+function wheelMove(delta){if(delta<=0||muted)return;angleAccum+=Math.min(1.3,delta);const t=host.performance.now();if(angleAccum>=.122&&t-lastTick>=62){angleAccum=Math.min(.16,angleAccum-.122);lastTick=t;play(['tick','tick2','tick3','tick4'][Math.floor(Math.random()*4)],.76,.96+Math.random()*.08)}}
 let toggle=doc.getElementById('grenadeSoundToggle');if(!toggle){toggle=doc.createElement('button');toggle.id='grenadeSoundToggle';toggle.type='button';toggle.style.cssText='height:32px;min-width:37px;border:1px solid #bacfa85b;border-radius:9px;background:#5a705238;color:#e1edce;font-size:17px;margin-left:3px;';const restart=doc.getElementById('restart');if(restart)restart.before(toggle)}
 toggle.textContent=muted?'🔇':'🔊';toggle.title=muted?'開啟製作音效':'關閉製作音效';toggle.setAttribute('aria-label','切換手榴彈製作音效');listen(toggle,'click',()=>{unlock();setMuted(!muted)});
 function target(e,id){return !!e.target?.closest?.('#'+id)}
