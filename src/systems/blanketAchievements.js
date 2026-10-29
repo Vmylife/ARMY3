@@ -46,11 +46,44 @@ const ACHIEVEMENTS=[
  {id:'safe_high',icon:'🎖️',name:'連長沒理由罵你',desc:'本次總分至少90分，且無人員、地雷及建築損失',rarity:'傳說',secret:true,check:s=>s.score>=90&&s.friends===0&&s.mines===0&&s.buildings===0}
 ];
 const QUOTES={
- score_full:['你的棉被有稜有角，我現在懷疑你偷帶了水泥。','這麼完美的豆腐乾，不拿去砌營舍可惜了。'],
- total_disaster:['你一個人用棉被完成了營區拆遷計畫。','以後你不用折棉被，直接去軍法處報到。'],
- friends_fifty:['你折的是棉被，醫護所收到的是傷亡名冊。'],
- perfect_conduct:['今天沒人受傷、建築沒倒。我先確認你是不是走錯遊戲。'],
- all_collapsed:['三次都倒？你是在挑戰地心引力，不是在接受內務鑑測。']
+ first_report:["終於完成三輪了，光是沒中途逃兵，我就先替你鼓掌。"],
+ five_layers:["五層就想申請表揚？先別急著把它叫摩天樓。"],
+ ten_layers:["十層棉被疊得出來，十頁內務檢討也準備得出來吧？"],
+ fifteen_layers:["你這不是床鋪，是一座在等建照的綠色大樓。"],
+ total_twenty:["搬了二十層棉被，怎麼還沒有一床像樣的豆腐乾？"],
+ score_sixty:["六十分過關！我睜一隻眼閉一隻眼的功力也升級了。"],
+ first_collapse:["倒得很有氣勢，但這不是我們想看的軍中表演。"],
+ first_friend:["你壓到的是弟兄，不是棉被的防滑墊。"],
+ first_mine:["你把內務檢查做成爆破課，軍械士現在在找你。"],
+ first_building:["少了一棟建築，你的棉被怎麼還完整地待在那裡？"],
+ clean_desk:["無人受傷也無營損，今天這份報告終於不用寫檢討。"],
+ twenty_layers:["二十層？你是來疊棉被，還是來搶營區制高點？"],
+ thirty_layers:["三十層高到會遮住班長的視線，算你有本事。"],
+ total_sixty:["三輪總共六十層，棉被庫存終於知道誰是兇手了。"],
+ three_tens:["三輪都超過十層，這種穩定度讓我懷疑你偷練。"],
+ improving:["每輪都疊得更高，你這是進步，還是越來越不怕死？"],
+ no_toppoll:["三輪一塔未倒，地心引力今天請了事假。"],
+ two_toppolls:["三輪倒兩輪，剩下一輪是不是棉被忘記配合？"],
+ mine_three:["你把床底下的地雷清得很乾淨，就是方法不太合法。"],
+ building_three:["工程連問我拆了三棟的申請單在哪，我指了指你的棉被。"],
+ friends_ten:["十個弟兄成了你的緩衝墊，醫務所已經開始排班。"],
+ score_eighty:["八十分？今天班長終於可以少用一點血壓藥。"],
+ single_forty:["四十層還不夠高？難道你想在頂樓架設哨所？"],
+ total_ninety:["九十層的棉被，有沒有想過先找倉儲股申請場地？"],
+ score_ninety:["九十分！我原本準備的三頁缺失紀錄都白寫了。"],
+ perfect_conduct:["今天人、房、地雷都沒事，這才叫內務訓練，不是戰爭。"],
+ six_buildings:["你靠棉被就拆了六棟，工程連的預算可以砍半了。"],
+ friends_fifty:["你折的是棉被，醫護所收到的是傷亡名冊。"],
+ five_mines:["五顆地雷都被你踩出了聲響，拆彈組真的快哭了。"],
+ all_collapsed:["三次都倒？你是在挑戰地心引力，不是在接受內務鑑測。"],
+ score_full:["你的棉被有稜有角，我現在懷疑你偷帶了水泥。"],
+ fifty_layers:["五十層直通外太空，衛星都以為營區長了一座山。"],
+ total_150:["一百五十層？國軍沒有欠你那麼多床棉被吧。"],
+ hundred_friends:["一百名弟兄被棉被制伏，你比敵軍還會減少我方兵力。"],
+ total_disaster:["你一個人用棉被完成了營區拆遷計畫。"],
+ three_one:["每輪都只有一層，你是不是把疊棉被誤會成放棉被？"],
+ three_equal:["三輪數字一模一樣，政戰主任正在調閱監視器。"],
+ safe_high:["高分又零災情，這份成績終於可以直接送給連長簽。"]
 };
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function loadProgress(){try{const p=JSON.parse(localStorage.getItem(KEY)||'{}');return {ids:Array.isArray(p.ids)?p.ids.filter(id=>typeof id==='string'):[],best:toInt(p.best),last:p.last||null};}catch{return {ids:[],best:0,last:null}}}
@@ -182,7 +215,7 @@ function openDetail(a,unlocked){
  node('h3','',content,hidden?'？？？ 機密成就':a.name);
  node('div','abr-detail-rarity',content,a.rarity+' · '+(unlocked?'已解鎖':'尚未解鎖'));
  node('p','',content,hidden?'這項隱藏成就尚未解鎖，達成特殊條件後才會公開。':a.desc);
- if(unlocked){const qs=QUOTES[a.id];node('blockquote','',content,'「'+(qs?.[0]||'班長已收到這份奇怪的成就申請，正在研究要不要給你放榮譽假。')+'」');}
+ if(unlocked){const qs=QUOTES[a.id];node('blockquote','',content,'「'+(qs?.[0]||'內務科找不到這份成就的講評，請班長稍後補件。')+'」');}
  const ok=button('知道了，班長','abr-okay',()=>closeModal(scr));content.append(ok);openModal(scr);
 }
 document.addEventListener('keydown',e=>{

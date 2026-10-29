@@ -1,3 +1,4 @@
+import './grenadePowerBalanceFix.js?v=324';
 import './grenadeCasualtyGrounding.js?v=323';
 import './grenadeGalleryFix.js?v=323';
 import './grenadeEnemyReview.js?v=321';

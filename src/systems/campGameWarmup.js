@@ -11,9 +11,9 @@ const urls = {
 const stage1 = [
  'blanket-stack.html?fromCamp=1&armyPrewarmed=1','grenade-workshop-test.html?fromCamp=1&armyPrewarmed=1',
  'assets/audio/minigames/blanket-parade-loop.mp3','assets/audio/minigames/grenade-ordnance-loop.mp3',
- 'src/systems/minigameBgm.js?v=190','src/systems/grenadeEarlyAudio.js?v=323','src/systems/blanketSfx.js?v=170',
- 'src/systems/blanketAchievements.js?v=180','src/systems/grenadeWorkshopSfx.js?v=323',
- 'src/systems/grenadeArenaSfx.js?v=323',
+ 'src/systems/minigameBgm.js?v=190','src/systems/grenadeEarlyAudio.js?v=324','src/systems/blanketSfx.js?v=170',
+ 'src/systems/blanketAchievements.js?v=324','src/systems/grenadeWorkshopSfx.js?v=324',
+ 'src/systems/grenadeArenaSfx.js?v=324',
  'assets/audio/blanket/blanket_drop_fabric.mp3','assets/audio/blanket/blanket_land_1.mp3',
  'assets/audio/blanket/blanket_land_2.mp3','assets/audio/blanket/blanket_land_3.mp3',
  'assets/audio/blanket/blanket_land_4.mp3','assets/audio/blanket/blanket_perfect_ding.mp3',
@@ -146,7 +146,7 @@ function warm(kind){
     // The workshop previously waited for its 3D sub-frame before loading any audio.
     // Boot the original workshop SFX and BGM here, while the player is still walking.
     const script=w.document.createElement('script');script.type='module';
-    script.src=new URL('src/systems/grenadeEarlyAudio.js?v=323',ROOT).href;
+    script.src=new URL('src/systems/grenadeEarlyAudio.js?v=324',ROOT).href;
     w.document.head.append(script);
     // The workshop wraps warmThrowingGame in a private closure. Its own start
     // button is the supported way to start the nested arena warm-up. Restore
