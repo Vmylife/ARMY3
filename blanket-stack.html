@@ -34,5 +34,125 @@
 <div id="actions" hidden><button id="cleanup" type="button">收拾棉被</button></div>
 <div id="overlay"><div class="panel" id="modal"><h1>🛏️ 棉被疊疊樂</h1><p id="loadingText">正在載入操場…</p><span id="loadLine"><span id="loadBar"></span></span><button id="play" disabled>準備中…</button></div></div>
 <div id="fatal" hidden><div><h2>無法載入棉被疊疊樂</h2><p id="reason"></p><button id="reload">重新載入</button></div></div>
-<script type="module" src="./blanket-stack.js?v=153"></script>
+<!-- ARMY3 v1.54 / NPC face-up landing hotfix. Only this HTML needs replacing. -->
+<script type="module">
+try {
+  // Keep the v1.53 game intact; apply narrowly scoped landing fixes before loading.
+  const response = await fetch('./blanket-stack.js?v=153', {cache:'no-store'});
+  if(!response.ok) throw new Error('棉被主程式下載失敗：HTTP '+response.status);
+  let source = await response.text();
+
+  const replaceOnce = (find, replacement, name) => {
+    const index = source.indexOf(find);
+    if(index < 0 || source.indexOf(find,index+find.length)>=0) {
+      throw new Error('棉被修正與目前的遊戲版本不相容：'+name);
+    }
+    source = source.slice(0,index)+replacement+source.slice(index+find.length);
+  };
+
+  // Keep the body centered where the soldier fell while rotating it onto its back.
+  replaceOnce(
+    'let m=mul(T(o.x+(o.swayX||0),o.y??o.sourceY??0,o.z+(o.swayZ||0)),ry((o.rot||0)*Math.PI/180));',
+    `const faceYaw=(o.rot||0)*Math.PI/180;
+ const lyingOffset=(o.category==='soldier'?(o.supineBlend||0):0)*(sz[1]||1.7)*oScale*.5;
+ let m=mul(T(o.x+(o.swayX||0)+Math.sin(faceYaw)*lyingOffset,o.y??o.sourceY??0,o.z+(o.swayZ||0)+Math.cos(faceYaw)*lyingOffset),ry(faceYaw));`,
+    '角色中心'
+  );
+
+  // A settled casualty uses neutral standing bones rotated onto the back,
+  // never the twisted final frame of the knockdown animation.
+  replaceOnce(
+    'const animator=o.flyAnim||((o.crushed&&npcDown)?npcDown:m.animator);',
+    'const animator=(o.crushed&&o.supineBlend>0&&npcIdle)?npcIdle:(o.flyAnim||((o.crushed&&npcDown)?npcDown:m.animator));',
+    '平躺動畫'
+  );
+
+  // Compute the lowest extent of the rotated character's actual model-sized box.
+  // This accounts for both axes throughout the fall and rotation, not just at rest.
+  replaceOnce(
+    'function hitSoldier(o,originX=foundation.x,originZ=foundation.z,blast=false){',
+    `function soldierGroundHeight(o){
+ const dims=o.size||[1.12,1.7,.86],scale=o.scale||1;
+ const wx=dims[0]*scale,hy=dims[1]*scale,dz=dims[2]*scale;
+ const ax=o.tiltX||0,az=o.tiltZ||0;
+ const ca=Math.cos(ax),sa=Math.sin(ax),cb=Math.cos(az),sb=Math.sin(az);
+ const minY=-Math.abs(ca*sb)*wx*.5+Math.min(0,ca*cb*hy)-Math.abs(sa)*dz*.5;
+ return -minY+.15;
+}
+function hitSoldier(o,originX=foundation.x,originZ=foundation.z,blast=false){`,
+    '模型防穿地'
+  );
+
+  replaceOnce(
+    'o.crushed=true;o.flyClock=0;o.flyFromY=o.y||0;o.flyLife=blast?1.8:1.5;',
+    'o.crushed=true;o.flyClock=0;o.flyFromY=o.y||0;o.flyLife=blast?1.8:1.5;o.supineBlend=0;o.supineClock=undefined;o.supineStartY=undefined;o.supineStartZ=undefined;',
+    '擊倒初始化'
+  );
+
+  // Only a brand-new game resets bodies; cleanup between rounds leaves them lying there.
+  replaceOnce(
+    'o.flyAnim=null;o.flyClock=undefined;o.flyVX=0;o.flyVZ=0;o.flyVY=0;',
+    'o.flyAnim=null;o.flyClock=undefined;o.flyVX=0;o.flyVZ=0;o.flyVY=0;o.supineBlend=0;o.supineClock=undefined;o.supineStartY=undefined;o.supineStartZ=undefined;',
+    '重新開局重置'
+  );
+
+  replaceOnce(
+`for(const o of soldiers){if(!o.crushed||o.flyClock===undefined||o.flyClock>o.flyLife+1)continue;
+  o.flyClock+=dt;o.flyAnim?.evaluate(dt);
+  if(o.flyClock<=o.flyLife){o.flyVY-=17*dt;o.x+=o.flyVX*dt;o.z+=o.flyVZ*dt;o.y+=o.flyVY*dt;
+   o.tiltZ=Math.sin(Math.min(1,o.flyClock/o.flyLife)*Math.PI)*.85;
+   if(o.y<=.01){o.y=.01;o.flyVY=Math.abs(o.flyVY)*.20;o.flyVX*=.72;o.flyVZ*=.72;}
+   o.flyVX*=Math.exp(-.8*dt);o.flyVZ*=Math.exp(-.8*dt);
+  }else{o.y=Math.max(.01,(o.y||0)-dt*2.5);o.tiltZ=1.30;o.flyAnim?.evaluate(0);}
+ }`,
+`for(const o of soldiers){
+  if(!o.crushed||o.flyClock===undefined||o.flyClock>o.flyLife+1)continue;
+  o.flyClock+=dt;
+  if(o.flyClock<=o.flyLife){
+    o.flyAnim?.evaluate(dt);
+    o.flyVY-=17*dt;
+    o.x+=o.flyVX*dt;o.z+=o.flyVZ*dt;o.y+=o.flyVY*dt;
+    o.tiltX=0;
+    o.tiltZ=Math.sin(Math.min(1,o.flyClock/o.flyLife)*Math.PI)*.85;
+    const floor=soldierGroundHeight(o);
+    if(o.y<=floor){
+      o.y=floor;
+      o.flyVY=Math.max(0,-o.flyVY*.18);
+      o.flyVX*=.72;o.flyVZ*=.72;
+    }
+    o.flyVX*=Math.exp(-.8*dt);o.flyVZ*=Math.exp(-.8*dt);
+  }else{
+    if(o.supineClock===undefined){
+      o.supineClock=0;
+      o.supineStartY=o.y||0;
+      o.supineStartZ=o.tiltZ||0;
+      o.flyAnim=null;
+    }
+    o.supineClock=Math.min(.42,o.supineClock+dt);
+    const t=o.supineClock/.42,eased=t*t*(3-2*t);
+    o.supineBlend=eased;
+    o.tiltX=-Math.PI*.5*eased;
+    o.tiltZ=o.supineStartZ*(1-eased);
+    const floor=soldierGroundHeight(o);
+    o.y=Math.max(floor,o.supineStartY*(1-eased)+floor*eased);
+    if(t>=1){o.supineBlend=1;o.tiltX=-Math.PI*.5;o.tiltZ=0;o.y=soldierGroundHeight(o);}
+  }
+ }`,
+    '飛行與落地姿勢'
+  );
+
+  // Relative imports from a temporary module need an absolute URL base.
+  source = source.replace(/(\bfrom\s+)(['"])(\.\/[^'"]+)\2/g,
+    (_all,prefix,quote,path)=>prefix+quote+new URL(path,location.href).href+quote);
+  const moduleURL = URL.createObjectURL(new Blob([source],{type:'text/javascript'}));
+  try { await import(moduleURL); }
+  finally { URL.revokeObjectURL(moduleURL); }
+} catch (e) {
+  console.error('棉被 NPC 修正載入失敗',e);
+  const fatal=document.getElementById('fatal');
+  document.getElementById('reason').textContent=e?.message||String(e);
+  fatal.hidden=false;
+  document.getElementById('reload').onclick=()=>location.reload();
+}
+</script>
 </body></html>
