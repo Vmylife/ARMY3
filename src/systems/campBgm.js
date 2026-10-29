@@ -1,14 +1,14 @@
 // ARMY3 main camp BGM v1.0: original commissioned camp march.
 // Must be activated by a real click for iOS Safari; only the main camp loads this file.
 const STORE_KEY='ARMY3_camp_music_muted_v1';
-const TARGET_VOLUME=.27;
+const TARGET_VOLUME=.15;
 let muted=false;
 try { muted=localStorage.getItem(STORE_KEY)==='1'; } catch {}
 let started=false,unlocked=false,raf=0,level=0,context=null,gain=null;
 const audio=new Audio(new URL('../../assets/audio/army-camp-march-loop.mp3?v=1',import.meta.url).href);
 audio.loop=true;
 audio.preload='none';
-audio.volume=.27;
+audio.volume=.15;
 audio.setAttribute('playsinline','');
 
 // WebAudio gain works on iPhone, where changing HTMLMediaElement.volume can be ignored.
