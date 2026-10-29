@@ -24,7 +24,7 @@ function initializeAudio(){
  } catch(e) { console.warn('背景音樂音量控制初始化失敗',e);context=null;gain=null; }
 }
 function ready(){return document.body.classList.contains('army-ready')}
-function desiredVolume(){return started&&!muted&&ready()&&!document.hidden?TARGET_VOLUME:0}
+function desiredVolume(){return started&&!muted&&ready()&&!document.hidden&&!document.body.classList.contains('army-in-minigame')?TARGET_VOLUME:0}
 function animateVolume(){
  raf=0;
  const desired=desiredVolume();
@@ -81,3 +81,6 @@ document.addEventListener('visibilitychange',()=>{
 });
 // If a browser blocked the automatic return-from-minigame start, the next real tap unlocks it.
 document.addEventListener('pointerdown',()=>{if(started&&!muted&&audio.paused)play()},{capture:true,passive:true});
+
+// Opening the prewarmed training overlay fades the camp music, without unloading the camp.
+new MutationObserver(fade).observe(document.body,{attributes:true,attributeFilter:['class']});

@@ -40,7 +40,7 @@
 <script type="module">
 try {
   // Apply a single continuous supine knockback from the first hit frame. Other game logic stays v1.53.
-  const response = await fetch('./blanket-stack.js?v=153', {cache:'no-store'});
+  const response = await fetch('./blanket-stack.js?v=153', {cache:'default'});
   if(!response.ok) throw new Error('棉被主程式下載失敗：HTTP '+response.status);
   let source = await response.text();
 
@@ -175,6 +175,10 @@ function hitSoldier(o,originX=foundation.x,originZ=foundation.z,blast=false){`,
     " $('overlay').hidden=false;\n window.dispatchEvent(new CustomEvent('army:blanket:finished',{detail:{score,best,total,rounds:roundResults.map(r=>({...r})),totals:{friends:totalCrushed,buildings:totalBuildings,mines:totalMines}}}));\n}\nfunction worldToScreen(",
     '棉被成就與鑑測報告');
 
+  // The scene was already fetched into the browser cache during camp exploration.
+  source=source.replace("fetch('./blanket-stack-scene.json?v=153',{cache:'no-cache'})","fetch('./blanket-stack-scene.json?v=153',{cache:'default'})");
+  // Warm-frame return uses the updated camp session module, not Safari's older cached copy.
+  source=source.replaceAll('campSession.js?v=144','campSession.js?v=190');
   // Relative imports from a temporary module need an absolute URL base.
   source = source.replace(/(\bfrom\s+)(['"])(\.\/[^'"]+)\2/g,
     (_all,prefix,quote,path)=>prefix+quote+new URL(path,location.href).href+quote);

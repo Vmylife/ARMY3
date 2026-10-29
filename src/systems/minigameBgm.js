@@ -38,11 +38,16 @@ export function installMinigameBgm(kind,{host=window,sceneWindow=window,control=
      // In the workshop, the 3D arena is preloaded hidden. Stay active while crafting.
      return !!intro&&intro.style.display==='none';
    }
+   // A warm workshop runs before its nested 3D thrower is even initialized.
+   // Its intro button is a real user gesture: start the soundtrack immediately.
+   const workshopIntro=sceneDoc.getElementById('startBtn')&&sceneDoc.getElementById('intro');
+   if(workshopIntro)return workshopIntro.style.display==='none';
    const state=sceneWindow.__grenadeTest?.state;
    return !!state&&!['intro','end'].includes(state);
  }
  function gesture(e){
-   if(disposed)return;
+   // Background warm-up clicks are synthetic. Music only unlocks on a real touch.
+   if(disposed||e?.isTrusted===false)return;
    const target=e?.target,button=target?.closest?.('#play,#startBtn,#skipIntro');
    if(button){
      if((kind==='blanket'&&button.id==='play')||(kind==='grenade'&&(button.id==='startBtn'||button.id==='skipIntro'))){started=true;play();}
