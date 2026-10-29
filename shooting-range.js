@@ -1,6 +1,6 @@
 /* ARMY3 shooting range: first playable FPS prototype. No external game engine. */
 (()=>{'use strict';
-const $=id=>document.getElementById(id),cv=$('scene'),ctx=cv.getContext('2d',{alpha:false});
+const $=id=>document.getElementById(id),cv=$('scene'),ctx=cv.getContext('2d',{alpha:true});
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),rand=(a,b)=>a+Math.random()*(b-a),choice=a=>a[Math.random()*a.length|0],TAU=Math.PI*2;
 const AUDIO={shot:'./assets/audio/rifle/npc_rifle_B.mp3',blast:'./assets/audio/grenade/explosion_crack_rumble.mp3',collapse:'./assets/audio/grenade/collapse_1.mp3',land:'./assets/audio/grenade/ground_land.mp3'};
 let muted=false;try{muted=localStorage.getItem('ARMY3_shoot_muted')==='1'}catch{}
@@ -18,7 +18,7 @@ function reset(){elapsed=0;remaining=45;ammo=20;reloading=0;recoil=0;kick=0;camY
   for(let i=0;i<9;i++){let a=makeActor('red',rand(-22,22),rand(18,59),i%4===0?'sweep':'run');actors.push(a)}
   for(let i=0;i<15;i++){const action=i%5===0?'weed':i%6===0?'pullup':i%3===0?'sweep':'run';let a=makeActor('green',rand(-21,21),rand(17,63),action);if(action==='pullup'){const pos=i%2?[-17,31]:[16,47];a.x=a.tx=pos[0];a.z=a.tz=pos[1];}actors.push(a)}
   for(const [x,z] of [[-6,25],[12,36],[-15,51]])barrels.push({id:++barrelId,x,z,active:true,carrier:null});
-  updateHUD();$('alert').classList.remove('show');
+  window.__armyShooting3D?.reset?.();updateHUD();$('alert').classList.remove('show');
 }
 function startGame(){reset();playing=true;last=performance.now();$('start').hidden=true;$('results').hidden=true;$('hud').hidden=false;requestAnimationFrame(loop);}
 function endGame(){if(!playing)return;playing=false;shootHold=false;$('hud').hidden=true;$('results').hidden=false;
@@ -49,7 +49,7 @@ function updateActors(dt){for(const a of actors){if(!a.alive){if(a.lift>0||a.vy>
 function spawnBurst(x,z,count=30,kind='blast'){const col=kind==='blast'?['#fff1a0','#ffbd62','#9e795b','#29382e']:['#e9dca7','#b1c49b'];for(let i=0;i<count;i++){particles.push({x,y:rand(.1,2),z,vx:rand(-7,7),vy:rand(1.8,9),vz:rand(-6,6),life:rand(.36,1.2),age:0,color:choice(col),r:rand(.05,.26)})}}
 function knock(a,fromX,fromZ,impulse=1){if(!a.alive)return;a.alive=false;const dx=a.x-fromX,dz=a.z-fromZ,dist=Math.hypot(dx,dz)||1;a.vx=dx/dist*rand(4,9)*impulse;a.vz=dz/dist*rand(4,9)*impulse;a.vy=rand(4,7)*impulse;a.lift=.1;a.down=false;if(a.carrying){a.carrying.carrier=null;a.carrying.x=a.x;a.carrying.z=a.z;a.carrying=null}
  if(a.team==='red')redKills++;else friendKills++;updateHUD();}
-function explode(b){if(!b||!b.active)return;b.active=false;barrelsBlown++;sound('blast',.58);spawnBurst(b.x,b.z,48);kick+=13;alertText(choice(['💥 報告！這個桶子真的會爆！','💥 國軍安全教育：請勿亂射紅桶！','💥 班長！友軍怎麼飛那麼遠？']));
+function explode(b){if(!b||!b.active)return;b.active=false;window.__armyShooting3D?.explode?.(b.x,b.z);barrelsBlown++;sound('blast',.58);spawnBurst(b.x,b.z,48);kick+=13;alertText(choice(['💥 報告！這個桶子真的會爆！','💥 國軍安全教育：請勿亂射紅桶！','💥 班長！友軍怎麼飛那麼遠？']));
  for(const a of actors)if(a.alive){const d=Math.hypot(a.x-b.x,a.z-b.z);if(d<7.4)knock(a,b.x,b.z,clamp(1.15-d/14,.48,1.15))}
  for(const other of barrels)if(other.active&&other!==b&&Math.hypot(other.x-b.x,other.z-b.z)<8.4){if(!delayedBlasts.some(x=>x.b===other))delayedBlasts.push({b:other,at:elapsed+rand(.24,.48)})}
 }
@@ -124,12 +124,15 @@ function weapon(){// Hand-drawn first-person rifle: tiny breath motion + firing 
  ctx.fillStyle='#b79072';ctx.beginPath();ctx.ellipse(-76,-52,22,34,.4,0,TAU);ctx.ellipse(76,-52,22,34,-.4,0,TAU);ctx.fill();
  if(kick>8){ctx.fillStyle=`rgba(255,213,117,${clamp((kick-8)/8,0,.85)})`;ctx.beginPath();ctx.arc(0,-247,rand(10,26),0,TAU);ctx.fill();}
  ctx.restore()}
-function render(){ctx.clearRect(0,0,W,H);drawFloor();const list=[];for(const a of actors){const p=P(a.x,0,a.z);if(p)list.push({depth:p.z,kind:'actor',item:a});}for(const b of barrels){if(!b.active)continue;const p=P(b.x,0,b.z);if(p)list.push({depth:p.z,kind:'barrel',item:b});}list.sort((a,b)=>b.depth-a.depth);for(const it of list){if(it.kind==='actor')soldier(it.item);else barrelDraw(it.item)}
+function render(){
+ const world3D=window.__armyShooting3D?.ready?.();
+ window.__armyShooting3D?.sync?.(actors,barrels,{yaw:camYaw,pitch:camPitch,fov:2*Math.atan(H/(2*F))*180/Math.PI});
+ ctx.clearRect(0,0,W,H);if(!world3D){drawFloor();}const list=[];for(const a of actors){const p=P(a.x,0,a.z);if(p)list.push({depth:p.z,kind:'actor',item:a});}for(const b of barrels){if(!b.active)continue;const p=P(b.x,0,b.z);if(p)list.push({depth:p.z,kind:'barrel',item:b});}list.sort((a,b)=>b.depth-a.depth);if(!world3D)for(const it of list){if(it.kind==='actor')soldier(it.item);else barrelDraw(it.item)}
  for(const p of particles){const v=P(p.x,p.y,p.z);if(!v)continue;ctx.globalAlpha=clamp(1-p.age/p.life,0,1);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(v.x,v.y,Math.max(1,v.s*p.r),0,TAU);ctx.fill();ctx.globalAlpha=1}
  for(const t of tracers){ctx.globalAlpha=clamp(t.t/.16,0,1);line(t.x1,t.y1,t.x2,t.y2,'#ffe3aa',2.4);ctx.globalAlpha=1}weapon();}
 function loop(now){if(!playing)return;const dt=clamp((now-last)/1000,.001,.05);last=now;update(dt);render();if(playing)requestAnimationFrame(loop);}
 let dragging=null;cv.addEventListener('pointerdown',e=>{if(!playing)return;dragging={id:e.pointerId,x:e.clientX,y:e.clientY};cv.setPointerCapture(e.pointerId)});
-cv.addEventListener('pointermove',e=>{if(!dragging||e.pointerId!==dragging.id||!playing)return;const dx=e.clientX-dragging.x,dy=e.clientY-dragging.y;dragging.x=e.clientX;dragging.y=e.clientY;camYaw=clamp(camYaw+dx*.0031,-.94,.94);camPitch=clamp(camPitch+dy*.0024,-.25,.32)});
+cv.addEventListener('pointermove',e=>{if(!dragging||e.pointerId!==dragging.id||!playing)return;const dx=e.clientX-dragging.x,dy=e.clientY-dragging.y;dragging.x=e.clientX;dragging.y=e.clientY;camYaw=clamp(camYaw+dx*.0031,-.94,.94);camPitch=clamp(camPitch-dy*.0024,-.25,.32)});
 cv.addEventListener('pointerup',()=>dragging=null);cv.addEventListener('pointercancel',()=>dragging=null);
 $('shoot').addEventListener('pointerdown',e=>{e.preventDefault();if(!playing)return;shootHold=true;$('shoot').classList.add('pressed');$('shoot').setPointerCapture(e.pointerId);fire()});for(const n of ['pointerup','pointercancel','lostpointercapture'])$('shoot').addEventListener(n,()=>{shootHold=false;$('shoot').classList.remove('pressed')});
 $('reload').addEventListener('click',reload);$('begin').addEventListener('click',startGame);$('again').addEventListener('click',startGame);
@@ -138,5 +141,5 @@ function back(){shootHold=false;playing=false;if(window.parent!==window){try{win
 document.querySelectorAll('.backToCamp').forEach(x=>x.addEventListener('click',back));
 window.addEventListener('keydown',e=>{if(e.repeat)return;if(e.code==='Space'){e.preventDefault();if(playing)fire()}if(e.key.toLowerCase()==='r')reload()});
 reset();render();
-window.__armyShootingTest={state:()=>({playing,remaining,ammo,redKills,friendKills,barrels:barrels.map(b=>({x:b.x,z:b.z,active:b.active,carrier:!!b.carrier})),actors:actors.length}),fire,finish:endGame,shootAt:(yaw,pitch)=>{camYaw=yaw;camPitch=pitch},debugExplode:()=>explode(barrels.find(b=>b.active))};
+window.__armyShootingTest={state:()=>({playing,remaining,ammo,redKills,friendKills,aimYaw:camYaw,aimPitch:camPitch,barrels:barrels.map(b=>({x:b.x,z:b.z,active:b.active,carrier:!!b.carrier})),actors:actors.length}),fire,finish:endGame,shootAt:(yaw,pitch)=>{camYaw=yaw;camPitch=pitch},debugExplode:()=>explode(barrels.find(b=>b.active))};
 })();
