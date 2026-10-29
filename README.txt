@@ -1,21 +1,9 @@
-ARMY3 補丁：手榴彈 B 版咻聲／脫手同步／音量調整
+ARMY3 v3.23 手榴彈友軍躺地防穿模＋雙圖鑑合併
 
-差分更新：只上傳 ZIP 內的 6 個程式/音效檔案（請保留目錄）。
-從 Github 當前正式版本製作，無需重傳以前的背景音樂或模型。
+1. 敵友軍擊飛後落地的渲染高度補償，解決躺著一部分埋入地面的問題。物理擊飛高度不改。
+2. 製作頁原本 18 項成就卡完全由正式結算使用的 34 項勳章卡替換。
+3. 讀取原本的 army-grenade-training-v1/unlockedIds，所以已解鎖的 34 項勳章不會重置。
+4. 開場圖鑑可以上下捲動，每個成就可點開詳情；未解鎖的隱藏成就不洩漏內容。
+5. 原本 18 項成就不再顯示。未刪除既有使用者本機資料；結算 34 項紀錄與成績不變。
 
-變更：
-1. 手榴彈投擲音效使用 B_Long_Slide_Whistle 卡通滑音；飛行聲音量 .73 -> .38（約 -5.7 dB，原始音樂不重新混音）。
-2. 按下投擲鍵後先等待角色轉身和揮臂；只有 world.flight 存在且 world.camPhase==='flight' (launchFlight/右手真正脫手) 才播放。
-3. 不改角色揮臂動畫、手榴彈物理、鏡頭或落地／爆炸事件。
-4. 主軍營 BGM 音量 .27 -> .15（約 -5.1 dB）；主頁音樂模組版本改 v002 避免舊快取。
-5. 只更新手榴彈音效模組的載入版本，不改充填、壓實、轉輪、計分、NPC 打靶槍聲。
-
-覆蓋路徑：
-index.html
-src/systems/campBgm.js
-src/systems/grenadeArenaSfx.js
-src/systems/grenadeWorkshopSfx.js
-grenade-score.js
-assets/audio/grenade/flight_cartoon_B_long.mp3
-
-提示：若 GitHub Pages 在手機仍播放舊聲音，請重新整理或清除網頁快取。瀏覽器不允許自動音訊時，首次點擊畫面解鎖音效。
+解壓縮後保留資料夾路徑，直接覆蓋 GitHub Vmylife/ARMY3。

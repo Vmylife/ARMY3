@@ -1,4 +1,5 @@
-import './grenadeGalleryFix.js?v=322';
+import './grenadeCasualtyGrounding.js?v=323';
+import './grenadeGalleryFix.js?v=323';
 import './grenadeEnemyReview.js?v=321';
 /* ARMY3 grenade audio v3.16: cartoon B launched at real hand-release, reduced volume. */
 (()=>{'use strict';
