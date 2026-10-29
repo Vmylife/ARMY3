@@ -48,7 +48,32 @@ listen(doc,'click',e=>{
  if(target(e,'shapeDone')){stopAll();play('done',.92)}
  if(target(e,'restart')||target(e,'retryBtn'))stopAll();
 },true);
-const toast=doc.getElementById('toast');if(toast){let seen='';const observer=new host.MutationObserver(()=>{let t=toast.textContent||'';if(t===seen)return;seen=t;if(t.includes('火藥滿出來')){stopAll();play('overflow',.90)} });observer.observe(toast,{childList:true,characterData:true,subtree:true});disposers.push(()=>observer.disconnect())}
+// Result text is ONE bold word only: no extra density or next-step instructions.
+// This normalizes the original workshop toast after gameplay updates it, without
+// changing score, powder, QTE timing, audio cues or the original result logic.
+const toast=doc.getElementById('toast');if(toast){
+ const css=doc.createElement('style');css.id='armyPressResultOnly325';
+ css.textContent='#toast.army-press-result-only{font-size:clamp(21px,5.5vw,27px);font-weight:950;letter-spacing:1.5px;white-space:nowrap;min-width:130px;max-width:calc(100vw - 32px);padding:11px 27px;}';
+ doc.head.append(css);disposers.push(()=>css.remove());
+ let seen='';
+ const refresh=()=>{
+  const text=toast.textContent||'';
+  const match=/^\s*(PERFECT|GREAT|GOOD|BAD|MISS)(?=[！!…\s]|$)/i.exec(text);
+  if(match){
+   const short=match[1].toUpperCase()+'！';
+   toast.classList.add('army-press-result-only');
+   if(text!==short)toast.textContent=short;
+   seen=short;return;
+  }
+  toast.classList.remove('army-press-result-only');
+  if(text===seen)return;
+  seen=text;
+  if(text.includes('火藥滿出來')){stopAll();play('overflow',.90)}
+ };
+ const observer=new host.MutationObserver(refresh);
+ observer.observe(toast,{childList:true,characterData:true,subtree:true});
+ disposers.push(()=>{observer.disconnect();toast.classList.remove('army-press-result-only')});
+} 
 listen(doc,'visibilitychange',()=>{if(doc.hidden)stopAll()});
 listen(host,'pagehide',stopAll);
 // Preload buffers while the 3D arena initializes. The first real touch resumes audio on iPhone Safari.
