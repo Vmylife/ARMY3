@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#10251d">
+<title>打靶場景編輯器｜國軍當兵模擬器</title>
+<link rel="stylesheet" href="./grenade-scene-editor.css?v=3">
+<style>
+.topbar b{color:#f3d89a}
+#panel .qualityHint{border-left:3px solid #dfb86f;padding-left:9px}
+#shootingStatus{position:absolute;bottom:52px;left:12px;max-width:calc(100% - 24px);padding:7px 11px;border:1px solid #cbb88788;border-radius:11px;background:#10261ddc;color:#f5e4b8;font-size:12px;z-index:3;pointer-events:none}
+@media(max-width:750px){#shootingStatus{bottom:64px;left:8px;right:8px;font-size:11px;}}
+</style>
+</head>
+<body>
+<header class="topbar">
+ <div><b>🎯 打靶場景編輯器</b><small>手榴彈軍營底圖副本 · 0 名人物 · 全部保留可破壞建築與道具</small></div>
+ <div class="topactions"><a href="./grenade-scene-editor.html">手榴彈編輯器</a><button id="togglePanel">收合工具</button></div>
+</header>
+<main id="stage">
+ <canvas id="world" aria-label="3D 打靶場景編輯器"></canvas>
+ <div id="loading">正在讀取原有軍營素材…</div>
+ <div id="camHelp">點選／拖曳模型 · 空白處拖曳移動視角 · 兩指縮放</div>
+ <div id="shootingStatus" hidden></div>
+ <div class="camera"><button id="moveSelected">移動選取：關</button><button id="camOrbit">旋轉視角：關</button><button id="zoomIn">＋</button><button id="zoomOut">－</button><button id="homeCamera">回中心</button></div>
+</main>
+<aside id="panel">
+ <div class="sceneLine"><label>目前場景<select id="scenes"></select></label><button id="newScene" class="warm">＋ 新增場景</button><button id="renameScene">改名</button><button id="deleteScene" class="danger">刪除場景</button></div>
+ <div class="section">
+  <div class="sectionTitle"><b>新增模型</b><span id="objectCount">0 個物件</span></div>
+  <div class="two">
+   <label>分類<select id="category"><option value="building">建築（可破壞）</option><option value="prop">環境物件（可破壞）</option><option value="ground">道路與地面</option><option value="soldier">士兵（需要時才新增）</option></select></label>
+   <label>素材<select id="template"></select></label>
+  </div>
+  <p class="qualityHint">初始場景完整沿用 GitHub 現有的手榴彈軍營 JSON：建築、道路、操場、器材、樹木、圍欄和碎裂模型全部保留；紅軍、友軍及投擲者清空。可自由移動、刪除、複製及新增物件。修改只存到「打靶」專用存檔，不會影響手榴彈場景。</p>
+  <div class="btnRow"><button id="add" class="primary">＋ 放到鏡頭中心</button><button id="duplicate">複製選取</button><button id="remove" class="danger">刪除選取</button></div>
+  <details><summary>場景物件清單（可快速選取）</summary><select id="objectList" size="5" style="margin-top:8px"></select></details>
+ </div>
+ <div class="section editFields">
+  <div class="sectionTitle"><b id="chosen">尚未選取物件</b><span id="selectionInfo">點擊場景中的模型即可選取</span></div>
+  <div id="selectedQualityWrap" class="qualitySwitch" hidden><label>選取物件的畫質<select id="selectedQuality"><option value="low">低畫質（輕量版）</option><option value="high">高畫質（原版貼圖）</option></select></label><span>切換後保留位置、旋轉與縮放</span></div>
+  <div class="fields">
+   <label>X<input type="number" id="fieldX" step="0.5"></label><label>Z<input type="number" id="fieldZ" step="0.5"></label>
+   <label>角度°<input type="number" id="fieldRot" step="15"></label><label>縮放<input type="number" id="fieldScale" step="0.1" min="0.1" max="12"></label>
+   <label id="widthWrap" hidden>道路寬<input type="number" id="fieldWidth" step="1" min="1" max="120"></label>
+   <label id="depthWrap" hidden>道路長<input type="number" id="fieldDepth" step="1" min="1" max="120"></label>
+  </div>
+  <details style="margin-top:8px"><summary>批次排列複製（快速搭建靶場）</summary>
+   <div class="fields" style="margin-top:8px"><label>橫向幾個（含原始）<input id="batchCols" type="number" min="1" max="40" value="5"></label>
+   <label>縱向幾個（含原始）<input id="batchRows" type="number" min="1" max="40" value="5"></label>
+   <label>橫向間隔（米）<input id="batchDx" type="number" min="1" max="100" value="15"></label>
+   <label>縱向間隔（米）<input id="batchDz" type="number" min="1" max="100" value="15"></label></div>
+   <button id="batchAdd" class="warm" style="margin-top:8px;width:100%">批次排列複製</button>
+  </details>
+  <div class="btnRow"><button data-nudge="x-">←</button><button data-nudge="z+">↑</button><button data-nudge="z-">↓</button><button data-nudge="x+">→</button><button data-nudge="rot-">↶ 15°</button><button data-nudge="rot+">15° ↷</button></div>
+ </div>
+ <div class="section last"><div class="btnRow">
+  <button id="undo">↶ 復原</button><button id="redo">↷ 重做</button><button id="export" class="primary">匯出打靶場景 JSON</button><button id="import">匯入 JSON</button><button id="importMainCamp" class="warm">↻ 還原手榴彈底圖</button>
+  <input type="file" id="importFile" accept=".json,application/json" hidden>
+ </div>
+ <p id="hint">打靶場景獨立儲存在目前瀏覽器中。佈置好後請按「匯出打靶場景 JSON」，取得 shooting-user-scene.json（保留高低畫質、座標、旋轉、縮放、所有碎裂模型路徑）。如果清除瀏覽器資料，尚未匯出的修改會遺失。「還原手榴彈底圖」會清除目前預設打靶場景的修改，請先匯出備份。</p>
+ <div id="message"></div>
+ </div>
+</aside>
+<script type="module" src="./shooting-scene-editor.js?v=1"></script>
+</body></html>
