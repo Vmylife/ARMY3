@@ -1,28 +1,22 @@
-ARMY3 — 手榴彈自然質感音效更新 (v3.15)
+ARMY3 棉被鑑測結算 + 38 項成就 v1.80（包含上一版小遊戲配樂 v1.70）
 
-以 GitHub 正式版 main 為基底的差分更新，僅更動手榴彈音效，不更動槍聲。
-覆蓋 ZIP 中所有檔案至 Vmylife/ARMY3 根目錄，保留資料夾結構。
+1. 將本 ZIP 解壓縮到 Vmylife/ARMY3 專案根目錄，保留路徑，覆蓋同名檔案。
+2. 只需要覆蓋更新：無需替換 blanket-stack.js、3D 物件或場景 JSON。
+3. 此包整合上一版 v1.70 的棉被/手榴彈 BGM、v1.61 棉被碰撞聲+PERFECT叮聲與收拾得分聲。
+4. 新增三輪結算深綠報告 UI、分數稱號、班長講評、38 項永久成就圖鑑（含隱藏成就）。
+5. 成就只由真實三輪統計觸發，資料保存在 localStorage: ARMY3_blanket_achievements_v1。
+6. 原始分數公式、塌塔判定、NPC/建築/地雷及所有物理均未修改。
+7. 若 GitHub Pages 快取舊版，請使用 Ctrl+F5 強制重新整理或手機瀏覽器清除該站點快取。
 
-檔案：
- grenade-score.js                           音效模組版本更新（清除舊快取）
- src/systems/grenadeWorkshopSfx.js          製作音效：4 種乾爽齒輪棘輪變化
- src/systems/grenadeArenaSfx.js             投擲、落地、爆炸、倒塌音效觸發
- assets/audio/grenade/*.mp3                 全部新的手榴彈音效素材
+更新清單：
+blanket-stack.html
+src/systems/blanketAchievements.js （新增）
+src/systems/blanketSfx.js
+src/systems/minigameBgm.js
+src/systems/grenadeWorkshopSfx.js
+grenade-score.js
+assets/audio/minigames/blanket-parade-loop.mp3
+assets/audio/minigames/grenade-ordnance-loop.mp3
+assets/audio/blanket/blanket_perfect_ding.mp3
 
-觸發：
- - 轉輪：順時針拖動，依轉動角度發出 4 種喀喀聲；不轉就不響
- - 左右/上下計量條：按實際指針移動量，輕微不規則卡榫聲
- - 輕觸畫面成功鎖定：一次機械喀聲
- - 投擲開始：3.5 秒連續風切音，在真正落地時提前淡出
- - 落地：金屬接地撞擊＋碎砂落下
- - 爆炸：清脆爆裂與低頻衝擊疊加，保留原遊戲的爆炸低頻底音
- - 建築倒塌：遊戲累計摧毀建築數真正增加時觸發 3 種不同倒塌聲
-   同一時間最多疊兩個聲音，並合併密集的拆毀事件防止破音
-
-注意：
- 1. 素材為多層不規則噪音和無固定音高共振構成的 Foley 風格擬音，
-    並非現場錄製的機械、建築或爆炸聲。降低電子音感，但無法保證等同實錄。
- 2. 完全不修改原有 NPC 打靶、槍聲、主遊戲 BGM、大地圖、物理、計分及動畫。
- 3. iPhone 請按開始遊戲啟動聲音，並確認手榴彈右上喇叭非靜音；
-    Github Pages 快取舊音效時請完全關閉遊戲頁面後再開啟。
- 4. 覆蓋前最好先備份同名檔；如已上傳以前的 v2.09 包，本包仍可直接覆蓋。
+附註：本包為測試後的整合差分檔，不會直接推送 GitHub。重製僅在此 ZIP 覆蓋的檔案。

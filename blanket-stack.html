@@ -36,6 +36,7 @@
 <div id="fatal" hidden><div><h2>無法載入棉被疊疊樂</h2><p id="reason"></p><button id="reload">重新載入</button></div></div>
 <!-- ARMY3 v1.55 / One-motion airborne supine landing fix. Only this HTML needs replacing. -->
 <script type="module" src="./src/systems/blanketSfx.js?v=170"></script>
+<script type="module" src="./src/systems/blanketAchievements.js?v=180"></script>
 <script type="module">
 try {
   // Apply a single continuous supine knockback from the first hit frame. Other game logic stays v1.53.
@@ -166,6 +167,13 @@ function hitSoldier(o,originX=foundation.x,originZ=foundation.z,blast=false){`,
   replaceOnce("$('cleanup').addEventListener('click',finishRound);",
     "$('cleanup').addEventListener('click',()=>{if($('cleanup').disabled)return;window.dispatchEvent(new CustomEvent('army:blanket:cashout',{detail:{layers:state==='collapseDone'?collapseSavedLayers:stack.length,round}}));finishRound();});",
     '收拾棉被金幣得分聲');
+
+  // ARMY3 v1.80: dispatch REAL three-round results after the original scoring/UI is done.
+  // Achievements are only presentation and do not change any score, physics or sound rules.
+  replaceOnce(
+    " $('overlay').hidden=false;\n}\nfunction worldToScreen(",
+    " $('overlay').hidden=false;\n window.dispatchEvent(new CustomEvent('army:blanket:finished',{detail:{score,best,total,rounds:roundResults.map(r=>({...r})),totals:{friends:totalCrushed,buildings:totalBuildings,mines:totalMines}}}));\n}\nfunction worldToScreen(",
+    '棉被成就與鑑測報告');
 
   // Relative imports from a temporary module need an absolute URL base.
   source = source.replace(/(\bfrom\s+)(['"])(\.\/[^'"]+)\2/g,
