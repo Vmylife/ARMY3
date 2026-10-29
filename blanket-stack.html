@@ -35,6 +35,7 @@
 <div id="overlay"><div class="panel" id="modal"><h1>🛏️ 棉被疊疊樂</h1><p id="loadingText">正在載入操場…</p><span id="loadLine"><span id="loadBar"></span></span><button id="play" disabled>準備中…</button></div></div>
 <div id="fatal" hidden><div><h2>無法載入棉被疊疊樂</h2><p id="reason"></p><button id="reload">重新載入</button></div></div>
 <!-- ARMY3 v1.55 / One-motion airborne supine landing fix. Only this HTML needs replacing. -->
+<script type="module" src="./src/systems/blanketSfx.js?v=161"></script>
 <script type="module">
 try {
   // Apply a single continuous supine knockback from the first hit frame. Other game logic stays v1.53.
@@ -147,6 +148,24 @@ function hitSoldier(o,originX=foundation.x,originZ=foundation.z,blast=false){`,
  }`,
     '飛行與落地姿勢'
   );
+
+  // ARMY3 v1.61: replace old synthesized blanket audio calls with precise SFX events.
+  // The previous NPC supine fix above remains unchanged. No physics or score adjustments.
+  replaceOnce('playTap();falling=',
+    'window.dispatchEvent(new CustomEvent("army:blanket:drop"));falling=', '放置棉被聲');
+  replaceOnce('playStackImpact(accuracy,stack.length);',
+    'window.dispatchEvent(new CustomEvent("army:blanket:land",{detail:{accuracy,layers:stack.length}}));', '棉被接觸聲');
+  replaceOnce("say('棉被塔倒塌！',2.4);playCollapse();",
+    "say('棉被塔倒塌！',2.4);window.dispatchEvent(new CustomEvent('army:blanket:topple'));", '棉被塔倒塌聲');
+  replaceOnce('if(risk.value>.62)playCreak(risk.value);',
+    "if(risk.value>.62)window.dispatchEvent(new CustomEvent('army:blanket:tension'));", '棉被拉扯聲');
+  replaceOnce('playBlast();squashPoint(',
+    "window.dispatchEvent(new CustomEvent('army:blanket:blast'));squashPoint(", '地雷爆炸聲');
+  replaceOnce("if(o.category==='building'){roundBuildings++;totalBuildings++}",
+    "if(o.category==='building'){roundBuildings++;totalBuildings++;window.dispatchEvent(new CustomEvent('army:blanket:building'))}", '建築破壞聲');
+  replaceOnce("$('cleanup').addEventListener('click',finishRound);",
+    "$('cleanup').addEventListener('click',()=>{if($('cleanup').disabled)return;window.dispatchEvent(new CustomEvent('army:blanket:cashout',{detail:{layers:state==='collapseDone'?collapseSavedLayers:stack.length,round}}));finishRound();});",
+    '收拾棉被金幣得分聲');
 
   // Relative imports from a temporary module need an absolute URL base.
   source = source.replace(/(\bfrom\s+)(['"])(\.\/[^'"]+)\2/g,
