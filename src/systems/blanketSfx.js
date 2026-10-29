@@ -1,4 +1,6 @@
-/* ARMY3 Blanket Stacking SFX v1.62 quality bands + shared volume control.
+import {installMinigameBgm} from './minigameBgm.js?v=170';
+const blanketMusic=installMinigameBgm('blanket',{control:false});
+/* ARMY3 Blanket Stacking SFX v1.70 original v1.61 cloth + perfect ding + BGM.
    Event-driven foley; grenade blast/collapse SFX reuse the *existing* grenade assets.
    This module does not edit movement, physics, NPCs, rounds or scoring.
  */
@@ -8,10 +10,7 @@ const clips = {
   land2: '../../assets/audio/blanket/blanket_land_2.mp3',
   land3: '../../assets/audio/blanket/blanket_land_3.mp3',
   land4: '../../assets/audio/blanket/blanket_land_4.mp3',
-  perfect: '../../assets/audio/blanket/blanket_quality_perfect.mp3',
-  good: '../../assets/audio/blanket/blanket_quality_good.mp3',
-  bad: '../../assets/audio/blanket/blanket_quality_bad.mp3',
-  danger: '../../assets/audio/blanket/blanket_quality_danger.mp3',
+  perfectDing: '../../assets/audio/blanket/blanket_perfect_ding.mp3',
   tumble: '../../assets/audio/blanket/blanket_tower_tumble.mp3',
   tension: '../../assets/audio/blanket/blanket_tension_rustle.mp3',
   coin1: '../../assets/audio/blanket/coin_tick_1.mp3',
@@ -80,7 +79,18 @@ const range=document.createElement('input');range.type='range';range.id='blanket
 range.setAttribute('aria-label','全部音效音量，0 到 100%');
 range.style.cssText='display:block;width:100%;height:34px;margin:0;accent-color:#edcb79;cursor:pointer;touch-action:pan-x;';
 const hint=document.createElement('small');hint.textContent='棉被、金幣、爆炸、倒塌統一調整';hint.style.cssText='display:block;font-size:10px;color:#bdcdbd;line-height:1.35;margin-top:3px;';
-panel.append(label,range,hint);control.append(toggle,panel);document.body.append(control);
+const bgmLabel=document.createElement('label');bgmLabel.htmlFor='blanketMusicRange';
+bgmLabel.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid #d7c88742;padding-top:10px;margin-top:10px;';
+const bgmText=document.createElement('span');bgmText.textContent='背景音樂';
+const bgmNumber=document.createElement('output');bgmNumber.style.cssText='color:#f4d78f;font-weight:900;';
+bgmLabel.append(bgmText,bgmNumber);
+const bgmRange=document.createElement('input');bgmRange.id='blanketMusicRange';bgmRange.type='range';bgmRange.min='0';bgmRange.max='100';bgmRange.step='1';
+bgmRange.style.cssText='display:block;width:100%;height:34px;margin:0;accent-color:#b4d7a7;cursor:pointer;touch-action:pan-x;';
+bgmRange.setAttribute('aria-label','棉被背景音樂音量，0 到 100%');
+function syncMusicVolume(){const n=blanketMusic.getVolume();bgmRange.value=n;bgmNumber.textContent=n+'%';}
+syncMusicVolume();
+bgmRange.addEventListener('input',()=>{blanketMusic.setVolume(bgmRange.value);syncMusicVolume();});
+panel.append(label,range,hint,bgmLabel,bgmRange);control.append(toggle,panel);document.body.append(control);
 function syncVolumeUI(){range.value=String(volumePct);number.textContent=volumePct+'%';toggle.textContent=volumePct===0?'🔇':volumePct<=35?'🔈':'🔊';toggle.title='音效音量 '+volumePct+'%';}
 syncVolumeUI();
 toggle.addEventListener('click',()=>{panel.hidden=!panel.hidden;toggle.setAttribute('aria-expanded',String(!panel.hidden));});
@@ -154,23 +164,19 @@ on('army:blanket:drop', () => { unlock(); play('drop', .44, .96 + Math.random() 
 on('army:blanket:land', e => {
   const accuracy = Number(e.detail?.accuracy ?? 1);
   const layers = Math.max(1, Number(e.detail?.layers || 1));
-  // Both the landing deviation and the actual tower stability decide the sound.
-  // The game exposes lastRisk from its existing physics; this never changes scoring.
-  const rawRisk=Number(window.__blanketTest?.danger ?? 0);
-  const risk=Number.isFinite(rawRisk)?rawRisk:0;
-  const off=Number.isFinite(accuracy)?Math.max(0,accuracy):1;
-  const quality=(risk>=.88||off>=.95)?'danger'
-    :off<.24&&risk<.78?'perfect'
-    :off<.58&&risk<.74?'good':'bad';
-  lastQuality=quality;
-  const volumeByQuality={perfect:.54,good:.61,bad:.66,danger:.73};
-  const v=Math.min(.83,volumeByQuality[quality]+Math.log1p(layers)*.014);
-  play(quality,v,.96+Math.random()*.065);
-  // Dangerous placement has a slightly stronger fabric drag; the pre-existing
-  // tower-instability event remains separate, following the original game rule.
-  if(quality==='danger'&&risk<.62)play('tension',.16,.98);
+  // Restore the familiar v1.61 cloth landing variations. No electronic quality replacements.
+  const variant = 1 + Math.floor(Math.random() * 4);
+  const v = Math.min(.75, .49 + Math.log1p(layers) * .047);
+  play('land' + variant, v, .94 + Math.random() * .11);
+  if (accuracy > .6 && Math.random() < .25) play('tension', .16, 1.12);
+  // The actual game shows PERFECT for offset < .24 after the third layer.
+  // A short bell is an ADDITION, never a substitute for the blanket thud.
+  const perfect = Number.isFinite(accuracy) && accuracy < .24 && layers > 2;
+  lastQuality = perfect ? 'perfect' : 'normal';
+  if(perfect) play('perfectDing',.50,.98+Math.random()*.035);
 });
 on('army:blanket:topple', () => {
+  blanketMusic.duck(2100,.45);
   play('tumble', .66, .94 + Math.random() * .09);
 });
 on('army:blanket:tension', () => {
@@ -178,6 +184,7 @@ on('army:blanket:tension', () => {
   if (now - lastTension > 820) { lastTension = now; play('tension', .31, .96 + Math.random() * .10); }
 });
 on('army:blanket:blast', () => {
+  blanketMusic.duck(1700,.18);
   const now = performance.now();
   // Chain reactions play, but very rapid blasts do not clip each other.
   const volume = now - lastBlast < 180 ? .40 : .69;
@@ -185,6 +192,7 @@ on('army:blanket:blast', () => {
   play('blast', volume, .96 + Math.random() * .07);
 });
 on('army:blanket:building', () => {
+  blanketMusic.duck(1400,.25);
   const now = performance.now();
   if (now - lastBuilding < 150 || activeBuildingSounds >= 2) return;
   lastBuilding = now;
@@ -196,22 +204,13 @@ on('army:blanket:building', () => {
     if (buildingIndex % 3 === 0) play('debris', .23, 1);
   }
 });
-on('army:blanket:cashout', e => {
+on('army:blanket:cashout', () => {
   unlock();
   stopPayout();
-  const c = audioContext();
-  if (!c || c.state !== 'running' || muted()) return;
-  const layers = Math.max(1, Math.floor(Number(e.detail?.layers) || 1));
-  const steps = Math.min(24, Math.max(5, Math.round(4 + Math.sqrt(layers) * 3.2)));
-  const start = c.currentTime + .018;
-  let offset = 0;
-  for (let i = 0; i < steps; i++) {
-    const progress = i / Math.max(1, steps-1);
-    const spacing = .118 - .041 * progress;
-    play('coin' + (1 + i % 4), .40 + progress * .13, 1 + progress * .10, start + offset, true);
-    offset += spacing;
-  }
-  play('payout', .55, 1, start + offset + .04, true);
+  // The previous sound had TWO parts: a long coin-tick prelude then a five-note
+  // 'ding-ding-ding' payout. Use ONLY the latter, immediately on pressing Cleanup.
+  play('payout', .65, 1, undefined, true);
+  blanketMusic.duck(1320,.50);
 });
 // iPhone Safari unlock: listen in capture phase so the actual touch can resume WebAudio.
 document.addEventListener('pointerdown', unlock, {capture: true, passive: true});

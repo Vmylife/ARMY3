@@ -1,8 +1,10 @@
 /* ARMY3 grenade workshop sound overlay v1. Works from the preloaded same-origin 3D iframe.
    Zero changes to crafting/aiming/scoring logic. All audio is original game-only FX. */
 import './grenadeArenaSfx.js?v=316';
+import {installMinigameBgm} from './minigameBgm.js?v=170';
 (()=>{'use strict';
 const host=window.parent!==window&&new URLSearchParams(location.search).get('embedded')==='1'?window.parent:window;
+installMinigameBgm('grenade',{host,sceneWindow:window,control:true});
 let doc;
 try{doc=host.document;if(!doc.querySelector('#pourBtn')&&!doc.querySelector('#startBtn'))return}catch{return}
 // The 3D arena iframe can be re-created. Always unhook the previous instance first.
