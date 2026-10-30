@@ -1,21 +1,56 @@
-<!doctype html><html lang="zh-Hant"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="theme-color" content="#122920">
-<title>國軍射擊鑑測｜我的子彈有上靶嗎？</title>
-<link rel="stylesheet" href="./shooting-paper.css?v=144"></head><body>
-<canvas id="world3d" aria-label="國軍原本的立體訓練場"></canvas><canvas id="shootingOverlay" aria-label="拖曳控制步槍瞄準"></canvas>
+<!doctype html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#162e23"><title>國軍模擬器｜實彈射擊鑑測</title>
+<link rel="stylesheet" href="./shooting-paper.css?v=145"></head><body>
+<canvas id="world3d" aria-label="國軍三維射擊訓練場"></canvas>
+<canvas id="shootingOverlay" aria-label="拖曳控制步槍瞄準"></canvas>
 <div id="hud" hidden>
- <div class="hudTop"><div class="hudPanel"><small>剩餘時間</small><b id="timeDisplay">45.0</b></div><div class="hudPanel"><small>上靶 / 已射</small><b><span id="hitsDisplay">0</span> / <span id="shotsDisplay">0</span></b></div></div>
- <div class="tip">滑動瞄準 · 以中央柱最上端為落點 · 固定 70% 等速不規則呼吸 · 10 發單點</div>
+ <div class="hudTop">
+  <div class="hudPanel"><small>剩餘秒數</small><b id="timeDisplay">45.0</b></div>
+  <div class="hudPanel"><small>上靶 / 已射</small><b><span id="hitsDisplay">0</span><span class="hudSep"> / </span><span id="shotsDisplay">0</span></b></div>
+ </div>
  <div id="hitFlash" aria-live="polite"></div>
- <div class="controls"><div class="left"><div class="bullets" id="ammoDisplay">10 / 10</div><button id="zoomBtn">◎ 開鏡 2.4×</button><button id="collectBtn" disabled>收靶紙／結算</button></div><button id="shootBtn">射擊</button></div>
+ <div class="controls">
+  <div class="left"><div class="bullets" id="ammoDisplay">10 / 10</div><button id="zoomBtn">◎ 開鏡</button><button id="collectBtn" disabled>收靶紙</button></div>
+  <button id="shootBtn">射擊</button>
+ </div>
  <button id="muteBtn" aria-label="切換音效">🔊</button>
 </div>
-<div id="startScreen" class="screen"><div class="panel"><div class="eyebrow">國軍實彈訓練 · 紙靶試玩 v1.44</div><h1>報告班長！<br>這次真的有靶紙。</h1><p>你就是場景中唯一的那名士兵，站在原位置朝前方靶架射擊。機械瞄具固定 70% 不規則呼吸晃動，槍只能單點射擊，另有 20 名友軍在靶前跑動，射中靶紙後留下真正的彈孔。</p>
-<div class="facts"><span>🎯 原本靶架 + 紙靶</span><span>🔫 10 發單點</span><span>◎ 2.4× 放大</span><span>📋 射完靶紙飛到眼前</span></div>
-<p class="small">上下滑動：上滑抬槍、下滑壓槍。左右拖曳改變方向。呼吸強度固定 70%，不可調整；前方有 20 名跑動友軍，別射到人。可以射完 10 發，也可以提早點「收靶紙」看落點。沒上靶的子彈不會在紙上留下痕跡。</p>
-<div id="loadStatus">正在載入原本的國軍 3D 模型…</div><button id="startBtn" class="mainBtn" disabled>等待 3D 場景…</button><button class="backBtn secondaryBtn">返回軍營</button></div></div>
-<div id="resultScreen" class="screen" hidden><div class="panel resultPanel"><div class="eyebrow">國軍射擊鑑測 · 實際彈孔紀錄</div><h1>靶紙回收！</h1><canvas id="resultPaper" width="600" height="760" aria-label="放大的打靶紙與所有上靶彈孔"></canvas>
-<div class="results"><div><b id="resultShots">0</b><small>發射</small></div><div><b id="resultHits">0</b><small>上靶</small></div><div><b id="resultMisses">0</b><small>未上靶</small></div><div><b id="resultRate">0%</b><small>命中率</small></div></div>
-<p id="reportText"></p><button id="againBtn" class="mainBtn">再打 10 發</button><button class="backBtn secondaryBtn">返回軍營</button></div></div>
-<script type="module" src="./shooting-paper-world.js?v=144"></script><script src="./shooting-paper.js?v=144"></script>
+<div id="startScreen" class="screen">
+ <div class="panel introPanel">
+  <div class="eyebrow">國軍射擊鑑測</div>
+  <div class="introIcon" aria-hidden="true">🎯</div>
+  <h1>報告班長！<br>我真的有在瞄。</h1>
+  <p class="introCopy">10 發單點。滑動瞄準，別打到友軍。</p>
+  <div class="introHint">上滑抬槍 · 點「開鏡」放大</div>
+  <div id="loadStatus" role="status">正在載入軍營…</div>
+  <button id="startBtn" class="mainBtn" disabled>準備射擊…</button>
+  <button class="backBtn secondaryBtn">返回軍營</button>
+ </div>
+</div>
+<div id="resultScreen" class="screen" hidden>
+ <div class="panel resultPanel">
+  <div class="reportTop"><span>國軍實彈射擊報告</span><span class="reportNo">機密 · 不准外流</span></div>
+  <div class="resultHeading">
+   <div><h1 id="resultTitle">靶紙回收！</h1><div id="resultRank" class="resultRank">等待鑑定</div></div>
+   <div id="resultStamp" class="resultStamp">待審</div>
+  </div>
+  <div class="resultSummary">
+   <div class="resultMain"><small>上靶</small><strong id="resultHits">0</strong><span> / <b id="resultShots">0</b> 發</span></div>
+   <div class="resultAccuracy"><small>命中率</small><strong id="resultRate">0%</strong></div>
+  </div>
+  <div class="paperLabel"><strong>靶紙證物</strong><span>每個彈孔都有編號</span></div>
+  <canvas id="resultPaper" width="600" height="760" aria-label="打靶紙與所有上靶彈孔"></canvas>
+  <div class="resultExtras">
+   <div>脫靶 <b id="resultMisses">0</b></div>
+   <div>誤傷友軍 <b id="resultFriendly">0</b></div>
+  </div>
+  <div class="officerComment"><small>長官評語</small><p id="reportText"></p></div>
+  <button id="againBtn" class="mainBtn">再打 10 發</button>
+  <button class="backBtn secondaryBtn">返回軍營</button>
+ </div>
+</div>
+<script type="module" src="./shooting-paper-world.js?v=144"></script>
+<script src="./shooting-paper.js?v=145"></script>
 </body></html>

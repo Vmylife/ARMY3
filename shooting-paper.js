@@ -1,4 +1,4 @@
-/* ARMY3 · 報告長官！我的子彈有上靶嗎？ — standalone target-paper shooting v1.44 */
+/* ARMY3 · 報告長官！我的子彈有上靶嗎？ — standalone target-paper shooting v1.45 */
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
 const canvas=$('shootingOverlay'),ctx=canvas.getContext('2d',{alpha:true}),min=Math.min,max=Math.max,clamp=(x,a,b)=>max(a,min(b,x));
@@ -199,10 +199,40 @@ function fire(){if(state!=='playing'||elapsed<nextShot)return;
  bullets.push({t:0,life:.12,x:tip.x,y:tip.y,hit:!!hit});setHUD();if(rounds<=0){holdFire=false;setTimeout(()=>{if(state==='playing')finish()},530)}
 }
 function finish(){if(state!=='playing')return;state='reviewing';holdFire=false;reviewElapsed=0;reviewOrigin=getPaperRect();$('hud').hidden=true;$('shootBtn').classList.remove('pressed');}
-function presentResult(){if(state==='result')return;state='result';$('resultScreen').hidden=false;const image=paperImage();const dest=$('resultPaper');const q=dest.getContext('2d');dest.width=600;dest.height=760;q.clearRect(0,0,600,760);q.drawImage(image,0,0);
- $('resultShots').textContent=shots;$('resultHits').textContent=hits.length;$('resultMisses').textContent=shots-hits.length;$('resultRate').textContent=shots?Math.round(100*hits.length/shots)+'%':'0%';
- $('reportText').textContent=hits.length===0?'報告班長！紙沒事，軍費有事。':hits.length===shots?'全部上靶！槍比你還懂得瞄準。':'射偏的那幾發，報告上就當沒看見？';
- if(friendlyHits)$('reportText').textContent+='｜另有 '+friendlyHits+' 名友軍中彈！';}
+function presentResult(){if(state==='result')return;
+ state='result';$('resultScreen').hidden=false;
+ const image=paperImage(),dest=$('resultPaper'),q=dest.getContext('2d');
+ dest.width=600;dest.height=760;q.clearRect(0,0,600,760);q.drawImage(image,0,0);
+ $('resultShots').textContent=shots;
+ $('resultHits').textContent=hits.length;
+ $('resultMisses').textContent=shots-hits.length;
+ $('resultFriendly').textContent=friendlyHits;
+ $('resultRate').textContent=shots?Math.round(100*hits.length/shots)+'%':'0%';
+ let title,rank,stamp,officer;
+ if(shots===0){
+  title='還沒開槍就下課';rank='出席紀錄：查無此人';stamp='缺考';officer='一發都沒打，班長連罵你都找不到理由。';
+ }else if(friendlyHits>=3){
+  title='友軍正在找你';rank='射擊等第：軍紀調查';stamp='重大違規';officer='叫你打靶，不是叫你幫醫護所衝業績。';
+ }else if(friendlyHits>0){
+  title='你射到自己人啦';rank='射擊等第：待查';stamp='軍紀注意';officer='靶紙沒跟你結仇，你怎麼先跟弟兄結仇？';
+ }else if(hits.length===10&&shots===10){
+  title='班長難得笑了';rank='射擊等第：十發十中';stamp='特優';officer='十發全上靶！今天可以大聲喊報告了。';
+ }else if(shots>0&&hits.length===shots){
+  title='靶紙全數收件';rank='射擊等第：全上靶';stamp='優等';officer='有幾發打幾發，全部都有洞。下次記得打滿十發。';
+ }else if(hits.length>=8){
+  title='有在瞄，有前途';rank='射擊等第：優等';stamp='通過';officer='不錯。這張成績單先收好，免得全連都被要求跟進。';
+ }else if(hits.length>=5){
+  title='至少靶紙有感覺';rank='射擊等第：及格';stamp='合格';officer='勉強可以。下次記得瞄靶，不是瞄人生方向。';
+ }else if(hits.length>0){
+  title='靶紙擦邊球';rank='射擊等第：待加強';stamp='補強';officer='你不是沒有命中，只是靶紙不太想承認。';
+ }else{
+  title='靶紙毫髮無傷';rank='射擊等第：重測';stamp='重測';officer='報告長官，十公尺外的空氣被我成功擊退！';
+ }
+ $('resultTitle').textContent=title;
+ $('resultRank').textContent=rank;
+ $('resultStamp').textContent=stamp;
+ $('reportText').textContent=officer;
+}
 function update(dt){elapsed+=dt;remain=max(0,MAX_TIME-elapsed);
  updateBreathing(dt);moveRunners(dt);
  recoil=max(0,recoil-dt*28);flinch=max(0,flinch-dt*38);
@@ -217,7 +247,7 @@ function render(dt){ctx.clearRect(0,0,width,height);if(state==='playing'){for(co
  window.__armyShooting3D?.sync?.(runners,[],{yaw,pitch,fov:fovNow()*180/Math.PI,zoom,flinch,breathX,breathY,eye:[FIELD.x,FIELD.y,FIELD.z]});}
 function loop(now){const dt=clamp((now-lastFrame)/1000,0,.045);lastFrame=now;if(state==='playing')update(dt);if(state==='playing'||state==='reviewing')render(dt);if(state==='playing'||state==='reviewing')requestAnimationFrame(loop)}
 function reset(){cachedPaper=null;cachedPaperKey='';rounds=MAX_ROUNDS;shots=0;hits=[];elapsed=0;remain=MAX_TIME;nextShot=0;holdFire=false;zoom=false;recoil=0;flinch=0;breathX=0;breathY=0;bullets=[];reviewElapsed=0;reviewOrigin=null;
- yaw=Math.atan2(PAPER.x-FIELD.x,PAPER.z-FIELD.z);pitch=Math.atan2(PAPER.y-FIELD.y,PAPER.z-FIELD.z);resetSway();makeRunners();window.__armyShooting3D?.restartNPCs?.();$('zoomBtn').classList.remove('active');$('zoomBtn').textContent='◎ 開鏡 2.4×';document.body.classList.remove('scopeActive');setHUD();}
+ yaw=Math.atan2(PAPER.x-FIELD.x,PAPER.z-FIELD.z);pitch=Math.atan2(PAPER.y-FIELD.y,PAPER.z-FIELD.z);resetSway();makeRunners();window.__armyShooting3D?.restartNPCs?.();$('zoomBtn').classList.remove('active');$('zoomBtn').textContent='◎ 開鏡';document.body.classList.remove('scopeActive');setHUD();}
 function start(){if(!ready)return;reset();state='playing';$('hud').hidden=false;$('startScreen').hidden=true;$('resultScreen').hidden=true;lastFrame=performance.now();requestAnimationFrame(loop);}
 function changeAim(dx,dy){if(state!=='playing')return;const k=zoom?.0021:.0055;yaw-=dx*k;while(yaw>Math.PI)yaw-=Math.PI*2;while(yaw< -Math.PI)yaw+=Math.PI*2;pitch=clamp(pitch-dy*k,-1.1,.58)}
 canvas.addEventListener('pointerdown',e=>{if(state!=='playing'||dragging!==null)return;e.preventDefault();dragging={id:e.pointerId,x:e.clientX,y:e.clientY};try{canvas.setPointerCapture(e.pointerId)}catch{}},{passive:false});
@@ -227,7 +257,7 @@ for(const event of ['pointerup','pointercancel'])addEventListener(event,stopDrag
 $('shootBtn').addEventListener('pointerdown',e=>{e.preventDefault();if(state!=='playing')return;fire();$('shootBtn').classList.add('pressed');});
 for(const e of ['pointerup','pointercancel','lostpointercapture'])$('shootBtn').addEventListener(e,()=>{$('shootBtn').classList.remove('pressed')});
 $('collectBtn').addEventListener('click',finish);
-$('zoomBtn').addEventListener('click',()=>{if(state!=='playing')return;zoom=!zoom;$('zoomBtn').classList.toggle('active',zoom);$('zoomBtn').textContent=zoom?'◎ 關鏡':'◎ 開鏡 2.4×';document.body.classList.toggle('scopeActive',zoom)});
+$('zoomBtn').addEventListener('click',()=>{if(state!=='playing')return;zoom=!zoom;$('zoomBtn').classList.toggle('active',zoom);$('zoomBtn').textContent=zoom?'◎ 關鏡':'◎ 開鏡';document.body.classList.toggle('scopeActive',zoom)});
 $('muteBtn').addEventListener('click',()=>{muted=!muted;$('muteBtn').textContent=muted?'🔇':'🔊';try{localStorage.setItem('ARMY3_shoot_muted',muted?'1':'0')}catch{}});
 function back(){state='result';holdFire=false;if(parent!==window){try{parent.postMessage({type:'ARMY3_SHOOTING_RETURN'},location.origin);return}catch{}}location.href='./index.html'}
 document.querySelectorAll('.backBtn').forEach(b=>b.addEventListener('click',back));$('startBtn').addEventListener('click',start);$('againBtn').addEventListener('click',start);
@@ -235,8 +265,8 @@ addEventListener('keydown',e=>{if(e.code==='Space'&&state==='playing'&&!e.repeat
 async function boot(){try{const r=await fetch('./shooting-paper-scene.json?v=140',{cache:'no-store'});if(!r.ok)throw Error('場景檔 HTTP '+r.status);
  const s=await r.json(),player=s.items.filter(o=>o.category==='soldier'),targets=s.items.filter(o=>o.assetId==='target');if(player.length!==1||targets.length!==1)throw Error('本次場景應有 1 位射手和 1 座靶架');
  if(Math.hypot(player[0].x-FIELD.x,player[0].z-FIELD.z)>.02||Math.hypot(targets[0].x-PAPER.x,targets[0].z-backZ)>.02)throw Error('射手或靶架座標已更動，請更新瞄準設定');
- $('loadStatus').textContent='場景位置確認完成，等待原版 3D 模型載入…';
- const started=performance.now(),timer=setInterval(()=>{const v=window.__armyShooting3D?.status?.();if(v?.ready){clearInterval(timer);ready=true;$('loadStatus').textContent='✅ 原版軍營、射手位置、靶架及步槍已準備好';$('startBtn').disabled=false;$('startBtn').textContent='開始射擊';return}
+ $('loadStatus').textContent='位置確認完成，模型載入中…';
+ const started=performance.now(),timer=setInterval(()=>{const v=window.__armyShooting3D?.status?.();if(v?.ready){clearInterval(timer);ready=true;$('loadStatus').textContent='準備完成';$('startBtn').disabled=false;$('startBtn').textContent='開始射擊';return}
   if(v?.error){clearInterval(timer);$('loadStatus').textContent='❌ 3D 載入失敗：'+v.error;return}
   if(performance.now()-started>90000){clearInterval(timer);$('loadStatus').textContent='3D 載入逾時，請確認所有原版 GLB 檔案已上傳';}},250);
  }catch(e){console.error('[ARMY 紙靶打靶]',e);$('loadStatus').textContent='❌ '+e.message}}
