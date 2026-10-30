@@ -1,4 +1,4 @@
-/* ARMY3 v1.42 fixed 3D paper-target practice — reuse original Army3 GLB world and rifle. */
+/* ARMY3 v1.42 fixed 3D paper-target practice / 20 animated runners — reuse original Army3 GLB world and rifle. */
 import {loadGlb} from './src/core/glb111.js';
 import {RifleRenderer} from './src/training/rifleRenderer.js';
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -44,8 +44,9 @@ window.__armyShooting3D={
   explode(x,z,uid){const w=state.world;if(!state.ready||!w)return;
     const p=w.campProps?.find(p=>p.uid===uid);if(p&&!p.hit){w.impact=[x,z];w.explodeProp(p);}
     w.setLanding(x,z,true);w.beginTestPower(30);w.camPhase='intro';},
+  restartNPCs(){const w=state.world;w?.shootingKnockedIds?.clear();w?.friendlyKnockGroups?.clear();},
   reset(){const w=state.world;if(!w||!state.ready)return;
-    w.resetDetailed();w.radius=-1;w.blastHistory=[];w.blastMax=0;w.timer=0;w.camPhase='intro';w.actors=[];state.lastTime=0;},
+    w.resetDetailed();w.radius=-1;w.blastHistory=[];w.blastMax=0;w.timer=0;w.camPhase='intro';w.actors=[];w.shootingKnockedIds?.clear();state.lastTime=0;},
 };
 async function boot(){try{
   const response=await fetch(SOURCE,{cache:'default'});if(!response.ok)throw Error('原版 3D 渲染器 HTTP '+response.status);
@@ -66,8 +67,8 @@ async function boot(){try{
   src=patch(src,'this.drawHighFriendlySoldiers(vp);this.drawCampProps(vp,dist);this.drawDetailed(vp,dist);',
     'this.drawHighFriendlySoldiers(vp);this.drawCampProps(vp,dist);this.drawDetailed(vp,dist);if(window.__armyShootingView){window.__armyPaperWorldDraw?.(vp,this);window.__armyShootingExternalDrawRifle?.(vp,this);}',
     '固定 3D 靶紙／打靶步槍與軍營繪製');
-  // Player-only shooting scene. NPC instancing intentionally disabled.
-  // No animated NPC batch: the one placed soldier is the first-person player.
+  // 20 moving friendlies: use existing instanced cadet renderer, sharing one Running rig.
+  src=patch(src, 'this.friendlyIdle.evaluate(dt);', "if(window.__armyShootingView&&!this.shootingRunningInitialized){const rig=this.friendlyIdle;rig.setClip(rig.hasClip('Running')?'Running':rig.hasClip('Walking')?'Walking':'Idle',{restart:true});this.shootingRunningInitialized=true;}this.friendlyIdle.evaluate(dt);", '友軍共同跑步骨架動畫');
   src=patch(src,'precision highp float;in vec2 vUV;in vec3 vN;uniform sampler2D uTex;out vec4 frag;',
     'precision highp float;in vec2 vUV;in vec3 vN;uniform sampler2D uTex;uniform float uRed;out vec4 frag;',
     '紅軍實例化染色 uniform');
@@ -84,7 +85,7 @@ async function boot(){try{
     '紅桶與高塔色調');
   // Preserve existing project imports: Blob modules have no relative import base URL.
   src=src.replace(/(\bfrom\s*|\bimport\s*)(['"])(\.\/[^'"\n]+)\2/g,(_,prefix,quote,path)=>prefix+quote+new URL(path,location.href).href+quote);
-  const blob=new Blob([src+'\n//# sourceURL=shooting-paper-original-camp-v142.js'],{type:'text/javascript'}),url=URL.createObjectURL(blob);
+  const blob=new Blob([src+'\n//# sourceURL=shooting-paper-original-camp-v144.js'],{type:'text/javascript'}),url=URL.createObjectURL(blob);
   try{await import(url);}finally{URL.revokeObjectURL(url);}
   const w=window.GrenadeWorld;if(!w)throw Error('原版 WebGL 軍營未建立');state.world=w;
   if(!w.gl?.createVertexArray)throw Error('本裝置不支援 WebGL2，無法顯示原版 3D GLB 軍營');
@@ -188,7 +189,12 @@ async function boot(){try{
     if(w.modelState==='ready'&&!state.ready){state.ready=true;w.actors=[];}
     if(state.ready&&view&&!state.paused){
       w.actors=actors.map(a=>({uid:'shooting-'+a.id,id:a.id,px:a.x,pz:a.z,x:a.x,z:a.z,angle:a.angle,scale:1,
-        renderLift:a.lift||0,enemy:a.team==='red',hit:!a.alive,seed:a.phase/6.28,shootingAction:'run'}));
+        renderLift:a.lift||0,enemy:a.team==='red',hit:!a.alive,knockBucket:a.alive?undefined:0,seed:a.seed??0,shootingAction:'run'}));
+      if(!w.shootingKnockedIds)w.shootingKnockedIds=new Set();
+      for(const a of w.actors){if(!a.hit||w.shootingKnockedIds.has(a.id))continue;w.shootingKnockedIds.add(a.id);
+       a.knockBucket=0;if(!w.friendlyKnockGroups)w.friendlyKnockGroups=new Map();
+       if(!w.friendlyKnockGroups.has(0)&&w.soldierAssets?.high){const rig=w.soldierAssets.high.makeAnim();rig.setClip(rig.hasClip('Knock_Down')?'Knock_Down':'Idle',{restart:true});w.friendlyKnockGroups.set(0,rig);}
+      }
       // The original engine handles the exact building meshes, blast shockwave and fractured debris.
       if(w.radius>=0){const finished=w.advance(dt);if(finished){w.finishBlast();w.radius=-1;}}
       w.camPhase='intro';w.draw();
