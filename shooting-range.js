@@ -1,4 +1,4 @@
-/* ARMY3 高塔狙擊 v1.31 — standalone gameplay controller; 3D renderer reuses original grenade WebGL + GLB. */
+/* ARMY3 高塔狙擊 v1.32 — standalone gameplay controller; 3D renderer reuses original grenade WebGL + GLB. */
 (()=>{'use strict';
 const $=id=>document.getElementById(id),canvas=$('shootingOverlay'),ctx=canvas.getContext('2d',{alpha:true});
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));const random=(a,b)=>a+Math.random()*(b-a);
@@ -68,6 +68,7 @@ function visibleTarget(x,y,z){
  }return true;
 }
 function fire(){if(!playing||elapsed<nextShot||loading>0)return;if(ammo===0){reload();return;}nextShot=elapsed+.18;ammo--;shots++;recoil=Math.min(17,recoil+4.8);flinch=9;playSound('shot',.37);
+ // The exact top of the front iron-sight post is the ballistic point.
  const aim={x:width*.5+breathX,y:height*.5+breathY};const picks=[];
  for(const b of barrels)if(b.active){let z=barrelHit(b,aim);if(z!=null)picks.push({kind:'barrel',b,z});}
  for(const a of actors)if(a.alive){let z=npcHit(a,aim);if(z!=null)picks.push({kind:'actor',a,z});}
@@ -86,11 +87,51 @@ function step(dt){elapsed+=dt;remain=Math.max(0,DURATION-elapsed);const v=elapse
  for(const p of projectiles)p.t+=dt;projectiles=projectiles.filter(p=>p.t<p.life);
  for(const p of dust)p.t+=dt;dust=dust.filter(p=>p.t<p.life);
  if(elapsed>hitToastUntil)$('hitFlash').classList.remove('visible');setHUD();if(remain<=0)endGame();}
-function render(){ctx.clearRect(0,0,width,height);const b=breathX,cy=breathY;const cross=$('realAim');cross.style.left=`calc(50% + ${b.toFixed(1)}px)`;cross.style.top=`calc(50% + ${cy.toFixed(1)}px)`;
- // The original rifle GLB is drawn in the 3D world. Canvas is HUD-only.
+// Military rifle iron sights: open rear aperture, front protective ears and blade.
+// Fully procedural, transparent over the 3D world. The front post TOP is (0,0),
+// which uses the exact same breathing offset as the actual hit-testing ray.
+function drawIronSights(){
+ const x=width*.5+breathX,y=height*.5+breathY;
+ const scale=clamp(Math.min(width/390,height/690),.67,1.32)*(zoom?1.06:1);
+ ctx.save();ctx.translate(x,y);ctx.scale(scale,scale);
+ // A tiny breathing lean and a snappy recoil shake move the whole rifle together.
+ ctx.rotate(Math.sin(elapsed*1.35)*.005+(flinch||0)*.0016);
+ const metal='#0d1411',edge='#35413b';
+ ctx.lineCap='round';ctx.lineJoin='round';
+ // Rear circular aperture, visually above the front sight and without opaque glass.
+ ctx.save();ctx.shadowColor='#000b';ctx.shadowBlur=5;ctx.lineWidth=23;
+ ctx.strokeStyle=metal;ctx.beginPath();ctx.arc(0,30,128,0,Math.PI*2);ctx.stroke();ctx.restore();
+ ctx.strokeStyle=edge;ctx.lineWidth=2;ctx.globalAlpha=.72;
+ ctx.beginPath();ctx.arc(0,30,114,Math.PI*1.12,Math.PI*1.88);ctx.stroke();
+ ctx.globalAlpha=1;
+ // The front sight protection wings curve inward like the reference sight picture.
+ ctx.fillStyle=metal;ctx.strokeStyle=metal;ctx.lineWidth=19;
+ ctx.beginPath();ctx.moveTo(-75,-16);ctx.bezierCurveTo(-89,-18,-82,2,-73,29);
+ ctx.bezierCurveTo(-61,70,-59,102,-50,112);ctx.stroke();
+ ctx.beginPath();ctx.moveTo(75,-16);ctx.bezierCurveTo(89,-18,82,2,73,29);
+ ctx.bezierCurveTo(61,70,59,102,50,112);ctx.stroke();
+ // Rounded front blade: the uppermost point is the actual shot point.
+ ctx.beginPath();ctx.arc(0,0,8.2,Math.PI,0);ctx.lineTo(8.2,125);
+ ctx.lineTo(-8.2,125);ctx.closePath();ctx.fill();
+ // Sight base and upper rifle receiver, placed BELOW the aiming point.
+ ctx.beginPath();ctx.moveTo(-56,110);ctx.lineTo(56,110);ctx.lineTo(82,140);
+ ctx.lineTo(94,191);ctx.lineTo(-94,191);ctx.lineTo(-82,140);ctx.closePath();ctx.fill();
+ ctx.fillStyle='#1d2721';ctx.beginPath();ctx.moveTo(-39,129);ctx.lineTo(39,129);
+ ctx.lineTo(53,147);ctx.lineTo(-53,147);ctx.closePath();ctx.fill();
+ // Subtle receiver silhouette makes the irons look attached to a held rifle.
+ const bottom=Math.max(205,(height-y)/scale+8);
+ ctx.fillStyle=metal;ctx.beginPath();ctx.moveTo(-91,188);ctx.lineTo(-80,209);
+ ctx.lineTo(-72,bottom);ctx.lineTo(72,bottom);ctx.lineTo(80,209);ctx.lineTo(91,188);
+ ctx.closePath();ctx.fill();
+ ctx.restore();
+}
+function render(){ctx.clearRect(0,0,width,height);
+ // The original rifle GLB and camp are drawn underneath this near-camera iron sight.
+ // Draw temporary impacts first, then sights closest to the player's eye.
  for(const p of projectiles){ctx.save();ctx.globalAlpha=1-p.t/p.life;ctx.strokeStyle='#ffe8b2';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(p.sx,p.sy);ctx.lineTo(p.ex,p.ey);ctx.stroke();ctx.restore();}
  for(const p of dust){let s=proj(p.x,p.y,p.z);if(!s)continue;ctx.save();ctx.globalAlpha=.15*(1-p.t/p.life);ctx.fillStyle='#8f8571';ctx.beginPath();ctx.ellipse(s.x,s.y,Math.max(2,(p.t*5+1)*s.scale),Math.max(1,(p.t*1.6+1)*s.scale),0,0,Math.PI*2);ctx.fill();ctx.restore();}
- window.__armyShooting3D?.sync?.(actors,barrels,{yaw,pitch,fov:fovNow()*180/Math.PI,zoom,flinch,eye:[TOWER.x,TOWER.y,TOWER.z]});}
+ drawIronSights();
+ window.__armyShooting3D?.sync?.(actors,barrels,{yaw,pitch,fov:fovNow()*180/Math.PI,zoom,flinch,breathX,breathY,eye:[TOWER.x,TOWER.y,TOWER.z]});}
 function frame(now){if(!playing)return;const dt=clamp((now-lastTime)/1000,0,.045);lastTime=now;step(dt);render();if(playing)requestAnimationFrame(frame);}
 // Touch/desktop aiming.  HUD is non-intercepting except action buttons; the
 // transparent overlay is the actual drag surface. Listen globally for moves,
@@ -98,7 +139,8 @@ function frame(now){if(!playing)return;const dt=clamp((now-lastTime)/1000,0,.045
 let dragging=null,aimDragCount=0;
 function aimDelta(dx,dy){if(!playing)return;
   const k=zoom?.0021:.0055;
-  yaw+=dx*k;
+  // Horizontal touch direction was mirrored in v1.31; invert X only. Keep vertical unchanged.
+  yaw-=dx*k;
   if(yaw>Math.PI)yaw-=Math.PI*2;else if(yaw< -Math.PI)yaw+=Math.PI*2;
   // Upward drag raises the barrel / camera, just like a normal mobile FPS.
   pitch=clamp(pitch-dy*k,-1.19,.39);

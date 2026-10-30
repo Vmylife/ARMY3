@@ -1,4 +1,4 @@
-/* ARMY3 高塔狙擊 v1.31: reuse existing ARMY3 camp WebGL, destructible GLB environment and actual rifle GLB. */
+/* ARMY3 高塔狙擊 v1.32: reuse existing ARMY3 camp WebGL, destructible GLB environment and actual rifle GLB. */
 import {loadGlb} from './src/core/glb111.js';
 import {RifleRenderer} from './src/training/rifleRenderer.js';
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -94,13 +94,20 @@ async function boot(){try{
   try{const rifleGlb=await loadGlb('./assets/weapons/rifle.glb');state.rifle=new RifleRenderer(w.gl);state.rifle.addModel(rifleGlb);}
   catch(err){console.warn('原版 3D 步槍載入失敗，仍可使用準星射擊',err);}
   window.__armyShootingExternalDrawRifle=(vp,world)=>{
-    const view=state.view,rifle=state.rifle;if(!view||!rifle?.weapon||view.zoom)return;
+    const view=state.view,rifle=state.rifle;if(!view||!rifle?.weapon)return;
     const theta=view.yaw,phi=view.pitch,cy=Math.cos(theta),sy=Math.sin(theta),cp=Math.cos(phi),sp=Math.sin(phi);
     const forward=[sy*cp,sp,cy*cp],right=[cy,0,-sy],up=[-sy*sp,cp,-cy*sp];
-    const e=view.eye,recoil=(view.flinch||0)*.007;
-    const px=e[0]+forward[0]*(.96-recoil)+right[0]*.34-up[0]*.38;
-    const py=e[1]+forward[1]*(.96-recoil)+right[1]*.34-up[1]*.38;
-    const pz=e[2]+forward[2]*(.96-recoil)+right[2]*.34-up[2]*.38;
+    const e=view.eye,recoil=(view.flinch||0)*.009;
+    // First-person iron-sight stance: center the existing rifle's bore instead
+    // of leaving it shouldered off to the right. Match the shared breathing sway.
+    const zoomed=!!view.zoom,dist=zoomed?1.26:1.13;
+    const scalePx=2*Math.tan((view.fov||54)*Math.PI/360/2)/Math.max(1,world.height||innerHeight);
+    const swayRight=(view.breathX||0)*scalePx*dist;
+    const swayUp=-(view.breathY||0)*scalePx*dist;
+    const side=(zoomed?.015:.045)+swayRight,drop=(zoomed?.68:.60)-swayUp;
+    const px=e[0]+forward[0]*(dist-recoil)+right[0]*side-up[0]*drop;
+    const py=e[1]+forward[1]*(dist-recoil)+right[1]*side-up[1]*drop;
+    const pz=e[2]+forward[2]*(dist-recoil)+right[2]*side-up[2]*drop;
     const model=matMul(matT(px,py,pz),matMul(matRY(theta-Math.PI/2),matS(.35)));
     const g=world.gl;
     // Optional first-person weapon must NEVER stop the destructible camp render loop.
