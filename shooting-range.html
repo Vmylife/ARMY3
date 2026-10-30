@@ -1,29 +1,54 @@
-<!doctype html><html lang="zh-Hant"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="theme-color" content="#10251d">
-<title>國軍打靶｜高塔狙擊事故鑑測</title>
-<link rel="stylesheet" href="./shooting-range.css?v=132">
-</head><body>
-<canvas id="world3d" aria-label="原版可破壞軍營"></canvas><canvas id="shootingOverlay" aria-label="射擊視角操作"></canvas>
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#10271e">
+<title>國軍模擬器｜報告班長！我真的有瞄準</title>
+<style>
+:root{font-family:system-ui,-apple-system,"PingFang TC","Noto Sans TC",sans-serif;--gold:#f3d18a;--p:#173629;--white:#f7f2db}
+*,*::before,*::after{box-sizing:border-box;-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;-webkit-tap-highlight-color:transparent!important}
+::selection{background:transparent!important}body{margin:0;height:100dvh;width:100vw;overflow:hidden;background:#193b34;color:var(--white);touch-action:none}button,input{font:inherit}button{cursor:pointer;touch-action:manipulation}button:active{filter:brightness(1.2)}button:focus-visible{outline:2px solid var(--gold)}
+#scene{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#vignette{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at 52% 50%,transparent 28%,#0c231229 71%,#03100b91 100%)}
+#hud{position:fixed;inset:0;pointer-events:none;z-index:5}
+#top{position:absolute;top:calc(10px + env(safe-area-inset-top));left:10px;right:10px;display:flex;justify-content:space-between;align-items:flex-start;gap:7px}
+.hudbox{padding:9px 13px;border:1px solid #e9d39a66;border-radius:13px;background:#10261ddf;backdrop-filter:blur(5px);box-shadow:0 5px 15px #001b104b}
+#clock{font-size:24px;line-height:1.08;font-weight:1000;font-variant-numeric:tabular-nums;color:#ffdf93;display:block;text-align:center}
+#top small{font-size:10px;color:#c3d3b7;font-weight:700}
+#battleStats{display:flex;gap:11px;text-align:right}#battleStats strong{display:block;font-size:21px;color:#f5d08d;font-variant-numeric:tabular-nums}#battleStats .bad strong{color:#f3a597}#battleStats .red strong{color:#f0d09b}
+#caption{position:absolute;top:calc(83px + env(safe-area-inset-top));left:0;right:0;text-align:center;color:#f6deb0;font-size:12px;font-weight:800;text-shadow:0 2px 4px #09190b;max-width:80%;margin:auto}
+#reticle{position:absolute;width:31px;height:31px;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;filter:drop-shadow(0 1px 2px #102316)}
+#reticle:before,#reticle:after{content:"";position:absolute;top:14px;left:0;width:31px;height:2px;background:linear-gradient(90deg,#fff 0 31%,transparent 32% 68%,#fff 69%);border-radius:9px}#reticle:after{transform:rotate(90deg)}
+#actualAim{position:absolute;width:14px;height:14px;left:50%;top:50%;border:2px solid #fce6a2;border-radius:50%;box-shadow:0 0 7px #f2d28a7a,0 1px 3px #041a0d;transform:translate(-50%,-50%);pointer-events:none}#actualAim:after{content:"";position:absolute;left:4px;top:4px;width:2px;height:2px;background:#ffe9b7;border-radius:50%}
+#breathIndicator{position:absolute;left:50%;top:calc(50% + 32px);transform:translateX(-50%);color:#dce9c7;font-size:10px;text-shadow:0 1px 3px #092817;white-space:nowrap;letter-spacing:.5px}
+#bottom{position:absolute;bottom:calc(18px + env(safe-area-inset-bottom));left:10px;right:10px;display:flex;justify-content:space-between;align-items:flex-end;gap:10px}
+#leftControl{display:flex;flex-direction:column;gap:9px;pointer-events:auto}#leftControl button{min-width:91px;min-height:46px;border-radius:13px;padding:8px 10px;border:1px solid #dac58e77;background:#112b23e8;color:#f5dfad;font-weight:900;font-size:13px}
+#shoot{pointer-events:auto;border:2px solid #ffe0a0;border-radius:50%;width:93px;height:93px;color:#271a12;font-size:17px;font-weight:1000;background:radial-gradient(circle at 30% 20%,#ffdfa0,#e9a34a 70%,#b75f38);box-shadow:0 7px 19px #0008,inset 0 2px 3px #fff6;touch-action:none}#shoot:active,#shoot.pressed{transform:scale(.95);background:#ffc57e}
+#ammo{min-width:90px;font-weight:950;font-size:22px;color:var(--gold);text-align:left;text-shadow:0 2px 4px #000c}#ammo small{font-size:10px;color:#d2e3c6;display:block}
+#alert{position:absolute;top:28%;left:50%;transform:translateX(-50%);max-width:94%;text-align:center;font-size:clamp(15px,4vw,21px);font-weight:1000;color:#ffe7a9;text-shadow:0 3px 5px #1b2104,0 0 9px #292a0b;white-space:nowrap;opacity:0;transition:opacity .13s}#alert.show{opacity:1}
+#mute{pointer-events:auto;position:absolute;top:calc(109px + env(safe-area-inset-top));right:11px;background:#122d21ea;border:1px solid #d9c58b81;border-radius:11px;min-width:44px;height:36px;color:#f3dcac;font-size:18px;display:grid;place-items:center}
+#start,#results{position:fixed;inset:0;z-index:25;background:#081a12dc;backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:calc(16px + env(safe-area-inset-top)) 14px calc(16px + env(safe-area-inset-bottom));overflow-y:auto;touch-action:pan-y}#start[hidden],#results[hidden],#hud[hidden]{display:none!important}
+.panel{width:min(460px,100%);max-height:100%;overflow-y:auto;touch-action:pan-y;padding:19px;border:1px solid #e7d19873;border-radius:19px;background:linear-gradient(150deg,#2d4734,#102c20 80%);box-shadow:0 25px 65px #02100ca9}
+.headline{color:#f6d998;letter-spacing:2px;font-size:11px;font-weight:900}.panel h1{font-size:clamp(25px,7vw,34px);line-height:1.23;margin:9px 0 8px;color:#ffdf9b}.panel p{font-size:13px;color:#d0ddc5;line-height:1.75;margin:5px 0 14px}.chips{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin:15px 0}.chips span{background:#132f23;border:1px solid #b2cc9b3b;padding:10px 9px;border-radius:10px;font-size:12px;color:#e9efce;font-weight:750}
+.mainBtn,.secondaryBtn{width:100%;min-height:53px;margin-top:8px;border-radius:12px;font-weight:950;border:1px solid #efdc9e;background:linear-gradient(120deg,#ffe2a2,#e6ac55);color:#2e2b15;font-size:16px}.secondaryBtn{background:#405846;color:#f6eccb;border-color:#a2b798;font-size:14px}
+.resultScore{font-size:78px;line-height:1;color:#ffdf8e;font-weight:1000;text-align:center;text-shadow:0 3px 0 #60492b;margin:6px}.grade{text-align:center;font-size:21px;color:#f7deb0;font-weight:1000;margin:4px}.statgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:16px 0}.statcell{border:1px solid #9eb18448;border-radius:12px;background:#173629;text-align:center;padding:9px 5px}.statcell b{font-size:27px;color:#f7d99c;display:block}.statcell small{font-size:11px;color:#c4d4bd}.comments{border:1px solid #acbd9152;border-radius:12px;background:#122a1b;padding:13px;margin:12px 0}.comments strong{font-size:12px;color:#eed29a}.comments p{font-size:14px;color:#f4f0db;margin:5px 0}
+.medals{display:flex;gap:7px;flex-wrap:wrap}.medal{border:1px solid #dcc98b74;background:#355041;border-radius:9px;padding:7px 9px;font-size:12px;font-weight:800;color:#f4dca6}
+#progressBar{height:5px;background:#658b643b;border-radius:10px;overflow:hidden;margin:8px 1px}#progressBar>span{display:block;width:0;height:100%;background:#f1c66e}
+#musicCtl{margin:12px 0 5px;font-size:12px;color:#d8e0c9}#musicCtl input{width:100%;accent-color:#eac275;touch-action:pan-x}
+@media(max-height:600px){#bottom{bottom:calc(8px + env(safe-area-inset-bottom))}#shoot{width:74px;height:74px;font-size:15px}#top{top:calc(5px + env(safe-area-inset-top))}#caption{top:calc(73px + env(safe-area-inset-top))}.panel{padding:14px}.panel h1{font-size:23px}}
+</style>
+</head>
+<body>
+<canvas id="scene" aria-label="第一人稱打靶場"></canvas><div id="vignette"></div>
 <div id="hud" hidden>
- <header class="hudTop"><div class="hudPanel"><small>剩餘時間</small><strong id="timeDisplay">45.0</strong></div><div class="hudPanel stats"><div><small>紅軍擊倒</small><strong id="redDisplay">0</strong></div><div><small>友軍誤傷</small><strong id="friendDisplay" class="danger">0</strong></div></div></header>
- <div id="hudTip">滑動瞄準 · 以步槍準星柱頂對準目標 · 開鏡可放大</div>
- <div id="hitFlash" aria-live="polite"></div>
- <div class="hudBottom"><div class="controlsLeft"><span id="ammoDisplay">20 / 20</span><button id="zoomBtn" class="ctrlBtn">◎ 開鏡 2.4×</button><button id="reloadBtn" class="ctrlBtn">↻ 換彈</button></div><button id="shootBtn" aria-label="按住連發">射擊</button></div>
- <button id="muteBtn" class="muteBtn" aria-label="音效切換">🔊</button>
- <div id="perfLabel" hidden>FPS: --</div>
+ <div id="top"><div class="hudbox"><small>剩餘時間</small><span id="clock">45.0</span></div><div id="battleStats" class="hudbox"><div class="red"><small>紅軍擊倒</small><strong id="redCount">0</strong></div><div class="bad"><small>友軍誤傷</small><strong id="friendCount">0</strong></div></div></div>
+ <div id="caption">滑動畫面瞄準 · 黃色準星會隨呼吸飄移</div><div id="reticle"></div><div id="actualAim"></div><div id="breathIndicator">呼吸：吸氣中 ↑</div>
+ <div id="alert"></div><button id="mute" aria-label="切換音效">♫</button>
+ <div id="bottom"><div id="leftControl"><div id="ammo"><small>彈匣 ／ 20 發</small><span id="ammoValue">20 / 20</span></div><button id="reload" type="button">↻ 換彈</button></div><button id="shoot" type="button">射擊</button></div>
 </div>
-<div id="startScreen" class="screen"><section class="panel">
- <div class="eyebrow">國軍射擊鑑測 · 高塔狙擊 v1.32</div><h1>報告班長！<br>我真的有瞄準！</h1>
- <p>你站在軍營高塔上，下方有 <b>50 名紅軍</b>與 <b>150 名友軍</b>四處跑動。場上的 <b>42 個紅色爆炸桶</b>會連環爆炸——炸錯人，班長不負責。</p>
- <div class="facts"><span>🎯 2.4× 放大開鏡</span><span>🔫 按住連發</span><span>💥 可破壞軍營</span><span>⏱ 45 秒鑑測</span></div>
- <p class="small">上下滑動調整槍口高低（上滑抬槍），左右拖曳轉動視角。使用步槍機械瞄具，中央柱頂就是實際命中位置；呼吸會讓整把槍微晃。</p>
- <div id="loadingStatus" role="status">正在檢查場景與 3D 模型…</div>
- <button id="startBtn" class="mainBtn" disabled>等待場景載入…</button><button class="backBtn secondaryBtn">返回軍營</button>
- </section></div>
-<div id="resultScreen" class="screen" hidden><section class="panel">
- <div class="eyebrow">正式事故紀錄 · 高塔狙擊</div><h1>射擊結算報告</h1><div class="score" id="scoreDisplay">0</div><div id="gradeDisplay" class="grade">—</div>
- <div class="resultGrid"><div><b id="resultRed">0</b><small>紅軍擊倒</small></div><div><b id="resultFriend">0</b><small>友軍誤傷</small></div><div><b id="resultBarrel">0</b><small>引爆紅桶</small></div><div><b id="resultAccuracy">0%</b><small>命中率</small></div></div>
- <div class="officer"><b>班長講評</b><p id="officerComment"></p></div><button id="againBtn" class="mainBtn">再玩一次</button><button class="backBtn secondaryBtn">返回軍營</button>
- </section></div>
-<script type="module" src="./shooting-range-world.js?v=132"></script><script type="module" src="./shooting-range.js?v=132"></script>
-</body></html>
+<div id="start"><div class="panel"><div class="headline">國軍射擊鑑測 · 第三款小遊戲／測試版</div><h1>報告班長！<br>我真的有瞄準！</h1><p>紅軍和友軍都在靶場亂跑，有人掃地、拔草，甚至跑去拉單槓。更離譜的是，兩邊的人都可能把<strong style="color:#f4b7a2">紅色爆炸桶</strong>搬進來放著。</p><div class="chips"><span>🎯 第一人稱・呼吸準星晃動</span><span>🏃 紅軍／友軍都會亂跑</span><span>🧹 掃地、拔草、拉單槓</span><span>💣 搬桶、連鎖爆炸、擊飛</span></div><p>左右滑動瞄準，右下角按住「射擊」，左下角換彈。<br>45 秒後自動結算。現在是<strong>第一版玩法測試</strong>，還沒加入紅軍反擊。</p><button id="begin" class="mainBtn">開始 45 秒打靶</button><button class="secondaryBtn backToCamp">返回軍營</button></div></div>
+<div id="results" hidden><div class="panel"><div class="headline">國軍射擊鑑測 · 正式事故紀錄（測試版）</div><h1 style="text-align:center">射擊結算報告</h1><div class="resultScore" id="score">0</div><div class="grade" id="rank">—</div><div class="statgrid"><div class="statcell"><b id="rRed">0</b><small>擊倒紅軍</small></div><div class="statcell"><b id="rFriend">0</b><small>誤傷友軍</small></div><div class="statcell"><b id="rBarrel">0</b><small>引爆紅桶</small></div><div class="statcell"><b id="rAccuracy">0%</b><small>射擊命中率</small></div></div><div id="medals" class="medals"></div><div class="comments"><strong>班長講評</strong><p id="comment"></p></div><button id="again" class="mainBtn">再玩一次</button><button class="secondaryBtn backToCamp">返回軍營</button></div></div>
+<script type="module" src="./shooting-range.js?v=100"></script>
+</body>
+</html>
