@@ -1,4 +1,4 @@
-/* ARMY3 · 報告長官！我的子彈有上靶嗎？ — standalone target-paper shooting v1.42 */
+/* ARMY3 · 報告長官！我的子彈有上靶嗎？ — standalone target-paper shooting v1.43 */
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
 const canvas=$('shootingOverlay'),ctx=canvas.getContext('2d',{alpha:true}),min=Math.min,max=Math.max,clamp=(x,a,b)=>max(a,min(b,x));
@@ -10,35 +10,52 @@ const backZ=22.15;
 let width=1,height=1,dpr=1,ready=false,state='loading',zoom=false,rounds=MAX_ROUNDS,shots=0,hits=[],elapsed=0,remain=MAX_TIME,nextShot=0,holdFire=false,lastFrame=0,recoil=0,flinch=0,breathX=0,breathY=0;
 let yaw=Math.atan2(PAPER.x-FIELD.x,PAPER.z-FIELD.z),pitch=Math.atan2(PAPER.y-FIELD.y,PAPER.z-FIELD.z);
 let bullets=[],reviewElapsed=0,reviewOrigin=null,dragging=null,shotTick=0;
-// Breath is deliberately a damped random walk, NOT several repeating sine waves.
-// The user controls only the amplitude; the motion style does not affect scoring rules.
+// Continuous, constant-speed wandering: the path may curve unpredictably,
+// but there are no random speed changes, scripted holds, or spring deceleration.
+// The setting controls travel range; the shot ray and sight post still agree.
 let breathLevel=30;
 try { const stored=Number(localStorage.getItem('ARMY3_paper_breath_level_v1')); if(Number.isFinite(stored))breathLevel=clamp(stored,0,100); }catch{}
-const sway={x:0,y:0,vx:0,vy:0,gx:0,gy:0,remaining:0,rate:4.2,seed:0x52A7D3E9};
+const SWAY_SPEED=1.08, SWAY_RADIUS=1.60;
+const sway={x:0,y:0,heading:0,turnRate:0,targetTurn:0,turnCountdown:0,seed:0x52A7D3E9};
 function randomBreath(){let x=sway.seed|0;x^=x<<13;x^=x>>>17;x^=x<<5;sway.seed=x;return (x>>>0)/4294967296;}
 function randomSigned(){return randomBreath()*2-1;}
 function updateBreathing(dt){
-  // Zero really means NO respiratory sway; recoil is a separate gun effect.
+  // A zero setting freezes the sight absolutely; recoil remains independent.
   if(breathLevel===0){breathX=breathY=0;return;}
-  sway.remaining-=dt;
-  if(sway.remaining<=0){
-    const burst=randomBreath()<.19,linger=randomBreath()<.12;
-    // Some quick, sharp corrections, some quiet holds, with no fixed period.
-    sway.remaining=linger?.85+randomBreath()*1.5:burst?.07+randomBreath()*.27:.22+randomBreath()*1.0;
-    sway.rate=burst?7+randomBreath()*4:2.4+randomBreath()*4.3;
-    const bias=burst?1.6:.85;
-    sway.gx=clamp(sway.x*.22+randomSigned()*bias,-1.7,1.7);
-    sway.gy=clamp(sway.y*.16+randomSigned()*bias,-1.7,1.7);
+  sway.turnCountdown-=dt;
+  if(sway.turnCountdown<=0){
+    // Only change the CURVATURE, never the travelling speed.
+    sway.targetTurn=randomSigned()*2.5;
+    sway.turnCountdown=.32+randomBreath()*.67;
   }
-  // Critically damped spring avoids noisy per-frame trembling and keeps motion irregular.
-  const omega=sway.rate,damping=2*omega;
-  sway.vx+=(omega*omega*(sway.gx-sway.x)-damping*sway.vx)*dt;
-  sway.vy+=(omega*omega*(sway.gy-sway.y)-damping*sway.vy)*dt;
-  sway.x=clamp(sway.x+sway.vx*dt,-1.85,1.85);
-  sway.y=clamp(sway.y+sway.vy*dt,-1.85,1.85);
-  const strength=Math.pow(breathLevel/100,2.05),base=Math.min(width,500);
-  breathX=sway.x*base*.42*strength;
-  breathY=sway.y*base*.50*strength;
+  // Smooth, unpredictable steering: no sudden direction teleporting.
+  sway.turnRate+=(sway.targetTurn-sway.turnRate)*Math.min(1,dt*3.4);
+  const radius=Math.hypot(sway.x,sway.y);
+  let inwardSteer=0;
+  if(radius>1.03){
+    // Curve back into the allowed range before reaching the edge.
+    const headingToCentre=Math.atan2(-sway.y,-sway.x);
+    const delta=Math.atan2(Math.sin(headingToCentre-sway.heading),Math.cos(headingToCentre-sway.heading));
+    inwardSteer=clamp((radius-1.03)/.43,0,1)*clamp(delta,-2.5,2.5)*2.7;
+  }
+  sway.heading+=(sway.turnRate+inwardSteer)*dt;
+  const step=SWAY_SPEED*dt;
+  let dx=Math.cos(sway.heading)*step,dy=Math.sin(sway.heading)*step;
+  let nextX=sway.x+dx,nextY=sway.y+dy;
+  if(Math.hypot(nextX,nextY)>SWAY_RADIUS){
+    // Emergency reflection rather than clamping, which made the sight STOP.
+    const r=Math.hypot(nextX,nextY),nx=nextX/r,ny=nextY/r;
+    const dot=(dx*nx+dy*ny)/step;
+    const vx=dx/step-2*dot*nx,vy=dy/step-2*dot*ny;
+    sway.heading=Math.atan2(vy,vx);
+    nextX=sway.x+vx*step;nextY=sway.y+vy*step;
+  }
+  const r=Math.hypot(nextX,nextY);
+  if(r>SWAY_RADIUS){nextX*=SWAY_RADIUS/r;nextY*=SWAY_RADIUS/r;}
+  sway.x=nextX;sway.y=nextY;
+  const amplitude=Math.min(width,500)*.46*Math.pow(breathLevel/100,2.05);
+  breathX=sway.x*amplitude;
+  breathY=sway.y*amplitude;
 }
 function setBreathLevel(value){
   breathLevel=clamp(Math.round(Number(value)||0),0,100);
@@ -48,7 +65,7 @@ function setBreathLevel(value){
   if(breathLevel===0)breathX=breathY=0;
   try{localStorage.setItem('ARMY3_paper_breath_level_v1',String(breathLevel));}catch{}
 }
-function resetSway(){Object.assign(sway,{x:0,y:0,vx:0,vy:0,gx:0,gy:0,remaining:0,rate:4.2});breathX=breathY=0;}
+function resetSway(){Object.assign(sway,{x:0,y:0,heading:randomBreath()*Math.PI*2,turnRate:0,targetTurn:0,turnCountdown:0});breathX=breathY=0;}
 let muted=false;try{muted=localStorage.getItem('ARMY3_shoot_muted')==='1'}catch{}
 $('muteBtn').textContent=muted?'🔇':'🔊';
 const audio=new Audio('./assets/audio/rifle/npc_rifle_B.mp3');audio.preload='auto';
