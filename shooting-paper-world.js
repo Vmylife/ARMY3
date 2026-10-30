@@ -1,4 +1,4 @@
-/* ARMY3 v1.40 paper-target practice — reuse original Army3 GLB world and rifle. */
+/* ARMY3 v1.41 fixed 3D paper-target practice — reuse original Army3 GLB world and rifle. */
 import {loadGlb} from './src/core/glb111.js';
 import {RifleRenderer} from './src/training/rifleRenderer.js';
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -64,8 +64,8 @@ async function boot(){try{
    const vp=mul(pers(fps?.fov||54,c.width/c.height,.2,19000),lookAt(eye,tgt));`,'第一人稱透視視角');
   src=patch(src,'for(const a of [...visibleActors,this.thrower]){','for(const a of (window.__armyShootingView?[]:[...visibleActors,this.thrower])){','隱藏原本投擲者');
   src=patch(src,'this.drawHighFriendlySoldiers(vp);this.drawCampProps(vp,dist);this.drawDetailed(vp,dist);',
-    'this.drawHighFriendlySoldiers(vp);this.drawCampProps(vp,dist);this.drawDetailed(vp,dist);if(window.__armyShootingView)window.__armyShootingExternalDrawRifle?.(vp,this);',
-    '打靶步槍與軍營繪製');
+    'this.drawHighFriendlySoldiers(vp);this.drawCampProps(vp,dist);this.drawDetailed(vp,dist);if(window.__armyShootingView){window.__armyPaperWorldDraw?.(vp,this);window.__armyShootingExternalDrawRifle?.(vp,this);}',
+    '固定 3D 靶紙／打靶步槍與軍營繪製');
   // Player-only shooting scene. NPC instancing intentionally disabled.
   // No animated NPC batch: the one placed soldier is the first-person player.
   src=patch(src,'precision highp float;in vec2 vUV;in vec3 vN;uniform sampler2D uTex;out vec4 frag;',
@@ -84,13 +84,75 @@ async function boot(){try{
     '紅桶與高塔色調');
   // Preserve existing project imports: Blob modules have no relative import base URL.
   src=src.replace(/(\bfrom\s*|\bimport\s*)(['"])(\.\/[^'"\n]+)\2/g,(_,prefix,quote,path)=>prefix+quote+new URL(path,location.href).href+quote);
-  const blob=new Blob([src+'\n//# sourceURL=shooting-paper-original-camp-v140.js'],{type:'text/javascript'}),url=URL.createObjectURL(blob);
+  const blob=new Blob([src+'\n//# sourceURL=shooting-paper-original-camp-v141.js'],{type:'text/javascript'}),url=URL.createObjectURL(blob);
   try{await import(url);}finally{URL.revokeObjectURL(url);}
   const w=window.GrenadeWorld;if(!w)throw Error('原版 WebGL 軍營未建立');state.world=w;
   if(!w.gl?.createVertexArray)throw Error('本裝置不支援 WebGL2，無法顯示原版 3D GLB 軍營');
   // Load the original ARMY3 rifle as an actual 3D gun, with its original vertex colors.
   try{const rifleGlb=await loadGlb('./assets/weapons/rifle.glb');state.rifle=new RifleRenderer(w.gl);state.rifle.addModel(rifleGlb);}
   catch(err){console.warn('原版 3D 步槍載入失敗，仍可使用準星射擊',err);}
+  // Paper is an actual 3D mesh in the SAME WebGL2 context / camera pass as
+  // the target GLB, not a 2D canvas projected using a separate approximation.
+  // Its vertices are authored in world units; they never move with aim sway.
+  const fixed=window.__armyFixedPaper;
+  if(!fixed?.geometry)throw Error('固定靶紙座標尚未建立');
+  const g=w.gl,P=fixed.geometry;
+  function shader(type,source){const sh=g.createShader(type);g.shaderSource(sh,source);g.compileShader(sh);
+    if(!g.getShaderParameter(sh,g.COMPILE_STATUS))throw Error('靶紙 shader：'+g.getShaderInfoLog(sh));return sh;}
+  const vs=shader(g.VERTEX_SHADER,`#version 300 es
+    layout(location=0) in vec3 position;layout(location=1) in vec2 uv;
+    uniform mat4 uVP;out highp vec2 vUV;
+    void main(){vUV=uv;gl_Position=uVP*vec4(position,1.);}`);
+  const fs=shader(g.FRAGMENT_SHADER,`#version 300 es
+    precision highp float;in vec2 vUV;uniform sampler2D uPaper;
+    out vec4 outColor;void main(){outColor=texture(uPaper,vUV);}`);
+  const prog=g.createProgram();g.attachShader(prog,vs);g.attachShader(prog,fs);g.linkProgram(prog);
+  if(!g.getProgramParameter(prog,g.LINK_STATUS))throw Error('靶紙程式：'+g.getProgramInfoLog(prog));
+  g.deleteShader(vs);g.deleteShader(fs);
+  const vbuf=g.createBuffer(),vao=g.createVertexArray(),tex=g.createTexture();
+  // WebGL camera looks along +Z, with camera-right towards -X (ARMY3 lookAt).
+  // Place the artwork facing the player, slightly in FRONT of the original GLB.
+  const L=P.x+P.w/2,R=P.x-P.w/2,B=P.y-P.h/2,T=P.y+P.h/2,Z=P.z;
+  const verts=new Float32Array([
+    L,B,Z,0,0,  R,B,Z,1,0,  L,T,Z,0,1,
+    R,B,Z,1,0,  R,T,Z,1,1,  L,T,Z,0,1,
+  ]);
+  g.bindVertexArray(vao);g.bindBuffer(g.ARRAY_BUFFER,vbuf);g.bufferData(g.ARRAY_BUFFER,verts,g.STATIC_DRAW);
+  g.enableVertexAttribArray(0);g.vertexAttribPointer(0,3,g.FLOAT,false,20,0);
+  g.enableVertexAttribArray(1);g.vertexAttribPointer(1,2,g.FLOAT,false,20,12);
+  g.bindVertexArray(null);
+  g.bindTexture(g.TEXTURE_2D,tex);
+  g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MIN_FILTER,g.LINEAR_MIPMAP_LINEAR);
+  g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MAG_FILTER,g.LINEAR);
+  g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_S,g.CLAMP_TO_EDGE);
+  g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_T,g.CLAMP_TO_EDGE);
+  let uploaded=-1;
+  window.__armyPaperWorldDraw=(vp,world)=>{
+    if(world.gl!==g)return;
+    const version=fixed.version();
+    if(uploaded!==version){
+      const oldFlip=g.getParameter(g.UNPACK_FLIP_Y_WEBGL);
+      g.activeTexture(g.TEXTURE0);g.bindTexture(g.TEXTURE_2D,tex);
+      g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,true);
+      try{g.texImage2D(g.TEXTURE_2D,0,g.RGBA,g.RGBA,g.UNSIGNED_BYTE,fixed.image());g.generateMipmap(g.TEXTURE_2D);uploaded=version;}
+      finally{g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,oldFlip);}
+    }
+    const hadDepth=g.isEnabled(g.DEPTH_TEST),hadCull=g.isEnabled(g.CULL_FACE),hadBlend=g.isEnabled(g.BLEND);
+    const previousDepthMask=g.getParameter(g.DEPTH_WRITEMASK),previousDepthFunc=g.getParameter(g.DEPTH_FUNC);
+    try{
+      g.enable(g.DEPTH_TEST);g.depthFunc(g.LEQUAL);g.depthMask(true);
+      g.disable(g.CULL_FACE);g.disable(g.BLEND);
+      g.useProgram(prog);g.uniformMatrix4fv(g.getUniformLocation(prog,'uVP'),false,vp);
+      g.uniform1i(g.getUniformLocation(prog,'uPaper'),0);
+      g.activeTexture(g.TEXTURE0);g.bindTexture(g.TEXTURE_2D,tex);
+      g.bindVertexArray(vao);g.drawArrays(g.TRIANGLES,0,6);
+    }finally{
+      g.bindVertexArray(null);g.depthMask(previousDepthMask);g.depthFunc(previousDepthFunc);
+      if(!hadDepth)g.disable(g.DEPTH_TEST);
+      if(hadCull)g.enable(g.CULL_FACE);else g.disable(g.CULL_FACE);
+      if(hadBlend)g.enable(g.BLEND);else g.disable(g.BLEND);
+    }
+  };
   window.__armyShootingExternalDrawRifle=(vp,world)=>{
     const view=state.view,rifle=state.rifle;if(!view||!rifle?.weapon)return;
     const theta=view.yaw,phi=view.pitch,cy=Math.cos(theta),sy=Math.sin(theta),cp=Math.cos(phi),sp=Math.sin(phi);

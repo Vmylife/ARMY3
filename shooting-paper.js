@@ -1,9 +1,10 @@
-/* ARMY3 · 報告長官！我的子彈有上靶嗎？ — standalone target-paper shooting v1.40 */
+/* ARMY3 · 報告長官！我的子彈有上靶嗎？ — standalone target-paper shooting v1.41 */
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
 const canvas=$('shootingOverlay'),ctx=canvas.getContext('2d',{alpha:true}),min=Math.min,max=Math.max,clamp=(x,a,b)=>max(a,min(b,x));
 const FIELD={x:12.272136337858274,z:.6765632048809667,y:1.58};
-const PAPER={x:12.3,z:21.68,y:1.05,w:.98,h:1.25};
+// Fit completely within target.glb's ~1.15 m by 1.48 m physical extent.
+const PAPER={x:12.3,z:21.68,y:.97,w:.98,h:1.02};
 const FOV=54,ZOOM=2.4,MAX_ROUNDS=20,MAX_TIME=45,FIRE_DELAY=.22;
 const backZ=22.15;
 let width=1,height=1,dpr=1,ready=false,state='loading',zoom=false,rounds=MAX_ROUNDS,shots=0,hits=[],elapsed=0,remain=MAX_TIME,nextShot=0,holdFire=false,lastFrame=0,recoil=0,flinch=0,breathX=0,breathY=0;
@@ -17,7 +18,9 @@ function resize(){width=innerWidth;height=innerHeight;dpr=min(devicePixelRatio||
 addEventListener('resize',resize);resize();
 const focal=()=>height/(2*Math.tan(fovNow()/2));
 const fovNow=()=>2*Math.atan(Math.tan(FOV*Math.PI/360/2)/(zoom?ZOOM:1));
-function cameraBasis(){const cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);return {forward:[sy*cp,sp,cy*cp],right:[cy,0,-sy],up:[-sy*sp,cp,-cy*sp]}}
+// Match the ORIGINAL ARMY3 WebGL lookAt() camera basis exactly. Its horizontal
+// camera-right vector is cross(forward, worldUp), i.e. negative world X at yaw=0.
+function cameraBasis(){const cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);return {forward:[sy*cp,sp,cy*cp],right:[-cy,0,sy],up:[-sy*sp,cp,-cy*sp]}}
 function project(x,y,z){const dx=x-FIELD.x,dy=y-FIELD.y,dz=z-FIELD.z,{forward,right,up}=cameraBasis();
   const depth=dx*forward[0]+dy*forward[1]+dz*forward[2];if(depth<=.12)return null;
   const sx=dx*right[0]+dy*right[1]+dz*right[2],sy=dx*up[0]+dy*up[1]+dz*up[2],f=focal();
@@ -28,7 +31,7 @@ function hitFromSight(){const f=focal(),nx=breathX/f,ny=-breathY/f,{forward,righ
   if(t<=0||!Number.isFinite(t))return null;
   const x=FIELD.x+direction[0]*t,y=FIELD.y+direction[1]*t;
   if(Math.abs(x-PAPER.x)>PAPER.w/2||Math.abs(y-PAPER.y)>PAPER.h/2)return null;
-  return {x:(x-PAPER.x)/PAPER.w+.5,y:.5-(y-PAPER.y)/PAPER.h};
+  return {x:.5-(x-PAPER.x)/PAPER.w,y:.5-(y-PAPER.y)/PAPER.h};
 }
 const basePaper=document.createElement('canvas');basePaper.width=600;basePaper.height=760;
 const pctx=basePaper.getContext('2d');
@@ -51,14 +54,16 @@ function paperImage(){const key=shots+':'+hits.length; if(cachedPaperKey===key&&
  });
  cachedPaper=c;cachedPaperKey=key;return c;
 }
-function paperCorners(){const l=PAPER.x-PAPER.w/2,r=PAPER.x+PAPER.w/2,t=PAPER.y+PAPER.h/2,b=PAPER.y-PAPER.h/2;
+// Only used for the final paper-collection animation. The live target paper
+// is a real 3D world-space quad rendered with the SAME view-projection matrix
+// and depth buffer as the target GLB, so it cannot slide independently.
+function paperCorners(){const l=PAPER.x+PAPER.w/2,r=PAPER.x-PAPER.w/2,t=PAPER.y+PAPER.h/2,b=PAPER.y-PAPER.h/2;
  return [project(l,t,PAPER.z),project(r,t,PAPER.z),project(l,b,PAPER.z)];}
 function getPaperRect(){const [tl,tr,bl]=paperCorners();if(!tl||!tr||!bl)return null;
  const w=Math.hypot(tr.x-tl.x,tr.y-tl.y),h=Math.hypot(bl.x-tl.x,bl.y-tl.y);return {x:tl.x,y:tl.y,w,h,tl,tr,bl};}
-function drawPaperAtTarget(){const [tl,tr,bl]=paperCorners();if(!tl||!tr||!bl)return;
- const w=Math.hypot(tr.x-tl.x,tr.y-tl.y),h=Math.hypot(bl.x-tl.x,bl.y-tl.y);if(w<1||h<1||Math.abs(tl.x)>width*3||Math.abs(tl.y)>height*3)return;
- const image=paperImage();ctx.save();ctx.setTransform(dpr*(tr.x-tl.x)/image.width,dpr*(tr.y-tl.y)/image.width,dpr*(bl.x-tl.x)/image.height,dpr*(bl.y-tl.y)/image.height,dpr*tl.x,dpr*tl.y);
- ctx.drawImage(image,0,0);ctx.restore();}
+// The WebGL module reads this canvas + immutable world transform to texture a
+// paper mesh fixed on the physical target. Never tie it to muzzle sway/yaw.
+window.__armyFixedPaper={geometry:{...PAPER},image:paperImage,version:()=>shots+':'+hits.length};
 function drawIronSights(){const x=width*.5+breathX,y=height*.5+breathY;
  const scale=clamp(min(width/390,height/690),.67,1.34)*(zoom?1.06:1);ctx.save();ctx.translate(x,y);ctx.scale(scale,scale);ctx.rotate(Math.sin(elapsed*1.35)*.005+flinch*.0016);
  ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#101612';ctx.lineWidth=22;ctx.shadowColor='#050a08a8';ctx.shadowBlur=5;
@@ -90,7 +95,7 @@ function drawAnimation(dt){reviewElapsed+=dt;const t=clamp(reviewElapsed/.85,0,1
  const r={x:start.x+(dx-start.x)*ease,y:start.y+(dy-start.y)*ease,w:start.w+(desiredW-start.w)*ease,h:start.h+(desiredH-start.h)*ease};
  ctx.fillStyle=`rgba(8,25,18,${.72*ease})`;ctx.fillRect(0,0,width,height);ctx.save();ctx.shadowColor='#0009';ctx.shadowBlur=25*ease;ctx.drawImage(paperImage(),r.x,r.y,r.w,r.h);ctx.restore();
  if(t>=1)presentResult();}
-function render(dt){ctx.clearRect(0,0,width,height);if(state==='playing'){drawPaperAtTarget();for(const b of bullets){ctx.globalAlpha=clamp(1-b.t/b.life,0,1);ctx.strokeStyle=b.hit?'#e5d1a2':'#d6ad6c';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(width*.5+26,height*.88);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.globalAlpha=1}drawIronSights();}
+function render(dt){ctx.clearRect(0,0,width,height);if(state==='playing'){for(const b of bullets){ctx.globalAlpha=clamp(1-b.t/b.life,0,1);ctx.strokeStyle=b.hit?'#e5d1a2':'#d6ad6c';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(width*.5+26,height*.88);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.globalAlpha=1}drawIronSights();}
  else if(state==='reviewing')drawAnimation(dt);
  window.__armyShooting3D?.sync?.([],[],{yaw,pitch,fov:fovNow()*180/Math.PI,zoom,flinch,breathX,breathY,eye:[FIELD.x,FIELD.y,FIELD.z]});}
 function loop(now){const dt=clamp((now-lastFrame)/1000,0,.045);lastFrame=now;if(state==='playing')update(dt);if(state==='playing'||state==='reviewing')render(dt);if(state==='playing'||state==='reviewing')requestAnimationFrame(loop)}
