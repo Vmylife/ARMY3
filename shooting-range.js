@@ -1,4 +1,4 @@
-/* ARMY3 高塔狙擊 — standalone gameplay controller; 3D renderer reuses original grenade WebGL + GLB. */
+/* ARMY3 高塔狙擊 v1.31 — standalone gameplay controller; 3D renderer reuses original grenade WebGL + GLB. */
 (()=>{'use strict';
 const $=id=>document.getElementById(id),canvas=$('shootingOverlay'),ctx=canvas.getContext('2d',{alpha:true});
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));const random=(a,b)=>a+Math.random()*(b-a);
@@ -92,9 +92,31 @@ function render(){ctx.clearRect(0,0,width,height);const b=breathX,cy=breathY;con
  for(const p of dust){let s=proj(p.x,p.y,p.z);if(!s)continue;ctx.save();ctx.globalAlpha=.15*(1-p.t/p.life);ctx.fillStyle='#8f8571';ctx.beginPath();ctx.ellipse(s.x,s.y,Math.max(2,(p.t*5+1)*s.scale),Math.max(1,(p.t*1.6+1)*s.scale),0,0,Math.PI*2);ctx.fill();ctx.restore();}
  window.__armyShooting3D?.sync?.(actors,barrels,{yaw,pitch,fov:fovNow()*180/Math.PI,zoom,flinch,eye:[TOWER.x,TOWER.y,TOWER.z]});}
 function frame(now){if(!playing)return;const dt=clamp((now-lastTime)/1000,0,.045);lastTime=now;step(dt);render();if(playing)requestAnimationFrame(frame);}
-let dragging=null;canvas.addEventListener('pointerdown',e=>{if(!playing)return;dragging={id:e.pointerId,x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId);});
-canvas.addEventListener('pointermove',e=>{if(!dragging||e.pointerId!==dragging.id||!playing)return;const dx=e.clientX-dragging.x,dy=e.clientY-dragging.y;dragging.x=e.clientX;dragging.y=e.clientY;const k=zoom?.00105:.0026;yaw=clamp(yaw+dx*k,-3.52,-1.12);pitch=clamp(pitch-dy*k,-1.08,.25);});
-for(const ev of ['pointerup','pointercancel','lostpointercapture'])canvas.addEventListener(ev,()=>dragging=null);
+// Touch/desktop aiming.  HUD is non-intercepting except action buttons; the
+// transparent overlay is the actual drag surface. Listen globally for moves,
+// because Safari may re-target a dragging touch during a WebGL/HUD redraw.
+let dragging=null,aimDragCount=0;
+function aimDelta(dx,dy){if(!playing)return;
+  const k=zoom?.0021:.0055;
+  yaw+=dx*k;
+  if(yaw>Math.PI)yaw-=Math.PI*2;else if(yaw< -Math.PI)yaw+=Math.PI*2;
+  // Upward drag raises the barrel / camera, just like a normal mobile FPS.
+  pitch=clamp(pitch-dy*k,-1.19,.39);
+  aimDragCount++;
+}
+canvas.addEventListener('pointerdown',e=>{if(!playing||dragging)return;
+  e.preventDefault();dragging={id:e.pointerId,x:e.clientX,y:e.clientY};
+  try{canvas.setPointerCapture(e.pointerId)}catch{}
+},{passive:false});
+window.addEventListener('pointermove',e=>{if(!dragging||e.pointerId!==dragging.id||!playing)return;
+  e.preventDefault();aimDelta(e.clientX-dragging.x,e.clientY-dragging.y);
+  dragging.x=e.clientX;dragging.y=e.clientY;
+},{passive:false});
+function releaseAim(e){if(!dragging||e&&e.pointerId!=null&&e.pointerId!==dragging.id)return;dragging=null;}
+for(const ev of ['pointerup','pointercancel'])window.addEventListener(ev,releaseAim);
+canvas.addEventListener('lostpointercapture',releaseAim);
+window.addEventListener('blur',()=>{dragging=null;});
+
 $('shootBtn').addEventListener('pointerdown',e=>{e.preventDefault();if(!playing)return;holdFire=true;e.currentTarget.setPointerCapture(e.pointerId);$('shootBtn').classList.add('pressed');fire();});
 for(const ev of ['pointerup','pointercancel','lostpointercapture'])$('shootBtn').addEventListener(ev,()=>{holdFire=false;$('shootBtn').classList.remove('pressed')});
 $('reloadBtn').addEventListener('click',reload);$('zoomBtn').addEventListener('click',()=>{zoom=!zoom;$('zoomBtn').classList.toggle('active',zoom);$('zoomBtn').textContent=zoom?'◎ 關鏡':'◎ 開鏡 2.4×';document.body.classList.toggle('scopeActive',zoom);});
@@ -110,5 +132,5 @@ async function boot(){try{const res=await fetch('./shooting-user-scene.json?v=13
  const started=performance.now();const check=setInterval(()=>{const state=window.__armyShooting3D?.status?.();if(state?.ready){clearInterval(check);ready=true;$('loadingStatus').textContent='✅ 3D 軍營、士兵 GLB、'+sceneBarrels.length+' 紅桶與高塔已載入';$('startBtn').textContent='開始 45 秒高塔狙擊';$('startBtn').disabled=false;return;}
  if(state?.error){clearInterval(check);$('loadingStatus').textContent='❌ 軍營載入失敗：'+state.error;return;}if(performance.now()-started>90000){clearInterval(check);$('loadingStatus').textContent='載入過久，請檢查網路、模型路徑與瀏覽器 Console。';}},300);
  }catch(e){console.error('[ARMY shooting]',e);$('loadingStatus').textContent='❌ '+e.message;}}
-boot();window.__armyShootingDebug={status:()=>({ready,playing,actors:actors.length,red:actors.filter(a=>a.team==='red').length,green:actors.filter(a=>a.team==='green').length,barrels:barrels.length,remain,yaw,pitch,zoom,sceneObjects:scene?.items?.length,navNodes:nodes.length}),finish:endGame,fire,zoom:()=>$('zoomBtn').click(),hitBarrel:()=>explode(barrels.find(b=>b.active))};
+boot();window.__armyShootingDebug={status:()=>({ready,playing,actors:actors.length,red:actors.filter(a=>a.team==='red').length,green:actors.filter(a=>a.team==='green').length,barrels:barrels.length,remain,yaw,pitch,zoom,sceneObjects:scene?.items?.length,navNodes:nodes.length,aimDrags:aimDragCount,walking:actors.filter(a=>a.alive&&a.routeIndex<a.route.length).length}),finish:endGame,fire,zoom:()=>$('zoomBtn').click(),hitBarrel:()=>explode(barrels.find(b=>b.active))};
 })();

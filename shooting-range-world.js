@@ -1,4 +1,4 @@
-/* ARMY3 高塔狙擊 v1.30: reuse existing ARMY3 camp WebGL, destructible GLB environment and actual rifle GLB. */
+/* ARMY3 高塔狙擊 v1.31: reuse existing ARMY3 camp WebGL, destructible GLB environment and actual rifle GLB. */
 import {loadGlb} from './src/core/glb111.js';
 import {RifleRenderer} from './src/training/rifleRenderer.js';
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -86,7 +86,7 @@ async function boot(){try{
     '紅桶與高塔色調');
   // Preserve existing project imports: Blob modules have no relative import base URL.
   src=src.replace(/(\bfrom\s*|\bimport\s*)(['"])(\.\/[^'"\n]+)\2/g,(_,prefix,quote,path)=>prefix+quote+new URL(path,location.href).href+quote);
-  const blob=new Blob([src+'\n//# sourceURL=shooting-original-camp-v130.js'],{type:'text/javascript'}),url=URL.createObjectURL(blob);
+  const blob=new Blob([src+'\n//# sourceURL=shooting-original-camp-v131.js'],{type:'text/javascript'}),url=URL.createObjectURL(blob);
   try{await import(url);}finally{URL.revokeObjectURL(url);}
   const w=window.GrenadeWorld;if(!w)throw Error('原版 WebGL 軍營未建立');state.world=w;
   if(!w.gl?.createVertexArray)throw Error('本裝置不支援 WebGL2，無法顯示原版 3D GLB 軍營');
@@ -102,10 +102,19 @@ async function boot(){try{
     const py=e[1]+forward[1]*(.96-recoil)+right[1]*.34-up[1]*.38;
     const pz=e[2]+forward[2]*(.96-recoil)+right[2]*.34-up[2]*.38;
     const model=matMul(matT(px,py,pz),matMul(matRY(theta-Math.PI/2),matS(.35)));
-    const g=world.gl;g.useProgram(rifle.program);g.uniformMatrix4fv(rifle.vp,false,vp);g.uniformMatrix4fv(rifle.model,false,model);g.disable(g.CULL_FACE);
-    g.bindVertexArray(rifle.weapon.vao);g.drawElements(g.TRIANGLES,rifle.weapon.count,rifle.weapon.type);
-    if((view.flinch||0)>6){g.bindVertexArray(rifle.flash.vao);g.drawElements(g.TRIANGLES,rifle.flash.count,rifle.flash.type);}
-    g.bindVertexArray(null);g.enable(g.CULL_FACE);
+    const g=world.gl;
+    // Optional first-person weapon must NEVER stop the destructible camp render loop.
+    // WebGL drawElements(mode, count, type, offset) REQUIRES the byte offset.
+    try {
+      g.useProgram(rifle.program);g.uniformMatrix4fv(rifle.vp,false,vp);g.uniformMatrix4fv(rifle.model,false,model);
+      g.disable(g.CULL_FACE);g.bindVertexArray(rifle.weapon.vao);
+      g.drawElements(g.TRIANGLES,rifle.weapon.count,rifle.weapon.type,0);
+      if((view.flinch||0)>6){g.bindVertexArray(rifle.flash.vao);g.drawElements(g.TRIANGLES,rifle.flash.count,rifle.flash.type,0);}
+    }catch(error){
+      console.warn('[Army Shooting] Optional rifle visual failed; continuing camp render',error);
+      state.rifle=null;
+    }finally{g.bindVertexArray(null);g.enable(g.CULL_FACE);}
+
   };
   function frame(ms){const dt=clamp((ms-(state.lastTime||ms))/1000,0,.048);state.lastTime=ms;const {view,actors,barrels}=state;
     if(view)window.__armyShootingView=view;
