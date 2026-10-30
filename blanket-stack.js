@@ -42,10 +42,10 @@ const modelPath=o=>cleanPath(o?.model||ASSET_FALLBACK[o?.assetId]);
 function blanketClothShape(o){
  if(o?.category!=='blanket'||!o.clothPower)return {x:1,y:1,z:1};
  const t=Math.max(0,o.clothTime||0);
- const motion=Math.sin(1.27+t*23)*Math.exp(-t*7.8)*o.clothPower;
- // A military 'tofu blanket' is firm: max ~8% height compression,
- // with a barely visible sideways bulge and one quick return bounce.
- return {x:1+.022*motion,y:1-.077*motion,z:1+.025*motion};
+ const motion=Math.cos(t*15)*Math.exp(-t*9)*o.clothPower;
+ // Only the newly landed layer compresses. Horizontal dimensions stay fixed,
+ // so an existing tower does not appear to jump or re-centre on impact.
+ return {x:1,y:1-.06*motion,z:1};
 }
 const qualityOf=o=>o.quality==='high'?'high':'low';
 const BY={}; // asset lookup for shared editor shader routines
@@ -169,7 +169,8 @@ function drawModel(o,vp,overridePath=null){
  const u=n=>uniform(p,n);
  gl.uniformMatrix4fv(u('uVP'),false,vp);
  gl.uniformMatrix4fv(u('uModel'),false,modelMatrix(o,m.geo));
- const tint=o.crushed?[.72,.74,.70]:o.broken?[.67,.62,.57]:[1,1,1];
+ // Subtle colour separation keeps the target readable without new lighting or textures.
+ const tint=o.crushed?[.72,.74,.70]:o.broken?[.67,.62,.57]:o.category==='soldier'?[.91,.94,.90]:o.category==='blanket'?[1.06,1.035,1]:[1,1,1];
  gl.uniform3fv(u('uTint'),tint);gl.uniform3fv(u('uInnerColor'),[.42,.41,.38]);gl.uniform1f(u('uRed'),o.team==='enemy'?1:0);
  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,m.tex);gl.uniform1i(u('uTex'),0);
  if(m.geo.skin){
@@ -296,7 +297,8 @@ function drawTopOutline(vp){
  gl.useProgram(flatProgram);lastUsed=flatProgram;
  gl.uniformMatrix4fv(gl.getUniformLocation(flatProgram,'uVP'),false,vp);
  gl.uniformMatrix4fv(gl.getUniformLocation(flatProgram,'uModel'),false,m);
- gl.uniform3f(gl.getUniformLocation(flatProgram,'uColor'),1,.76+Math.min(.20,outlineFlash*.65),.025+Math.min(.27,outlineFlash*.85));
+ const riskTint=cap((lastRisk.value-.45)/.55,0,1);
+ gl.uniform3f(gl.getUniformLocation(flatProgram,'uColor'),1,.76-riskTint*.22+Math.min(.20,outlineFlash*.65),.025+Math.min(.27,outlineFlash*.85));
  gl.bindVertexArray(topOutlineVAO);gl.disable(gl.CULL_FACE);
  gl.drawArrays(gl.TRIANGLES,0,topOutlineCount);gl.enable(gl.CULL_FACE);gl.bindVertexArray(null);
 }
@@ -305,15 +307,15 @@ let state='loading',round=1,roundResults=[],collapsingAt=0,collapseDir=[1,0],col
 let collapseAngle=0,collapseSpeed=0,collapseStage='hinge',collapseAxis=[0,1],collapseReleased=0;
 let totalCrushed=0,totalBuildings=0,totalMines=0,roundCrushed=0,roundBuildings=0,roundMines=0;
 let angleChoice=0,camYaw=.12,camDist=17.5,camPitch=.88,camTargetHeight=1.0,camFocus={x:-20.8,z:-2};
-let lastRisk={value:0,dx:0,dz:0},dangerStrikes=0,landingKick=0,outlineFlash=0;
+let lastRisk={value:0,dx:0,dz:0},dangerStrikes=0,landingKick=0,outlineFlash=0,visualSwayBlend=1;
 let ready=false,last=performance.now(),gameTime=0,pendingCelebration=null,messageEnds=0;
 let audioContext=null;
 const originalFoundation=()=>({...foundation,y:foundation.y||0,tiltX:0,tiltZ:0});
 const tierHeight=()=>foundation.size[1]*foundation.scale;
 function setState(next){state=next;const active=next!=='loading'&&next!=='intro'&&next!=='result';$('hud').hidden=!active;$('actions').hidden=!active;
- $('cleanup').disabled=!(next==='flying'||next==='collapseDone');$('cleanup').textContent=next==='collapseDone'?'收拾倒塌棉被':'收拾棉被';syncHUD()}
+ $('cleanup').disabled=!(next==='flying'||next==='collapseDone');$('cleanup').classList.remove('confirming');$('cleanup').textContent=next==='collapseDone'?'收拾倒塌棉被':'結束本輪';syncHUD()}
 function syncHUD(){$('round').textContent=String(round);$('left').textContent=String(4-round);$('layers').textContent=String(state==='collapsing'||state==='collapseDone'?collapseSavedLayers:stack.length)}
-function say(message,seconds=1.25){$('message').textContent=message;$('message').classList.add('show');messageEnds=performance.now()+seconds*1000}
+function say(message,seconds=1.25){const el=$('message');el.textContent=message;el.classList.toggle('perfect',message==='PERFECT！');el.classList.add('show');messageEnds=performance.now()+seconds*1000}
 function startRound(resetWorld=false){
  // 收拾只清掉棉被塔；被擊飛的友軍、破碎建築、引爆過的地雷與碎片都留在現場。
  // Only the first round of an entirely new game (or the "play again" button)
@@ -346,83 +348,44 @@ function spawnFlying(){
  flying={obj,dir:u,side:v,targetX:target.x,targetZ:target.z,lane,dist:-range,range,speed:4.3+Math.min(5.5,stack.length*.18),bob:0};
 }
 function dropFlying(){if(state!=='flying'||!flying)return;playTap();falling={o:{...flying.obj},velocity:0,landingY:stack.length*tierHeight(),time:0};flying=null;setState('dropping')}
-// Recoverable arcade balance: weight the RECENT upper tower most strongly.
-// The old test examined each lower support against ALL blocks above it and
-// amplified the result with height. One old offset therefore became almost
-// impossible to correct, and even a perfectly aligned next blanket could fall.
-// This model still punishes drifting away from the foundation, but shifting
-// the next few blankets toward the opposite side genuinely restores balance.
+// Test the centre of the whole load supported by each layer. A lower misplaced
+// layer can therefore matter even after the upper blankets are centred again.
+// Running suffix sums reproduce the historical support calculation in O(n).
 function stackRisk(){
- const halfX=Math.max(.3,foundation.size[0]*foundation.scale*.5);
- const halfZ=Math.max(.3,foundation.size[2]*foundation.scale*.5);
- const base=stack[0];
- let sumX=0,sumZ=0,sumWeight=0,wholeX=0,wholeZ=0;
- const first=Math.max(1,stack.length-7);
- for(let i=1;i<stack.length;i++){
-  const o=stack[i];wholeX+=o.x;wholeZ+=o.z;
-  if(i>=first){
-   // More weight on recent placements => an opposite correction works.
-   const age=stack.length-1-i,w=1/(1+age*.42);
-   sumX+=o.x*w;sumZ+=o.z*w;sumWeight+=w;
-  }
+ const halfX=foundation.size[0]*foundation.scale*.5,halfZ=foundation.size[2]*foundation.scale*.5;
+ let worst=0,dx=0,dz=0,sumX=0,sumZ=0,count=0;
+ for(let i=stack.length-2;i>=0;i--){
+  sumX+=stack[i+1].x;sumZ+=stack[i+1].z;count++;
+  const offsetX=sumX/count-stack[i].x,offsetZ=sumZ/count-stack[i].z;
+  const risk=Math.hypot(offsetX/Math.max(.3,halfX*.91),offsetZ/Math.max(.3,halfZ*.91))*(1+Math.min(.31,count*.013));
+  if(risk>worst){worst=risk;dx=offsetX;dz=offsetZ}
  }
- const n=Math.max(1,stack.length-1);
- const recentX=sumWeight?sumX/sumWeight:base.x,recentZ=sumWeight?sumZ/sumWeight:base.z;
- const overallX=wholeX/n,overallZ=wholeZ/n;
- const dx=(recentX-base.x)*.86+(overallX-base.x)*.14;
- const dz=(recentZ-base.z)*.86+(overallZ-base.z)*.14;
- // Height makes a leaning tower slightly more sensitive; a STRAIGHT tower
- // never becomes unstable merely because it has many layers.
- const heightFactor=1+Math.min(.10,Math.max(0,stack.length-5)*.004);
- const lean=Math.hypot(dx/(halfX*1.12),dz/(halfZ*1.12))*heightFactor;
  const top=stack[stack.length-1],below=stack[stack.length-2];
- let contact=0,contactX=0,contactZ=0;
- if(below){
-  contactX=top.x-below.x;contactZ=top.z-below.z;
-  // Physically unsupported: an almost entirely missed mattress must fall.
-  contact=Math.max(Math.abs(contactX)/(halfX*1.75),Math.abs(contactZ)/(halfZ*1.75));
+ if(below&&(Math.abs(top.x-below.x)>halfX*1.6||Math.abs(top.z-below.z)>halfZ*1.6)){
+  worst=Math.max(worst,2);dx=top.x-below.x;dz=top.z-below.z;
  }
- return {
-  value:Math.max(lean,contact*.76),dx:Math.abs(dx)+Math.abs(dz)>.015?dx:contactX,
-  dz:Math.abs(dx)+Math.abs(dz)>.015?dz:contactZ,contact
- };
+ return {value:worst,dx,dz};
 }
 function landBlanket(){
  const previous=stack[stack.length-1];
- const before=lastRisk.value;
  const landed=falling.o;
  const dropSpeed=falling.velocity;
  landed.y=stack.length*tierHeight();landed.tiltX=0;landed.tiltZ=0;
  stack.push(landed);falling=null;
- const risk=stackRisk();lastRisk=risk;landingKick=.24;outlineFlash=.28;
+ const risk=stackRisk();lastRisk=risk;landingKick=0;outlineFlash=.28;
  const accuracy=previous?Math.hypot(landed.x-previous.x,landed.z-previous.z):3;
- // The newly landed blanket flattens for a split second; the supporting
- // blankets respond with quickly diminishing micro-compression.
+ // Only the newly landed blanket compresses; supporting layers stay still.
  const impactEnergy=cap(.68+dropSpeed*.011,.72,1);
  for(let i=stack.length-1;i>=Math.max(0,stack.length-5);i--){
   const layer=stack[i],d=stack.length-1-i;
-  layer.clothPower=Math.max(layer.clothPower||0,impactEnergy*Math.pow(.49,d));
-  layer.clothTime=0;
+  if(d===0){layer.clothPower=impactEnergy;layer.clothTime=0;}
  }
  playStackImpact(accuracy,stack.length);
- // A dangerous placement gets a chance for a recovery on the next drop.
- // Precise landings cannot suddenly destroy an otherwise surviving tower.
- const unsupported=risk.contact>=1;
- const extreme=risk.value>=1.60;
- const worsening=risk.value>before+.045;
- if(risk.value>1.08&&worsening&&accuracy>.28){
-  dangerStrikes+=risk.value>1.35?1.5:1;
- }else if(risk.value<.97||accuracy<.28||risk.value<before-.045){
-  dangerStrikes=Math.max(0,dangerStrikes-1);
- }else{
-  dangerStrikes=Math.max(0,dangerStrikes-.25);
- }
- // Only a severe unsupported overhang, an extreme overall lean or two
- // *worsening* risky placements in a row can cause a real collapse.
- if(unsupported||(accuracy>.28&&(extreme||(risk.value>=1.08&&worsening&&dangerStrikes>=2)))){
+ if(risk.value>=1){
   beginCollapse(risk,true);return;
  }
  if(accuracy<.24&&stack.length>2)say('PERFECT！',.85);
+ else if(risk.value>.62)say('棉被塔正在傾斜！',1.1);
  if(risk.value>.62)playCreak(risk.value);
  // The next blanket immediately enters: no five-layer cinematic pause.
  spawnFlying();setState('flying');
@@ -579,9 +542,9 @@ function updateGame(dt){
  camPitch=mix(camPitch,pitchGoal,Math.min(1,dt*1.9));
  const desired=collapsing?Math.max(30,26+height*1.40):16.8+height*.68;
  landingKick=Math.max(0,landingKick-dt);
- camDist=mix(camDist,desired-(landingKick>0?1.2*Math.sin(landingKick/.24*Math.PI):0),Math.min(1,dt*2.2));
+ camDist=mix(camDist,desired-(landingKick>0?.85*Math.sin(landingKick/.24*Math.PI):0),1-Math.exp(-dt*(collapsing?2.2:1.5)));
  const targetHeight=collapsing?height*.26:Math.max(.9,height*.68);
- camTargetHeight=mix(camTargetHeight,targetHeight,Math.min(1,dt*2.5));
+ camTargetHeight=mix(camTargetHeight,targetHeight,1-Math.exp(-dt*(collapsing?2.5:1.6)));
  const move=collapsing?Math.min(height*.45,12):0;
  camFocus.x=mix(camFocus.x,foundation.x+collapseDir[0]*move,Math.min(1,dt*1.7));
  camFocus.z=mix(camFocus.z,foundation.z+collapseDir[1]*move,Math.min(1,dt*1.7));
@@ -611,6 +574,23 @@ function worldToScreen(x,y,z,vp){
  const w=vp[3]*x+vp[7]*y+vp[11]*z+vp[15];if(w<=.01)return null;
  return{x:(vp[0]*x+vp[4]*y+vp[8]*z+vp[12])/w,y:(vp[1]*x+vp[5]*y+vp[9]*z+vp[13])/w}
 }
+// Buildings can overlap the view even when their centre is outside it. Test a
+// conservative world-space bounding sphere against the camera's side and near
+// planes; keep the existing inexpensive point test for soldiers and props.
+function buildingFrustum(vp){
+ const planes=[];
+ for(const [row,sign] of [[0,1],[0,-1],[1,1],[1,-1],[2,1]]){
+  const a=vp[3]+sign*vp[row],b=vp[7]+sign*vp[4],c=vp[11]+sign*vp[8],d=vp[15]+sign*vp[12];
+  planes.push([a,b,c,d,Math.hypot(a,b,c)]);
+ }
+ return planes;
+}
+function buildingInView(o,planes,extra=0){
+ const size=o.size||[1,1,1],scale=Math.abs(o.scale||1);
+ const radius=Math.hypot(size[0],size[1],size[2])*scale*.55+extra;
+ const y=(o.y??o.sourceY??0)+size[1]*scale*.5;
+ return planes.every(p=>p[0]*o.x+p[1]*y+p[2]*o.z+p[3]>=-radius*p[4]);
+}
 let firstRender=false;
 function camera(){const w=Math.max(1,canvas.clientWidth),h=Math.max(1,canvas.clientHeight),ratio=w/h,portrait=ratio<.8;
  const pitch=camPitch; // close three-quarter gameplay, brief dramatic side reveal
@@ -627,15 +607,20 @@ function draw(){
  gl.viewport(0,0,cw,ch);gl.clearColor(.63,.78,.83,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
  const vp=camera();gl.useProgram(originalGroundProgram);lastUsed=originalGroundProgram;
  gl.uniformMatrix4fv(gl.getUniformLocation(originalGroundProgram,'uVP'),false,vp);gl.bindVertexArray(originalGroundVAO);gl.disable(gl.CULL_FACE);gl.drawArrays(gl.TRIANGLES,0,originalGroundCount);gl.enable(gl.CULL_FACE);
- const far=state==='collapsing'||state==='collapseDone'?105:Math.max(45,camDist*1.65);
+ const far=state==='collapsing'||state==='collapseDone'?105:Math.max(45,camDist*1.65),buildingPlanes=buildingFrustum(vp);
  // NO hard 115-person cap: all 275 placed NPCs are eligible for rendering.
  // For mid/far soldiers, reuse a low-poly mesh instead of drawing 275 high-poly rigs.
  for(const o of things){
   if(o.category==='mine'&&o.ignited)continue;
   const fragmented=o.broken&&o.fragmentsReady&&o.fragments?.length>0;
-  if(Math.hypot(o.x-camFocus.x,o.z-camFocus.z)>far+(fragmented?18:0))continue;
-  const ndc=worldToScreen(o.x,Math.min(1.2,(o.size?.[1]||1)*.4),o.z,vp);
-  if(!ndc||Math.abs(ndc.x)>(fragmented?1.9:1.4)||Math.abs(ndc.y)>(fragmented?1.85:1.38))continue;
+  const buildingRadius=o.category==='building'?Math.hypot(...(o.size||[1,1,1]))*Math.abs(o.scale||1)*.55:0;
+  if(Math.hypot(o.x-camFocus.x,o.z-camFocus.z)>far+(fragmented?18:0)+buildingRadius)continue;
+  if(o.category==='building'){
+   if(!buildingInView(o,buildingPlanes,fragmented?18:0))continue;
+  }else{
+   const ndc=worldToScreen(o.x,Math.min(1.2,(o.size?.[1]||1)*.4),o.z,vp);
+   if(!ndc||Math.abs(ndc.x)>(fragmented?1.9:1.4)||Math.abs(ndc.y)>(fragmented?1.85:1.38))continue;
+  }
   const low=o.category==='soldier'&&!o.crushed&&Math.hypot(o.x-camFocus.x,o.z-camFocus.z)>11&&cache.has(SOLDIER_LOD_PATH);
   if(!cache.has(low?SOLDIER_LOD_PATH:modelPath(o)))continue;
   if(fragmented){drawFragments(o,vp);continue}
@@ -649,8 +634,10 @@ function draw(){
   // Purely visual sub-centimeter oscillation; the stability calculation never changes.
   const wobble=(state==='flying'||state==='dropping')?Math.max(0,lastRisk.value-.36)*Math.min(.85,stack.length*tierHeight()*.095)*i/Math.max(1,stack.length-1)*Math.sin(gameTime*(2.0+lastRisk.value*2)):0;
   const directionLength=Math.hypot(lastRisk.dx,lastRisk.dz)||1;
-  o.swayX=wobble*(Math.abs(lastRisk.dx)>1e-4?lastRisk.dx/directionLength:1);
-  o.swayZ=wobble*lastRisk.dz/directionLength;drawModel(o,vp);
+  const swayX=wobble*(Math.abs(lastRisk.dx)>1e-4?lastRisk.dx/directionLength:1);
+  const swayZ=wobble*lastRisk.dz/directionLength;
+  o.swayX=mix(o.swayX||0,swayX,visualSwayBlend);
+  o.swayZ=mix(o.swayZ||0,swayZ,visualSwayBlend);drawModel(o,vp);
  }
  drawTopOutline(vp);
  if(flying)drawModel(flying.obj,vp);
@@ -717,10 +704,12 @@ function playBlast(){try{
 function tick(now){
  try{
   const dt=Math.min(.05,(now-last)/1000||0);last=now;
+  visualSwayBlend=1-Math.exp(-dt*6);
   if(ready&&state!=='result'&&state!=='intro'&&state!=='loading')updateGame(dt);
   $('layers').parentElement.classList.toggle('danger',lastRisk.value>.73&&['flying','dropping'].includes(state));
   if($('message').classList.contains('show')&&now>messageEnds)$('message').classList.remove('show');
-  if(ready)draw();
+  // The opaque result covers the scene; retain its last frame while reading.
+  if(ready&&state!=='result')draw();
   requestAnimationFrame(tick);
  }catch(e){console.error('棉被遊戲迴圈失敗',e);fatal(e)}
 }
@@ -738,32 +727,54 @@ async function boot(){
   for(const o of things){if(o.category==='mine')mines.push(o);else if(o.category==='soldier')soldiers.push(o);else if(o.category==='building')buildings.push(o);else if(o.category==='prop')props.push(o)}
   camFocus={x:foundation.x,z:foundation.z};
   initGL();initRings();initTopOutline();
-  // Keep the opening responsive: load the actual blanket first, then mines and soldiers.
-  const priority=[foundation,mines[0],soldiers[0]].filter(Boolean);
-  for(let i=0;i<priority.length;i++){
-   $('loadingText').textContent=['載入棉被模型…','準備骷髏地雷…','準備友軍模型…'][i];
-   $('loadBar').style.width=((i+1)*25)+'%';await ensureModel(priority[i]);
-  }
-  if(!cache.has(modelPath(foundation)))throw Error('棉被 3D 模型未能載入');
-  const group=[...new Map(things.filter(o=>modelPath(o)).map(o=>[modelPath(o),o])).values()]
-    .filter(o=>!cache.has(modelPath(o)))
-    .sort((a,b)=>Math.hypot(a.x-foundation.x,a.z-foundation.z)-Math.hypot(b.x-foundation.x,b.z-foundation.z));
-  const launch=async()=>{let cursor=0;const worker=async()=>{while(cursor<group.length){const o=group[cursor++];await ensureModel(o);await new Promise(r=>setTimeout(r,35))}};await Promise.all([worker(),worker()])};
-  void launch();
-  // Warm the six building fracture sources; a hit does not have to wait for a full download.
-  const fracturePaths=[...new Set(buildings.map(o=>cleanPath(o.destructible?.fracturedModel)).filter(Boolean))];
-  void (async()=>{for(const path of fracturePaths){try{
-   if(fractureCache.has(path))continue;
-   const job=loadGlb(path,{timeoutMs:65000});fractureDataCache.set(path,job);
-   await job;
-  }catch(e){fractureDataCache.delete(path);console.warn('破壞模型預載:',path,e)}}})();
-  // The fallback remains the original hi-poly NPC if a low-poly asset is missing.
-  void ensureModel({model:SOLDIER_LOD_PATH,assetId:'lowSoldier'});
+  // Match the first round's actual camera and renderer culling. In addition to
+  // visible objects, cover a small area around the tower for camera movement.
+  camTargetHeight=1.2;camDist=17.5;camPitch=.88;
+  const openingVP=camera(),openingPlanes=buildingFrustum(openingVP),openingFar=Math.max(45,camDist*1.65);
+  const distance=o=>Math.hypot(o.x-foundation.x,o.z-foundation.z);
+  const openingVisible=o=>{
+   const buildingRadius=o.category==='building'?Math.hypot(...(o.size||[1,1,1]))*Math.abs(o.scale||1)*.55:0;
+   if(distance(o)>openingFar+buildingRadius)return false;
+   if(o.category==='building')return buildingInView(o,openingPlanes);
+   const pt=worldToScreen(o.x,Math.min(1.2,(o.size?.[1]||1)*.4),o.z,openingVP);
+   return !!pt&&Math.abs(pt.x)<=1.4&&Math.abs(pt.y)<=1.38;
+  };
+  const byPath=new Map();
+  for(const o of things){const path=modelPath(o);if(path&&(!byPath.has(path)||distance(o)<distance(byPath.get(path))))byPath.set(path,o)}
+  const all=[...byPath.values()];
+  // Choose paths from ALL instances, not just the first instance of each model.
+  const nearPaths=new Set(things.filter(o=>modelPath(o)&&(distance(o)<=24||openingVisible(o))).map(modelPath));
+  const priority=[foundation,...all.filter(o=>nearPaths.has(modelPath(o))),{model:SOLDIER_LOD_PATH,assetId:'lowSoldier'}];
+  const uniquePriority=[...new Map(priority.filter(o=>modelPath(o)).map(o=>[modelPath(o),o])).values()];
+  let cursor=0,completed=0;
+  $('loadingText').textContent='準備附近場景 0 / '+uniquePriority.length+'…';
+  const loadOpening=async()=>{while(cursor<uniquePriority.length){
+   const o=uniquePriority[cursor++],loaded=await ensureModel(o);
+   if(!loaded)throw Error('附近場景模型載入失敗，請重新載入：'+(o.name||modelPath(o)));
+   completed++;$('loadingText').textContent='準備附近場景 '+completed+' / '+uniquePriority.length+'…';
+   $('loadBar').style.width=Math.round(completed/uniquePriority.length*100)+'%';
+  }};
+  // Bound concurrent downloads/decodes on iPhone, while showing real progress.
+  await Promise.all([loadOpening(),loadOpening()]);
+  const group=all.filter(o=>!cache.has(modelPath(o))).sort((a,b)=>distance(a)-distance(b));
+  const launch=async()=>{
+   let next=0;const worker=async()=>{while(next<group.length){await ensureModel(group[next++]);await new Promise(r=>setTimeout(r,35))}};
+   await Promise.all([worker(),worker()]);
+   // Warm fracture data after intact scenery, avoiding a startup decode spike.
+   const fracturePaths=[...new Set(buildings.map(o=>cleanPath(o.destructible?.fracturedModel)).filter(Boolean))];
+   for(const path of fracturePaths){try{
+    if(fractureCache.has(path)||fractureDataCache.has(path)||fracturePending.has(path))continue;
+    const job=loadGlb(path,{timeoutMs:65000});fractureDataCache.set(path,job);
+    await job;
+   }catch(e){fractureDataCache.delete(path);console.warn('破壞模型預載:',path,e)}}
+  };
+  let backgroundStarted=false;
   stack=[originalFoundation()];state='intro';ready=true;
-  $('loadingText').textContent='';$('loadLine').hidden=true;$('play').disabled=false;$('play').textContent='開始挑戰';$('loadBar').style.width='100%';
-  $('play').onclick=()=>{$('overlay').hidden=true;round=1;roundResults=[];totalCrushed=0;totalBuildings=0;totalMines=0;startRound(true)};
-  // Draw a real WebGL frame before unlocking start.
+  // Present one complete frame before allowing the player to start.
   draw();
+  $('loadingText').textContent='';$('loadLine').hidden=true;$('play').disabled=false;$('play').textContent='開始挑戰';$('loadBar').style.width='100%';
+  $('play').onclick=()=>{$('overlay').hidden=true;round=1;roundResults=[];totalCrushed=0;totalBuildings=0;totalMines=0;startRound(true);
+   if(!backgroundStarted){backgroundStarted=true;void launch()}};
  }catch(e){console.error('棉被遊戲初始化失敗',e);fatal(e)}
 }
 canvas.addEventListener('pointerdown',e=>{if(e.cancelable)e.preventDefault();if(state==='flying')dropFlying()},{passive:false});

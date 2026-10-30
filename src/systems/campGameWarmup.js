@@ -10,9 +10,9 @@ const urls = {
  grenade:'grenade-workshop-test.html'
 };
 const stage1 = [
- 'blanket-stack.html?fromCamp=1&armyPrewarmed=1','grenade-workshop-test.html?fromCamp=1&armyPrewarmed=1&v=153',
+ 'blanket-stack.html?fromCamp=1&armyPrewarmed=1&v=159','grenade-workshop-test.html?fromCamp=1&armyPrewarmed=1&v=153',
  'assets/audio/minigames/blanket-parade-loop.mp3','assets/audio/minigames/grenade-ordnance-loop.mp3',
- 'src/systems/minigameBgm.js?v=190','src/systems/grenadeEarlyAudio.js?v=191','src/systems/blanketSfx.js?v=170',
+ 'src/systems/minigameBgm.js?v=190','src/systems/grenadeEarlyAudio.js?v=191','src/systems/blanketSfx.js?v=173',
  'src/systems/blanketAchievements.js?v=180','src/systems/grenadeWorkshopSfx.js?v=326',
  'src/systems/grenadeArenaSfx.js?v=325',
  'assets/audio/blanket/blanket_drop_fabric.mp3','assets/audio/blanket/blanket_land_1.mp3',
@@ -32,7 +32,7 @@ const stage1 = [
  'assets/audio/grenade/collapse_3.mp3','assets/audio/grenade/debris_scatter.mp3',
  'assets/audio/grenade/collapse_1.mp3',
  'blanket-stack-scene.json?v=153','grenade-user-scene.json?v=130',
- 'blanket-stack.js?v=153','grenade-user-play.html?embedded=1&v=153',
+ 'blanket-stack.js?v=158','grenade-user-play.html?embedded=1&v=153',
  'grenade-user-play-3d.js?v=139'
 ];
 const status = {blanket:{},grenade:{}};
@@ -162,7 +162,7 @@ function warm(kind){
   // An older cached return handler may navigate only the iframe. Recover safely.
   try{if(s.frame===frame&&active===kind&&/\/index\.html$/.test(frame.contentWindow.location.pathname))exit()}catch{}
  });
- frame.src=new URL(urls[kind]+'?fromCamp=1&armyPrewarmed=1'+(kind==='grenade'?'&v=153':''),ROOT).href;
+ frame.src=new URL(urls[kind]+'?fromCamp=1&armyPrewarmed=1'+(kind==='grenade'?'&v=153':'&v=159'),ROOT).href;
  document.body.appendChild(frame);
 }
 const lastApproach={blanket:0,grenade:0};
