@@ -1,4 +1,4 @@
-/* ARMY3 · 報告長官！我的子彈有上靶嗎？ — standalone target-paper shooting v1.41 */
+/* ARMY3 · 報告長官！我的子彈有上靶嗎？ — standalone target-paper shooting v1.42 */
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
 const canvas=$('shootingOverlay'),ctx=canvas.getContext('2d',{alpha:true}),min=Math.min,max=Math.max,clamp=(x,a,b)=>max(a,min(b,x));
@@ -10,6 +10,45 @@ const backZ=22.15;
 let width=1,height=1,dpr=1,ready=false,state='loading',zoom=false,rounds=MAX_ROUNDS,shots=0,hits=[],elapsed=0,remain=MAX_TIME,nextShot=0,holdFire=false,lastFrame=0,recoil=0,flinch=0,breathX=0,breathY=0;
 let yaw=Math.atan2(PAPER.x-FIELD.x,PAPER.z-FIELD.z),pitch=Math.atan2(PAPER.y-FIELD.y,PAPER.z-FIELD.z);
 let bullets=[],reviewElapsed=0,reviewOrigin=null,dragging=null,shotTick=0;
+// Breath is deliberately a damped random walk, NOT several repeating sine waves.
+// The user controls only the amplitude; the motion style does not affect scoring rules.
+let breathLevel=30;
+try { const stored=Number(localStorage.getItem('ARMY3_paper_breath_level_v1')); if(Number.isFinite(stored))breathLevel=clamp(stored,0,100); }catch{}
+const sway={x:0,y:0,vx:0,vy:0,gx:0,gy:0,remaining:0,rate:4.2,seed:0x52A7D3E9};
+function randomBreath(){let x=sway.seed|0;x^=x<<13;x^=x>>>17;x^=x<<5;sway.seed=x;return (x>>>0)/4294967296;}
+function randomSigned(){return randomBreath()*2-1;}
+function updateBreathing(dt){
+  // Zero really means NO respiratory sway; recoil is a separate gun effect.
+  if(breathLevel===0){breathX=breathY=0;return;}
+  sway.remaining-=dt;
+  if(sway.remaining<=0){
+    const burst=randomBreath()<.19,linger=randomBreath()<.12;
+    // Some quick, sharp corrections, some quiet holds, with no fixed period.
+    sway.remaining=linger?.85+randomBreath()*1.5:burst?.07+randomBreath()*.27:.22+randomBreath()*1.0;
+    sway.rate=burst?7+randomBreath()*4:2.4+randomBreath()*4.3;
+    const bias=burst?1.6:.85;
+    sway.gx=clamp(sway.x*.22+randomSigned()*bias,-1.7,1.7);
+    sway.gy=clamp(sway.y*.16+randomSigned()*bias,-1.7,1.7);
+  }
+  // Critically damped spring avoids noisy per-frame trembling and keeps motion irregular.
+  const omega=sway.rate,damping=2*omega;
+  sway.vx+=(omega*omega*(sway.gx-sway.x)-damping*sway.vx)*dt;
+  sway.vy+=(omega*omega*(sway.gy-sway.y)-damping*sway.vy)*dt;
+  sway.x=clamp(sway.x+sway.vx*dt,-1.85,1.85);
+  sway.y=clamp(sway.y+sway.vy*dt,-1.85,1.85);
+  const strength=Math.pow(breathLevel/100,2.05),base=Math.min(width,500);
+  breathX=sway.x*base*.42*strength;
+  breathY=sway.y*base*.50*strength;
+}
+function setBreathLevel(value){
+  breathLevel=clamp(Math.round(Number(value)||0),0,100);
+  $('breathSlider').value=String(breathLevel);
+  const description=breathLevel===0?'完全不呼吸':breathLevel<22?'幾乎不晃':breathLevel<48?'輕度晃動':breathLevel<77?'劇烈亂晃':'極限亂晃';
+  $('breathValue').textContent=`${breathLevel}% · ${description}`;
+  if(breathLevel===0)breathX=breathY=0;
+  try{localStorage.setItem('ARMY3_paper_breath_level_v1',String(breathLevel));}catch{}
+}
+function resetSway(){Object.assign(sway,{x:0,y:0,vx:0,vy:0,gx:0,gy:0,remaining:0,rate:4.2});breathX=breathY=0;}
 let muted=false;try{muted=localStorage.getItem('ARMY3_shoot_muted')==='1'}catch{}
 $('muteBtn').textContent=muted?'🔇':'🔊';
 const audio=new Audio('./assets/audio/rifle/npc_rifle_B.mp3');audio.preload='auto';
@@ -26,7 +65,18 @@ function project(x,y,z){const dx=x-FIELD.x,dy=y-FIELD.y,dz=z-FIELD.z,{forward,ri
   const sx=dx*right[0]+dy*right[1]+dz*right[2],sy=dx*up[0]+dy*up[1]+dz*up[2],f=focal();
   return {x:width/2+f*sx/depth,y:height/2-f*sy/depth,depth};
 }
-function hitFromSight(){const f=focal(),nx=breathX/f,ny=-breathY/f,{forward,right,up}=cameraBasis();
+// The physical front-post peak is local (0,-8), NOT the centre of the viewport.
+// Use this SAME exact transformed point for visuals, bullet ray and tracer.
+function sightPose(){
+ const x=width*.5+breathX,y=height*.5+breathY-recoil*.28;
+ const scale=clamp(min(width/390,height/690),.67,1.34)*(zoom?1.06:1);
+ const tilt=(sway.x*.012+sway.y*.007)*Math.pow(breathLevel/100,1.2)+flinch*.0016;
+ return {x,y,scale,tilt};
+}
+function sightTip(){const p=sightPose(),postTopY=-8;
+ return {x:p.x-postTopY*p.scale*Math.sin(p.tilt),y:p.y+postTopY*p.scale*Math.cos(p.tilt)};
+}
+function hitFromSight(tip=sightTip()){const f=focal(),nx=(tip.x-width*.5)/f,ny=-(tip.y-height*.5)/f,{forward,right,up}=cameraBasis();
   const direction=forward.map((v,i)=>v+right[i]*nx+up[i]*ny),t=(PAPER.z-FIELD.z)/direction[2];
   if(t<=0||!Number.isFinite(t))return null;
   const x=FIELD.x+direction[0]*t,y=FIELD.y+direction[1]*t;
@@ -64,8 +114,8 @@ function getPaperRect(){const [tl,tr,bl]=paperCorners();if(!tl||!tr||!bl)return 
 // The WebGL module reads this canvas + immutable world transform to texture a
 // paper mesh fixed on the physical target. Never tie it to muzzle sway/yaw.
 window.__armyFixedPaper={geometry:{...PAPER},image:paperImage,version:()=>shots+':'+hits.length};
-function drawIronSights(){const x=width*.5+breathX,y=height*.5+breathY;
- const scale=clamp(min(width/390,height/690),.67,1.34)*(zoom?1.06:1);ctx.save();ctx.translate(x,y);ctx.scale(scale,scale);ctx.rotate(Math.sin(elapsed*1.35)*.005+flinch*.0016);
+function drawIronSights(){const {x,y,scale,tilt}=sightPose();
+ ctx.save();ctx.translate(x,y);ctx.scale(scale,scale);ctx.rotate(tilt);
  ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#101612';ctx.lineWidth=22;ctx.shadowColor='#050a08a8';ctx.shadowBlur=5;
  ctx.beginPath();ctx.arc(0,30,128,0,Math.PI*2);ctx.stroke();ctx.shadowBlur=0;
  ctx.strokeStyle='#303b34';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,30,114,Math.PI*1.13,Math.PI*1.87);ctx.stroke();
@@ -79,15 +129,19 @@ function setHUD(){$('timeDisplay').textContent=remain.toFixed(1);$('ammoDisplay'
 function toast(text){const el=$('hitFlash');el.textContent=text;el.classList.add('visible');setTimeout(()=>el.classList.remove('visible'),550)}
 function fire(){if(state!=='playing'||elapsed<nextShot)return;
  if(rounds<=0){finish();return}
- nextShot=elapsed+FIRE_DELAY;rounds--;shots++;recoil=min(17,recoil+4.5);flinch=8.8;sfx();const hit=hitFromSight();if(hit){hits.push({...hit,shot:shots});toast('上靶！第 '+shots+' 發');}
- bullets.push({t:0,life:.12,x:width*.5+breathX,y:height*.5+breathY,hit:!!hit});setHUD();if(rounds<=0){holdFire=false;setTimeout(()=>{if(state==='playing')finish()},530)}
+ nextShot=elapsed+FIRE_DELAY;rounds--;shots++;
+ // Snapshot the sight before firing recoil. The hole, post peak and tracer agree.
+ const tip=sightTip(),hit=hitFromSight(tip);
+ recoil=min(17,recoil+4.5);flinch=8.8;sfx();
+ if(hit){hits.push({...hit,shot:shots});toast('上靶！第 '+shots+' 發');}
+ bullets.push({t:0,life:.12,x:tip.x,y:tip.y,hit:!!hit});setHUD();if(rounds<=0){holdFire=false;setTimeout(()=>{if(state==='playing')finish()},530)}
 }
 function finish(){if(state!=='playing')return;state='reviewing';holdFire=false;reviewElapsed=0;reviewOrigin=getPaperRect();$('hud').hidden=true;$('shootBtn').classList.remove('pressed');}
 function presentResult(){if(state==='result')return;state='result';$('resultScreen').hidden=false;const image=paperImage();const dest=$('resultPaper');const q=dest.getContext('2d');dest.width=600;dest.height=760;q.clearRect(0,0,600,760);q.drawImage(image,0,0);
  $('resultShots').textContent=shots;$('resultHits').textContent=hits.length;$('resultMisses').textContent=shots-hits.length;$('resultRate').textContent=shots?Math.round(100*hits.length/shots)+'%':'0%';
  $('reportText').textContent=hits.length===0?'報告班長！紙沒事，軍費有事。':hits.length===shots?'全部上靶！槍比你還懂得瞄準。':'射偏的那幾發，報告上就當沒看見？';}
 function update(dt){elapsed+=dt;remain=max(0,MAX_TIME-elapsed);
- const s=elapsed*2.2;breathX=Math.sin(s*.91)*7+Math.sin(s*1.7)*2.3;breathY=Math.cos(s)*8+Math.sin(s*.6)*4-recoil*.28;
+ updateBreathing(dt);
  recoil=max(0,recoil-dt*28);flinch=max(0,flinch-dt*38);
  if(holdFire&&elapsed>=nextShot)fire();bullets=bullets.filter(b=>(b.t+=dt)<b.life);if(remain<=0)finish();setHUD();}
 function drawAnimation(dt){reviewElapsed+=dt;const t=clamp(reviewElapsed/.85,0,1),ease=1-Math.pow(1-t,3),start=reviewOrigin||{x:width/2,y:height/2,w:30,h:38};
@@ -100,7 +154,7 @@ function render(dt){ctx.clearRect(0,0,width,height);if(state==='playing'){for(co
  window.__armyShooting3D?.sync?.([],[],{yaw,pitch,fov:fovNow()*180/Math.PI,zoom,flinch,breathX,breathY,eye:[FIELD.x,FIELD.y,FIELD.z]});}
 function loop(now){const dt=clamp((now-lastFrame)/1000,0,.045);lastFrame=now;if(state==='playing')update(dt);if(state==='playing'||state==='reviewing')render(dt);if(state==='playing'||state==='reviewing')requestAnimationFrame(loop)}
 function reset(){cachedPaper=null;cachedPaperKey='';rounds=MAX_ROUNDS;shots=0;hits=[];elapsed=0;remain=MAX_TIME;nextShot=0;holdFire=false;zoom=false;recoil=0;flinch=0;breathX=0;breathY=0;bullets=[];reviewElapsed=0;reviewOrigin=null;
- yaw=Math.atan2(PAPER.x-FIELD.x,PAPER.z-FIELD.z);pitch=Math.atan2(PAPER.y-FIELD.y,PAPER.z-FIELD.z);$('zoomBtn').classList.remove('active');$('zoomBtn').textContent='◎ 開鏡 2.4×';document.body.classList.remove('scopeActive');setHUD();}
+ yaw=Math.atan2(PAPER.x-FIELD.x,PAPER.z-FIELD.z);pitch=Math.atan2(PAPER.y-FIELD.y,PAPER.z-FIELD.z);resetSway();$('breathPanel').hidden=true;$('breathBtn').setAttribute('aria-expanded','false');$('zoomBtn').classList.remove('active');$('zoomBtn').textContent='◎ 開鏡 2.4×';document.body.classList.remove('scopeActive');setHUD();}
 function start(){if(!ready)return;reset();state='playing';$('hud').hidden=false;$('startScreen').hidden=true;$('resultScreen').hidden=true;lastFrame=performance.now();requestAnimationFrame(loop);}
 function changeAim(dx,dy){if(state!=='playing')return;const k=zoom?.0021:.0055;yaw-=dx*k;while(yaw>Math.PI)yaw-=Math.PI*2;while(yaw< -Math.PI)yaw+=Math.PI*2;pitch=clamp(pitch-dy*k,-1.1,.58)}
 canvas.addEventListener('pointerdown',e=>{if(state!=='playing'||dragging!==null)return;e.preventDefault();dragging={id:e.pointerId,x:e.clientX,y:e.clientY};try{canvas.setPointerCapture(e.pointerId)}catch{}},{passive:false});
@@ -112,6 +166,9 @@ for(const e of ['pointerup','pointercancel','lostpointercapture'])$('shootBtn').
 $('collectBtn').addEventListener('click',finish);
 $('zoomBtn').addEventListener('click',()=>{if(state!=='playing')return;zoom=!zoom;$('zoomBtn').classList.toggle('active',zoom);$('zoomBtn').textContent=zoom?'◎ 關鏡':'◎ 開鏡 2.4×';document.body.classList.toggle('scopeActive',zoom)});
 $('muteBtn').addEventListener('click',()=>{muted=!muted;$('muteBtn').textContent=muted?'🔇':'🔊';try{localStorage.setItem('ARMY3_shoot_muted',muted?'1':'0')}catch{}});
+$('breathBtn').addEventListener('click',()=>{const panel=$('breathPanel');panel.hidden=!panel.hidden;$('breathBtn').setAttribute('aria-expanded',String(!panel.hidden));});
+$('breathSlider').addEventListener('input',e=>setBreathLevel(e.target.value));
+setBreathLevel(breathLevel);
 function back(){state='result';holdFire=false;if(parent!==window){try{parent.postMessage({type:'ARMY3_SHOOTING_RETURN'},location.origin);return}catch{}}location.href='./index.html'}
 document.querySelectorAll('.backBtn').forEach(b=>b.addEventListener('click',back));$('startBtn').addEventListener('click',start);$('againBtn').addEventListener('click',start);
 addEventListener('keydown',e=>{if(e.code==='Space'&&state==='playing'){e.preventDefault();holdFire=true;fire()}if(e.code==='KeyF')$('zoomBtn').click();if(e.code==='Enter'&&state==='playing')finish()});addEventListener('keyup',e=>{if(e.code==='Space')holdFire=false});addEventListener('blur',()=>{holdFire=false;dragging=null});
@@ -124,5 +181,5 @@ async function boot(){try{const r=await fetch('./shooting-paper-scene.json?v=140
   if(performance.now()-started>90000){clearInterval(timer);$('loadStatus').textContent='3D 載入逾時，請確認所有原版 GLB 檔案已上傳';}},250);
  }catch(e){console.error('[ARMY 紙靶打靶]',e);$('loadStatus').textContent='❌ '+e.message}}
 boot();
-window.__armyPaperTest={status:()=>({ready,state,shots,hits:hits.length,rounds,yaw,pitch,zoom,remain,paper:PAPER}),start,fire,finish,aim:changeAim,getHoles:()=>hits.slice(),getPaperIntersection:hitFromSight};
+window.__armyPaperTest={status:()=>({ready,state,shots,hits:hits.length,rounds,yaw,pitch,zoom,remain,paper:PAPER,breathLevel,breathX,breathY}),start,fire,finish,aim:changeAim,getHoles:()=>hits.slice(),getPaperIntersection:hitFromSight,getSightTip:sightTip,setBreathLevel};
 })();

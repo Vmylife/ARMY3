@@ -1,21 +1,28 @@
 <!doctype html><html lang="zh-Hant"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="theme-color" content="#122920">
 <title>國軍射擊鑑測｜我的子彈有上靶嗎？</title>
-<link rel="stylesheet" href="./shooting-paper.css?v=140"></head><body>
+<link rel="stylesheet" href="./shooting-paper.css?v=142"></head><body>
 <canvas id="world3d" aria-label="國軍原本的立體訓練場"></canvas><canvas id="shootingOverlay" aria-label="拖曳控制步槍瞄準"></canvas>
 <div id="hud" hidden>
  <div class="hudTop"><div class="hudPanel"><small>剩餘時間</small><b id="timeDisplay">45.0</b></div><div class="hudPanel"><small>上靶 / 已射</small><b><span id="hitsDisplay">0</span> / <span id="shotsDisplay">0</span></b></div></div>
- <div class="tip">滑動瞄準 · 中央柱頂即落點 · 打靶紙上會留下彈孔</div>
+ <div class="tip">滑動瞄準 · 以中央柱最上端為落點 · 可調不規律呼吸</div>
  <div id="hitFlash" aria-live="polite"></div>
  <div class="controls"><div class="left"><div class="bullets" id="ammoDisplay">20 / 20</div><button id="zoomBtn">◎ 開鏡 2.4×</button><button id="collectBtn" disabled>收靶紙／結算</button></div><button id="shootBtn">射擊</button></div>
  <button id="muteBtn" aria-label="切換音效">🔊</button>
+ <button id="breathBtn" aria-label="調整呼吸強度" aria-controls="breathPanel" aria-expanded="false">⚙ 呼吸</button>
+ <section id="breathPanel" hidden aria-label="呼吸設定">
+  <div class="breathHead"><strong>呼吸晃動強度</strong><output id="breathValue" for="breathSlider">30% · 輕度晃動</output></div>
+  <input id="breathSlider" type="range" min="0" max="100" step="1" value="30" aria-label="調整呼吸幅度">
+  <div class="breathExtremes"><span>0 · 完全不晃</span><span>100 · 超級誇張</span></div>
+  <p>速度和方向會不定時改變，不會固定左右搖擺。調整後立即生效。</p>
+ </section>
 </div>
-<div id="startScreen" class="screen"><div class="panel"><div class="eyebrow">國軍實彈訓練 · 紙靶試玩 v1.41</div><h1>報告班長！<br>這次真的有靶紙。</h1><p>你就是場景中唯一的那名士兵，站在原位置朝前方靶架射擊。機械瞄具會隨呼吸微晃，射中靶紙後會留下真正的彈孔。</p>
+<div id="startScreen" class="screen"><div class="panel"><div class="eyebrow">國軍實彈訓練 · 紙靶試玩 v1.42</div><h1>報告班長！<br>這次真的有靶紙。</h1><p>你就是場景中唯一的那名士兵，站在原位置朝前方靶架射擊。機械瞄具採用不規律呼吸晃動，強度可以從完全靜止調到極限亂晃，射中靶紙後留下真正的彈孔。</p>
 <div class="facts"><span>🎯 原本靶架 + 紙靶</span><span>🔫 20 發連射</span><span>◎ 2.4× 放大</span><span>📋 射完靶紙飛到眼前</span></div>
-<p class="small">上下滑動：上滑抬槍、下滑壓槍。左右拖曳改變方向。可以射完 20 發，也可以提早點「收靶紙」看落點。沒上靶的子彈不會在紙上留下痕跡。</p>
+<p class="small">上下滑動：上滑抬槍、下滑壓槍。左右拖曳改變方向。點遊戲右上角「⚙ 呼吸」可以隨時調整強度。可以射完 20 發，也可以提早點「收靶紙」看落點。沒上靶的子彈不會在紙上留下痕跡。</p>
 <div id="loadStatus">正在載入原本的國軍 3D 模型…</div><button id="startBtn" class="mainBtn" disabled>等待 3D 場景…</button><button class="backBtn secondaryBtn">返回軍營</button></div></div>
 <div id="resultScreen" class="screen" hidden><div class="panel resultPanel"><div class="eyebrow">國軍射擊鑑測 · 實際彈孔紀錄</div><h1>靶紙回收！</h1><canvas id="resultPaper" width="600" height="760" aria-label="放大的打靶紙與所有上靶彈孔"></canvas>
 <div class="results"><div><b id="resultShots">0</b><small>發射</small></div><div><b id="resultHits">0</b><small>上靶</small></div><div><b id="resultMisses">0</b><small>未上靶</small></div><div><b id="resultRate">0%</b><small>命中率</small></div></div>
 <p id="reportText"></p><button id="againBtn" class="mainBtn">再打 20 發</button><button class="backBtn secondaryBtn">返回軍營</button></div></div>
-<script type="module" src="./shooting-paper-world.js?v=141"></script><script src="./shooting-paper.js?v=141"></script>
+<script type="module" src="./shooting-paper-world.js?v=142"></script><script src="./shooting-paper.js?v=142"></script>
 </body></html>

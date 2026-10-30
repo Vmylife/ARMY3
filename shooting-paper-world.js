@@ -1,4 +1,4 @@
-/* ARMY3 v1.41 fixed 3D paper-target practice — reuse original Army3 GLB world and rifle. */
+/* ARMY3 v1.42 fixed 3D paper-target practice — reuse original Army3 GLB world and rifle. */
 import {loadGlb} from './src/core/glb111.js';
 import {RifleRenderer} from './src/training/rifleRenderer.js';
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -84,7 +84,7 @@ async function boot(){try{
     '紅桶與高塔色調');
   // Preserve existing project imports: Blob modules have no relative import base URL.
   src=src.replace(/(\bfrom\s*|\bimport\s*)(['"])(\.\/[^'"\n]+)\2/g,(_,prefix,quote,path)=>prefix+quote+new URL(path,location.href).href+quote);
-  const blob=new Blob([src+'\n//# sourceURL=shooting-paper-original-camp-v141.js'],{type:'text/javascript'}),url=URL.createObjectURL(blob);
+  const blob=new Blob([src+'\n//# sourceURL=shooting-paper-original-camp-v142.js'],{type:'text/javascript'}),url=URL.createObjectURL(blob);
   try{await import(url);}finally{URL.revokeObjectURL(url);}
   const w=window.GrenadeWorld;if(!w)throw Error('原版 WebGL 軍營未建立');state.world=w;
   if(!w.gl?.createVertexArray)throw Error('本裝置不支援 WebGL2，無法顯示原版 3D GLB 軍營');
@@ -156,7 +156,7 @@ async function boot(){try{
   window.__armyShootingExternalDrawRifle=(vp,world)=>{
     const view=state.view,rifle=state.rifle;if(!view||!rifle?.weapon)return;
     const theta=view.yaw,phi=view.pitch,cy=Math.cos(theta),sy=Math.sin(theta),cp=Math.cos(phi),sp=Math.sin(phi);
-    const forward=[sy*cp,sp,cy*cp],right=[cy,0,-sy],up=[-sy*sp,cp,-cy*sp];
+    const forward=[sy*cp,sp,cy*cp],right=[-cy,0,sy],up=[-sy*sp,cp,-cy*sp];
     const e=view.eye,recoil=(view.flinch||0)*.009;
     // First-person iron-sight stance: center the existing rifle's bore instead
     // of leaving it shouldered off to the right. Match the shared breathing sway.
