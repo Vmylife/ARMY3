@@ -343,28 +343,47 @@ function expectedVoiced(t){
 function updateModeText(){
  E.mode.textContent=vocals?'原版人聲已內建 · 無伴奏':'原版人聲載入中…';
 }
-async function loadVocals(bytes){
- const c=getAudio(),buffer=await c.decodeAudioData(bytes.slice(0));
- if(buffer.duration<CLIP-.04)throw Error('內建人聲長度不足');
- vocals=buffer;clipStart=0;
+async function applyPhrase(index){
+ activePhrase=index;
+ const part=PHRASES[index];
+ CLIP=part.duration;
+ sourcePitch=part.pitch;
+ vocals=audioBuffers[index];
+ clipStart=0;
+ E.words.textContent=part.text;
+ E.count.textContent='原版人聲 · 第 '+(index+1)+'/2 句 · '+CLIP.toFixed(1)+' 秒';
+ E.phrase1.classList.toggle('active',index===0);
+ E.phrase2.classList.toggle('active',index===1);
+ E.phrase1.classList.toggle('completed',index>0||!!takes[0]);
+ E.phrase2.classList.toggle('completed',!!takes[1]);
+ drawGrid();
  await extractPitch();
- if(pitch.length<Math.floor(CLIP/STEP*.12))throw Error('無法分析原版人聲音準');
- E.count.textContent='原版人聲 · '+CLIP+' 秒';
- setMode('ready');updateModeText();
+ E.rail.setAttribute('aria-valuenow','50');
+ E.thumb.style.top='50%';
 }
 async function autoLoadVocal(){
- if(['listen','imitate','playback'].includes(mode))return;
- vocals=null;setMode('empty');updateModeText();
- setText('正在載入內建原版人聲（無伴奏），並分析原唱音準…');
+ if(['listen','imitate','playback','countinTeacher','countinPlayer'].includes(mode))return;
+ audioBuffers=[];vocals=null;takes=[];lastScore=null;activePhrase=0;
+ setMode('empty');updateModeText();
+ setText('正在自動載入兩段原版人聲（無伴奏），以及對應的原唱音高…');
  try{
-  const response=await fetch(AUDIO_URL,{cache:'force-cache'});
-  if(!response.ok)throw Error('HTTP '+response.status);
-  const bytes=await response.arrayBuffer();
-  if(bytes.byteLength<1000)throw Error('內建原版音檔不完整');
-  await loadVocals(bytes);
+  const c=getAudio();
+  const decoded=await Promise.all(PHRASES.map(async part=>{
+   const response=await fetch(part.audioUrl,{cache:'force-cache'});
+   if(!response.ok)throw Error('音檔 HTTP '+response.status);
+   const bytes=await response.arrayBuffer();
+   if(bytes.byteLength<1000)throw Error('內建原版人聲不完整');
+   const audio=await c.decodeAudioData(bytes.slice(0));
+   if(audio.duration<part.duration-.06)throw Error('原版音檔片段太短');
+   return audio;
+  }));
+  audioBuffers=decoded;
+  await applyPhrase(0);
+  setMode('ready');updateModeText();
  }catch(err){
-  console.error('[軍歌鑑測] 內建人聲載入失敗',err);
-  setMode('error');setText('內建原版人聲載入失敗（'+err.message+'）。請按重新載入；不需要上傳任何音檔。');
+  console.error('[軍歌鑑測] 原版音檔載入失敗',err);
+  setMode('error');
+  setText('原版人聲載入失敗（'+err.message+'）。按重新載入即可，不需要上傳檔案。');
  }
 }
 function sample(t){return trace[clamp(Math.floor(t/STEP),0,Math.max(0,trace.length-1))]||{m:refBase,on:false}}
