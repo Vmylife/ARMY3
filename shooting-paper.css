@@ -144,3 +144,36 @@ p{margin:8px 0 14px;font-size:13px;line-height:1.6;color:#dce5d5}
 @media(max-width:360px){#resultScreen .resultPanel{padding:11px 10px}.shootEvidence{gap:8px}.shootScoreNumber strong{font-size:41px}.shootAchCard{min-height:90px;padding:7px 3px}.shootAchCard strong{font-size:11px}.shootGalleryGrid{gap:6px}.shootGalleryCard{padding:9px}}
 @media(max-height:690px){#resultScreen .resultPanel{padding-top:9px}.shootEvidence{gap:7px}#resultScreen #resultPaper{max-width:138px}.shootAchCard{min-height:82px}.shootScorebox{padding:6px 10px}.shootScoreNumber strong{font-size:40px}}
 @media(orientation:landscape) and (max-height:520px){#resultScreen .resultPanel{max-height:calc(100dvh - 8px);padding:9px 11px}.shootModal{padding:5px}.shootModalShell{padding:9px}.shootAchCard{min-height:72px}}
+
+/* v1.51 — five-stage progression. Keeps the original compact olive field-report. */
+.shootStagesIntro{border:1px solid #cbb8825c;border-radius:13px;background:#1a3527;padding:11px 10px 10px;margin:0 0 12px;text-align:left;}
+.shootStageHeader{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-bottom:8px;}
+.shootStageHeader strong{font-size:12px;color:#f1dba7;}
+.shootStageHeader small{font-size:10px;color:#bed0b9;}
+.shootStageChoices{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;}
+.shootStageCard{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px;min-height:53px;border:1px solid #b9caab55;border-radius:9px;background:#294938;color:#f4e3bd;font-weight:900;}
+.shootStageCard strong{font-size:19px;line-height:1.15;font-variant-numeric:tabular-nums;}
+.shootStageCard small{font-size:12px;min-height:12px;}
+.shootStageCard.selected{border-color:#f0d58c;background:#e9d292;color:#263a2e;box-shadow:0 0 0 1px #f5dca45a;}
+.shootStageCard.locked{background:#13271f;color:#7c9083;border-color:#435b4955;opacity:.65;}
+.shootStageCard:disabled{cursor:not-allowed;}
+.shootStageCard:focus-visible{outline:2px solid #f2d993;outline-offset:2px;}
+.shootStageTitle{font-size:14px;font-weight:900;color:#f4dca9;text-align:center;margin:11px 0 3px;}
+.shootStageDetail{font-size:11px;color:#c8d7c6;margin:0;text-align:center;line-height:1.45;}
+.shootStageHud{position:absolute;z-index:4;top:calc(77px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 12px;border:1px solid #e5ce8755;border-radius:12px;background:#102d23de;color:#f1dfa8;min-width:170px;white-space:nowrap;text-align:center;box-shadow:0 4px 12px #04130c55;}
+.shootStageHud #stageHud{font-size:11px;font-weight:850;}
+.shootStageHud #stageHitsHud{font-size:14px;line-height:1.15;font-weight:950;}
+#resultScreen .shootStageOutcome{font-size:16px;text-align:center;font-weight:950;border:1px solid #bace9255;background:#244434;border-radius:11px;padding:8px;margin:1px 0 7px;color:#efdfa9;}
+#resultScreen .shootStageOutcome.pass{color:#f9dc92;border-color:#e4ca7e77;background:#2c4930;}
+#resultScreen .shootStageOutcome.fail{color:#f0aa95;border-color:#e8a18b65;background:#492d27;}
+.shootResultStageProgress{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:0 0 10px;}
+.shootStageDot{display:grid;place-items:center;height:27px;border-radius:8px;background:#203b2c;border:1px solid #b1c4a649;color:#a4bcab;font-size:12px;font-weight:900;}
+.shootStageDot.passed{color:#1c3929;background:#e8d297;border-color:#f4e2b1;}
+.shootStageDot.active:not(.passed){border-color:#e7cc89;color:#f7dfa8;}
+.shootNextHint{font-size:11px;color:#c7d5be;line-height:1.5;text-align:center;margin:0 0 8px;}
+#resultScreen .shootResultActions{grid-template-columns:repeat(2,minmax(0,1fr));}
+#resultScreen .shootResultActions #againBtn{grid-column:1 / -1;min-height:46px;}
+#resultScreen .shootResultActions #chooseStageBtn,
+#resultScreen .shootResultActions .backBtn{min-height:40px;}
+@media(max-height:710px){.shootStageHud{top:calc(65px + env(safe-area-inset-top));padding:4px 9px}.shootStageHud #stageHud{font-size:10px}.shootStageHud #stageHitsHud{font-size:12px}#resultScreen .shootStageOutcome{font-size:13px;padding:6px}.shootStageDot{height:23px}}
+@media(max-width:360px){.shootStageHud{min-width:145px;top:calc(79px + env(safe-area-inset-top))}.shootStageCard{min-height:48px}.shootStageCard strong{font-size:17px}.shootStageCard small{font-size:10px}}
