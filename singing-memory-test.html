@@ -4,18 +4,18 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#172a20">
 <title>軍歌鑑測｜聽班長唱一句</title>
-<link rel="stylesheet" href="./singing-memory-test.css?v=3">
+<link rel="stylesheet" href="./singing-memory-test.css?v=4">
 </head>
 <body>
 <main class="app">
-<header class="top"><div class="brand">國軍實驗靶場 <span>/ 軍歌鑑測 V0.4 · 修正音準線</span></div><a class="back" href="./index.html">← 返回軍營</a></header>
+<header class="top"><div class="brand">國軍實驗靶場 <span>/ 軍歌鑑測 V0.5 · 階梯音準與四拍準備</span></div><a class="back" href="./index.html">← 返回軍營</a></header>
 <section class="hero">
  <div class="scene" aria-hidden="true"><div class="badgeIcon">♪</div>
   <div class="sergeant"><div class="beret"></div><div class="face"><i class="eye one"></i><i class="eye two"></i><i id="mouth" class="mouth"></i></div><div class="neck"></div><div class="body"><i class="badgeMark">班</i></div></div>
   <div class="speech" id="speech">「跟著我唱，不准走音！」</div>
  </div>
  <div class="heading"><div class="eyebrow">軍歌記憶音準 · 原版音訊測試</div><h1>班長唱一句，你敢跟著唱嗎？</h1>
- <p>聽示範時有正確音準線。輪到你時答案消失，只能用滑鼠或手指憑記憶唱。唱完公開播放你的走音版本。</p></div>
+ <p>班長先示範階梯音準，玩家憑記憶模仿。每次開唱前先聽四下「答、答、答、答」，畫面依序 3、2、1、唱；第五拍才開始唱。</p></div>
 </section>
 <section class="controls">
  <div class="line"><span class="tag" id="stageTag">等待開始</span><span id="takeCount">原版人聲｜約 8 秒</span></div>
@@ -28,13 +28,16 @@
    <line id="playhead" x1="0" x2="0" y1="0" y2="240" stroke="#faf8e5" stroke-width="2" stroke-dasharray="5 5"/>
    <circle id="controlDot" cx="0" cy="120" r="11" fill="#fa9294" stroke="#fff" stroke-width="2" visibility="hidden"/>
   </svg>
-  <div class="boardOverlay" id="boardOverlay">原版人聲載入中…</div>
+  <div id="countdown" class="countdown" hidden aria-live="off" aria-label="預備四拍，下一拍開唱">
+    <div class="countdownCore"><strong id="countdownWord">3</strong><small id="countdownLabel">班長準備開唱</small></div>
+   </div>
+   <div class="boardOverlay" id="boardOverlay">原版人聲載入中…</div>
   <div class="timeline" id="timeline"></div>
  </div>
- <div class="legend" id="legend"><span><b class="gold"></b>班長音高（只在示範時出現）</span><span><b class="red"></b>你的走音軌跡（回放後顯示）</span></div>
+ <div class="legend" id="legend"><span><b class="gold"></b>班長水平音階（只在示範時出現）</span><span><b class="red"></b>你的走音軌跡（回放後顯示）</span></div>
  <div class="actionArea"><button id="mainButton" class="primary" type="button">▶ 班長先唱</button>
  <button id="skipButton" class="secondary" type="button" disabled>重新聽示範</button></div>
- <p class="hint" id="hint">電腦：按住滑鼠左鍵、上下移動｜手機：長按並上下滑動。放開就會斷氣。</p>
+ <p class="hint" id="hint">四下「答」對應 3、2、1、唱；第五拍才開始。演唱時按住滑鼠或手指上下移動，放開會斷氣。</p>
  <div class="feedback" id="feedback" hidden>
    <div class="feedbackTitle"><span id="finalRank">F 級</span><strong id="finalScore">0 分</strong></div>
    <p id="comment"></p>
@@ -50,5 +53,5 @@
 </section>
 <footer>獨立試玩版本 · 尚未加入軍營正式小遊戲</footer>
 </main>
-<script src="./singing-memory-test.js?v=4" defer></script>
+<script src="./singing-memory-test.js?v=5" defer></script>
 </body></html>
