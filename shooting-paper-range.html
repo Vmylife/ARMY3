@@ -2,7 +2,7 @@
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#162e23"><title>國軍模擬器｜實彈射擊鑑測</title>
-<link rel="stylesheet" href="./shooting-paper.css?v=150"></head><body>
+<link rel="stylesheet" href="./shooting-paper.css?v=151"></head><body>
 <canvas id="world3d" aria-label="國軍三維射擊訓練場"></canvas>
 <canvas id="shootingOverlay" aria-label="拖曳控制步槍瞄準"></canvas>
 <div id="hud" hidden>
@@ -10,6 +10,7 @@
   <div class="hudPanel"><small>剩餘秒數</small><b id="timeDisplay">45.0</b></div>
   <div class="hudPanel"><small>上靶 / 已射</small><b><span id="hitsDisplay">0</span><span class="hudSep"> / </span><span id="shotsDisplay">0</span></b></div>
  </div>
+ <div class="shootStageHud"><div id="stageHud">第 1 / 5 關 · 0 名友軍</div><strong id="stageHitsHud">上靶 0 / 5</strong></div>
  <div id="hitFlash" aria-live="polite"></div>
  <div class="controls">
   <div class="left"><div class="bullets" id="ammoDisplay">10 / 10</div><button id="zoomBtn">◎ 開鏡</button><button id="collectBtn" disabled>收靶紙</button></div>
@@ -24,6 +25,12 @@
   <h1>報告班長！<br>我真的有在瞄。</h1>
   <p class="introCopy">10 發單點。滑動瞄準，別打到友軍。</p>
   <div class="introHint">上滑抬槍 · 點「開鏡」放大</div>
+  <div class="shootStagesIntro">
+   <div class="shootStageHeader"><strong>五關鑑測</strong><small id="shootProgressNote">已完成 0 / 5 關</small></div>
+   <div class="shootStageChoices" id="shootStageChoices" aria-label="選擇已解鎖的關卡"></div>
+   <div class="shootStageTitle" id="shootStageTitle">第 1 / 5 關 · 新兵適應</div>
+   <p class="shootStageDetail" id="shootStageDetail">0 名友軍干擾 · 10 發中 5 發上靶即可過關</p>
+  </div>
   <div id="loadStatus" role="status">正在載入軍營…</div>
   <button id="startBtn" class="mainBtn" disabled>準備射擊…</button>
   <button id="shootGalleryIntro" class="secondaryBtn" type="button">🏅 成就圖鑑</button>
@@ -37,6 +44,8 @@
    <div><h1 id="resultTitle">實彈射擊結算</h1><div id="resultRank" class="resultRank">等待鑑定</div></div>
    <div id="resultStamp" class="resultStamp">待審</div>
   </div>
+  <div class="shootStageOutcome" id="shootStageOutcome">等待鑑測結果</div>
+  <div class="shootResultStageProgress" id="shootResultStageProgress" aria-label="五關通關紀錄"><span class="shootStageDot active">1</span><span class="shootStageDot">2</span><span class="shootStageDot">3</span><span class="shootStageDot">4</span><span class="shootStageDot">5</span></div>
   <div class="shootScorebox">
    <div class="shootScorePrimary">
     <small>本次鑑測總分</small>
@@ -66,13 +75,15 @@
    <button id="shootGalleryResult" class="shootGalleryButton" type="button">🏅 查看全部成就圖鑑</button>
   </div>
   <div class="officerComment"><small>班長講評</small><p id="reportText"></p></div>
+  <div id="shootNextHint" class="shootNextHint">上靶至少5發可進下一關。</div>
   <div class="shootResultActions">
    <button id="againBtn" class="mainBtn">再打 10 發</button>
+   <button id="chooseStageBtn" class="secondaryBtn" type="button">選擇關卡</button>
    <button class="backBtn secondaryBtn">返回軍營</button>
   </div>
  </div>
 </div>
 <script type="module" src="./shooting-paper-world.js?v=149"></script>
-<script src="./shooting-paper-report.js?v=150"></script>
-<script src="./shooting-paper.js?v=150"></script>
+<script src="./shooting-paper-report.js?v=151"></script>
+<script src="./shooting-paper.js?v=151"></script>
 </body></html>
