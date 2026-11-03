@@ -12,3 +12,19 @@
 #board{touch-action:none}
 #board:active{cursor:crosshair}
 #guideLine,#yourLine{pointer-events:none}
+
+/* v0.5: clear flat-note staircase and a visually synchronized four-click count-in */
+#guideLine{stroke-linejoin:miter!important;stroke-linecap:butt!important;stroke-width:10;filter:drop-shadow(0 1px 4px rgba(255,216,135,.24))}
+.countdown[hidden]{display:none!important}
+.countdown{position:absolute;inset:0 0 25px;z-index:7;pointer-events:none;display:grid;place-items:center;background:radial-gradient(circle at center,rgba(6,24,17,.67) 0,rgba(6,24,17,.28) 27%,transparent 76%);user-select:none}
+.countdownCore{min-width:125px;min-height:135px;padding:12px 14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-radius:18px;border:2px solid #edcc82;box-shadow:0 8px 35px rgba(6,19,11,.43),inset 0 0 22px #e2c87f14;background:rgba(16,46,32,.93)}
+.countdownCore strong{font-size:clamp(64px,10vw,100px);line-height:1;font-weight:1000;color:#ffe2a1;text-shadow:0 3px 0 #705b3380,0 0 24px #edc87b75;letter-spacing:-.03em}
+.countdownCore small{font-size:12px;font-weight:900;color:#e7dab8;letter-spacing:.05em;white-space:nowrap}
+.countdown.pulse .countdownCore{animation:armyCountBeat .24s cubic-bezier(.2,.8,.2,1) both}
+@keyframes armyCountBeat{from{transform:scale(1.15);border-color:#ffe9b6;filter:brightness(1.23)}to{transform:scale(1);border-color:#edcc82;filter:brightness(1)}}
+@media(max-width:680px){
+ .countdownCore{min-width:103px;min-height:111px;padding:9px 12px}
+ .countdownCore strong{font-size:70px}
+ .countdownCore small{font-size:11px}
+}
+@media(prefers-reduced-motion:reduce){.countdown.pulse .countdownCore{animation:none}}
