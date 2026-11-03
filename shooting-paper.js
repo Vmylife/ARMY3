@@ -1,4 +1,4 @@
-/* ARMY3 · 報告長官！我的子彈有上靶嗎？ — standalone target-paper shooting v1.53 */
+/* ARMY3 · 報告長官！我的子彈有上靶嗎？ — standalone target-paper shooting v1.54 */
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
 const canvas=$('shootingOverlay'),ctx=canvas.getContext('2d',{alpha:true}),min=Math.min,max=Math.max,clamp=(x,a,b)=>max(a,min(b,x));
@@ -388,7 +388,20 @@ for(const e of ['pointerup','pointercancel','lostpointercapture'])$('shootBtn').
 $('collectBtn').addEventListener('click',finish);
 $('zoomBtn').addEventListener('click',()=>{if(state!=='playing')return;zoom=!zoom;$('zoomBtn').classList.toggle('active',zoom);$('zoomBtn').textContent=zoom?'◎ 關鏡':'◎ 開鏡';document.body.classList.toggle('scopeActive',zoom)});
 $('muteBtn').addEventListener('click',()=>{muted=!muted;$('muteBtn').textContent=muted?'🔇':'🔊';try{localStorage.setItem('ARMY3_shoot_muted',muted?'1':'0')}catch{}});
-function back(){state='result';holdFire=false;if(parent!==window){try{parent.postMessage({type:'ARMY3_SHOOTING_RETURN'},location.origin);return}catch{}}location.href='./index.html'}
+async function back(){
+ if(state==='leaving')return;
+ state='leaving';holdFire=false;dragging=null;
+ // Reuse the same camp-return function as blanket and grenade training.
+ // In a prewarmed iframe it posts ARMY3_RETURN_TO_CAMP to the live camp;
+ // on a cold navigation it restores the saved player/camera/NPC snapshot.
+ try{
+  const {returnToCamp}=await import('./src/systems/campSession.js?v=144');
+  returnToCamp();
+ }catch(error){
+  console.error('[射擊鑑測] 返回軍營失敗',error);
+  location.replace('./index.html?armyResume=1');
+ }
+}
 document.querySelectorAll('.backBtn').forEach(b=>b.addEventListener('click',back));
  $('startBtn').addEventListener('click',start);
  $('againBtn').addEventListener('click',start);
