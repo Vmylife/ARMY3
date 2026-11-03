@@ -2,7 +2,7 @@
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#162e23"><title>國軍模擬器｜實彈射擊鑑測</title>
-<link rel="stylesheet" href="./shooting-paper.css?v=145"></head><body>
+<link rel="stylesheet" href="./shooting-paper.css?v=150"></head><body>
 <canvas id="world3d" aria-label="國軍三維射擊訓練場"></canvas>
 <canvas id="shootingOverlay" aria-label="拖曳控制步槍瞄準"></canvas>
 <div id="hud" hidden>
@@ -26,31 +26,53 @@
   <div class="introHint">上滑抬槍 · 點「開鏡」放大</div>
   <div id="loadStatus" role="status">正在載入軍營…</div>
   <button id="startBtn" class="mainBtn" disabled>準備射擊…</button>
+  <button id="shootGalleryIntro" class="secondaryBtn" type="button">🏅 成就圖鑑</button>
   <button class="backBtn secondaryBtn">返回軍營</button>
  </div>
 </div>
 <div id="resultScreen" class="screen" hidden>
  <div class="panel resultPanel">
-  <div class="reportTop"><span>國軍實彈射擊報告</span><span class="reportNo">機密 · 不准外流</span></div>
+  <div class="reportTop"><span>國軍實彈射擊　/　鑑測報告</span><span class="reportNo">NO. S-010</span></div>
   <div class="resultHeading">
-   <div><h1 id="resultTitle">靶紙回收！</h1><div id="resultRank" class="resultRank">等待鑑定</div></div>
+   <div><h1 id="resultTitle">實彈射擊結算</h1><div id="resultRank" class="resultRank">等待鑑定</div></div>
    <div id="resultStamp" class="resultStamp">待審</div>
   </div>
+  <div class="shootScorebox">
+   <div class="shootScorePrimary">
+    <small>本次鑑測總分</small>
+    <div class="shootScoreNumber"><strong id="shootScore">0</strong><span>/ 100</span></div>
+   </div>
+   <div class="shootScoreRank"><span id="shootGrade">待評</span><strong id="shootHistoryBest">歷史最高 0 分</strong></div>
+  </div>
+  <div class="shootScoreExplanation" id="shootScoreExplanation">依命中、環數與友軍損失計分</div>
   <div class="resultSummary">
-   <div class="resultMain"><small>上靶</small><strong id="resultHits">0</strong><span> / <b id="resultShots">0</b> 發</span></div>
+   <div class="resultMain"><small>上靶</small><strong id="resultHits">0</strong><span>/ <b id="resultShots">0</b> 發</span></div>
    <div class="resultAccuracy"><small>命中率</small><strong id="resultRate">0%</strong></div>
   </div>
-  <div class="paperLabel"><strong>靶紙證物</strong><span>每個彈孔都有編號</span></div>
-  <canvas id="resultPaper" width="600" height="760" aria-label="打靶紙與所有上靶彈孔"></canvas>
-  <div class="resultExtras">
-   <div>脫靶 <b id="resultMisses">0</b></div>
-   <div>誤傷友軍 <b id="resultFriendly">0</b></div>
+  <div class="shootEvidence">
+   <div class="shootTarget">
+    <div class="paperLabel"><strong>靶紙證物</strong><span>彈孔有編號</span></div>
+    <canvas id="resultPaper" width="600" height="760" aria-label="打靶紙與所有上靶彈孔"></canvas>
+   </div>
+   <div class="resultExtras">
+    <div><span>脫靶</span><b id="resultMisses">0</b></div>
+    <div><span>誤傷友軍</span><b id="resultFriendly">0</b></div>
+    <div><span>9 環以上</span><b id="shootCenter">0</b></div>
+   </div>
   </div>
-  <div class="officerComment"><small>長官評語</small><p id="reportText"></p></div>
-  <button id="againBtn" class="mainBtn">再打 10 發</button>
-  <button class="backBtn secondaryBtn">返回軍營</button>
+  <div class="shootAchSection">
+   <div class="shootSectionHead"><strong>本次成就</strong><small id="shootAchMeta">本次達成 0 項</small></div>
+   <div class="shootAchGrid" id="shootAchCards"></div>
+   <button id="shootGalleryResult" class="shootGalleryButton" type="button">🏅 查看全部成就圖鑑</button>
+  </div>
+  <div class="officerComment"><small>班長講評</small><p id="reportText"></p></div>
+  <div class="shootResultActions">
+   <button id="againBtn" class="mainBtn">再打 10 發</button>
+   <button class="backBtn secondaryBtn">返回軍營</button>
+  </div>
  </div>
 </div>
 <script type="module" src="./shooting-paper-world.js?v=149"></script>
-<script src="./shooting-paper.js?v=149"></script>
+<script src="./shooting-paper-report.js?v=150"></script>
+<script src="./shooting-paper.js?v=150"></script>
 </body></html>
