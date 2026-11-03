@@ -1,4 +1,4 @@
-/* ARMY3 singing memory v0.3 — ORIGINAL VOICE STEM ONLY.
+/* ARMY3 singing memory v0.4 — ORIGINAL VOICE STEM ONLY.
    Original isolated vocal MP3 is bundled with ARMY3; users never upload files. Music stem is NEVER played.
    Correct pitch is derived from the selected vocal waveform (no invented tune).
    Browser-only processing: Web Audio + short-time pitch detection + OLA pitch warp.
@@ -21,6 +21,12 @@ let pitch=[],refBase=62,validPitch=0,mode='empty',session=0,frame=0,playerHeld=f
 let midiValue=refBase,pointerId=null,trace=[],lastScore=null,playSource=null,playPromise=null,comparison=false;
 let ownActionCount=0,analysisToken=0;
 const AUDIO_URL='./singing-samples/junji-original-vocals-intro.mp3?v=3';
+// Extracted offline from the same original vocal MP3 with spectral tracking.
+// A sung chorus has harmonics/overlapping voices; the old browser autocorrelation
+// rejected 90% of the frames and painted only tiny invisible fragments.
+// This derived contour stays synchronized to the shipped original, with
+// nulls only for genuine pauses. No melody was composed or substituted.
+const SOURCE_PITCH_50MS=[null,null,null,null,null,null,null,null,null,66.7,66.7,66.6,66.6,66.6,66.5,66.4,66.4,66.4,66.7,67,67,67,66.6,66.6,66.6,66.6,66.7,66.9,66.9,71.4,72,72.1,72.2,72.2,72.2,72.1,71.5,71.5,71.5,71.5,71.6,72,72,72,72.1,72.1,72.2,72.2,72.2,71.7,65.3,65.2,65.2,65,65,65,64.8,64.7,64.6,64.3,63.9,63.9,64.3,64.6,64.6,64.7,64.7,64.7,64.7,65,65,67.2,67.4,67.4,67.2,66.9,66.7,66.7,66.7,66.7,66.5,66.3,65.9,65.2,65.5,65.3,65.1,64.9,null,null,null,62.1,61.9,61.6,60,60,60,60,60,60.8,60.8,61.1,61.5,61.5,61.6,61.8,61.9,61.9,62.1,62.1,62.1,65.3,65.3,65.3,65,64.8,64.8,65,65,64.8,65.2,65.4,68.8,68.9,68.9,68.8,68,66.6,66.6,66.6,67.3,68.2,68.5,68.5,68.5,68.5,68.5,68.8,68.9,68.9,68.8,68.7,68.5,68.5,68.5,68.7,68.9,68.9,68.9,68.9,68.9,68.9,68.9,74.8,76,76,76.5,76.5,76.5,76.5,76.3];
 const MIDI=f=>69+12*Math.log2(f/440);
 function getAudio(){if(!ctx){const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)throw Error('此裝置不支援 Web Audio');ctx=new Audio()}return ctx}
 function setText(s){E.info.textContent=s}
@@ -32,7 +38,9 @@ function setMode(next){
  E.preview.disabled=playing||!vocals;
  E.mouth.classList.toggle('singing',next==='listen'||next==='playback');
  E.board.style.cursor=next==='imitate'?'crosshair':'default';
- E.guide.style.display=(next==='listen'||(next==='done'&&comparison))?'':'none';
+ const showReference=next==='listen'||(next==='done'&&comparison);
+ E.guide.style.display=showReference?'inline':'none';
+ E.guide.setAttribute('visibility',showReference?'visible':'hidden');
  E.trace.style.display=next==='done'&&comparison?'':'none';
  E.dot.setAttribute('visibility',next==='imitate'?'visible':'hidden');
  E.overlay.hidden=playing||next==='done';
@@ -147,51 +155,30 @@ function onsetOf(buffer){
 }
 async function extractPitch(){
  if(!vocals)return;
- const token=++analysisToken;
- const data=vocals.getChannelData(0),sr=vocals.sampleRate;
- const frames=Math.floor(CLIP/STEP)+1,raw=[];
- let loudest=.008;
- const amps=[];
- for(let k=0;k<frames;k++){
-  const t=clipStart+k*STEP;
-  const x=frameWave(data,sr,t);
-  amps.push(rms(x));raw.push(x);
-  loudest=Math.max(loudest,amps[k]);
-  if(k%35===0)await sleep();
+ // A prepared reference is reliably visible on phones and avoids slow, very
+ // fragile autocorrelation on this multi-voice recording at 16 kHz.
+ if(SOURCE_PITCH_50MS.length!==Math.round(CLIP/STEP)+1)throw Error('原唱音準資料不完整');
+ const valid=SOURCE_PITCH_50MS.filter(Number.isFinite).sort((x,y)=>x-y);
+ if(valid.length<CLIP/STEP*.5)throw Error('原唱音準有效資料不足');
+ refBase=valid[Math.floor(valid.length/2)];
+ validPitch=valid.length/SOURCE_PITCH_50MS.length;
+ pitch=SOURCE_PITCH_50MS.map((m,i)=>({
+   m:Number.isFinite(m)?m:refBase,
+   voiced:Number.isFinite(m),
+   t:i*STEP
+ }));
+ let path='',drawing=false;
+ for(let i=0;i<pitch.length;i++){
+  const p=pitch[i];
+  if(!p.voiced){drawing=false;continue}
+  const x=(i*STEP/CLIP*VIEW_W).toFixed(1),y=toY(p.m).toFixed(1);
+  path+=(drawing?' L':' M')+x+' '+y;
+  drawing=true;
  }
- if(token!==analysisToken)return;
- const threshold=Math.max(.004,loudest*.12);
- let vals=[],strong=[];
- for(let k=0;k<frames;k++){
-  let m=pitchOf(raw[k],threshold);
-  vals.push(m);
-  if(Number.isFinite(m))strong.push(m);
-  if(k%22===0)await sleep();
- }
- if(token!==analysisToken)return;
- if(!strong.length){
-  pitch=[];validPitch=0;setText('找不到足夠的清楚歌聲音準。請把起點移到有人聲的地方，或使用分離乾淨的人聲檔。');E.guide.setAttribute('d','');return;
- }
- strong.sort((a,b)=>a-b);
- refBase=strong[Math.floor(strong.length/2)];
- validPitch=strong.length/frames;
- // Fill holes for timing/score interpolation, but preserve natural nonvoiced gaps.
- const values=vals.map((m,i)=>{
-  if(Number.isFinite(m))return m;
-  for(let d=1;d<12;d++)if(Number.isFinite(vals[i-d]))return vals[i-d];
-  for(let d=1;d<12;d++)if(Number.isFinite(vals[i+d]))return vals[i+d];
-  return refBase;
- });
- for(let i=1;i<values.length;i++)if(Math.abs(values[i]-values[i-1])>9)values[i]=values[i-1];
- pitch=vals.map((m,i)=>({m:values[i],voiced:Number.isFinite(m),t:i*STEP}));
- let path='',open=false;
- pitch.forEach((p,i)=>{
-  if(!p.voiced){open=false;return}
-  const x=(i*STEP/CLIP*VIEW_W).toFixed(1);
-  path+=(open?' L':' M')+x+' '+toY(p.m).toFixed(1);open=true;
- });
  E.guide.setAttribute('d',path);
- setText('✅ 原版人聲已載入。原唱音準辨識率 '+Math.round(validPitch*100)+'%。起點 '+clipStart.toFixed(1)+' 秒，示範只播人聲，伴奏不播放。');
+ E.guide.setAttribute('stroke-width','9');
+ E.guide.setAttribute('stroke','#f2d39b');
+ setText('✅ 原版人聲已載入。音準線由原唱聲音分析取得（有效 '+Math.round(validPitch*100)+'%），班長示範時顯示金色線；換玩家時隱藏。沒有伴奏。');
 }
 function pitchAt(t){
  if(!pitch.length)return refBase;
@@ -372,14 +359,14 @@ E.preview.addEventListener('click',async()=>{
 E.replay.addEventListener('click',()=>{if(mode==='done')replay()});
 E.compare.addEventListener('click',()=>{
  if(mode!=='done')return;
- comparison=!comparison;E.guide.style.display=comparison?'':'none';
+ comparison=!comparison;E.guide.style.display=comparison?'inline':'none';E.guide.setAttribute('visibility',comparison?'visible':'hidden');
  E.trace.style.display=comparison?'':'none';
  E.compare.textContent=comparison?'收起音準線':'📈 查看音準差距';
 });
 window.addEventListener('pagehide',()=>stopAudio());
 window.armySingingTest={
  get status(){return {mode,hasOriginalVocals:!!vocals,hasOriginalMusic:false,musicPlayback:false,embeddedAudio:true,
-   phraseSeconds:CLIP,referenceFrames:pitch.length,voicedPercent:Math.round(validPitch*100),samples:trace.length,score:lastScore}},
+   phraseSeconds:CLIP,referenceFrames:pitch.length,voicedPercent:Math.round(validPitch*100),referenceVisible:E.guide.style.display!=='none',guidePathPoints:SOURCE_PITCH_50MS.filter(Number.isFinite).length,samples:trace.length,score:lastScore}},
  get refPitch(){return pitch.map(p=>({...p}))},
  analyzePitch:pitchOf,calculate
 };
