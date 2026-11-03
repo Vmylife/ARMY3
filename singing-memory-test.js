@@ -1,4 +1,4 @@
-/* ARMY3 singing memory v0.4 — ORIGINAL VOICE STEM ONLY.
+/* ARMY3 singing memory v0.5 — ORIGINAL VOICE STEM ONLY.
    Original isolated vocal MP3 is bundled with ARMY3; users never upload files. Music stem is NEVER played.
    Correct pitch is derived from the selected vocal waveform (no invented tune).
    Browser-only processing: Web Audio + short-time pitch detection + OLA pitch warp.
@@ -6,6 +6,7 @@
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
 const CLIP=8, STEP=.05, VIEW_W=800, VIEW_H=240;
+const BEAT_SECONDS=.55, COUNT_TEXT=['3','2','1','唱'];
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const sleep=()=>new Promise(r=>setTimeout(r,0));
 const E={
@@ -14,12 +15,13 @@ const E={
  head:$('playhead'),dot:$('controlDot'),mouth:$('mouth'),speech:$('speech'),
  feedback:$('feedback'),rank:$('finalRank'),points:$('finalScore'),comment:$('comment'),
  replay:$('replayButton'),compare:$('compareButton'),hint:$('hint'),count:$('takeCount'),
+ countdown:$('countdown'),countdownWord:$('countdownWord'),countdownLabel:$('countdownLabel'),
  preview:$('previewClip'),info:$('voiceInfo'),mode:$('voiceMode'),timeline:$('timeline')
 };
 let ctx=null,vocals=null,clipStart=0;
 let pitch=[],refBase=62,validPitch=0,mode='empty',session=0,frame=0,playerHeld=false;
 let midiValue=refBase,pointerId=null,trace=[],lastScore=null,playSource=null,playPromise=null,comparison=false;
-let ownActionCount=0,analysisToken=0;
+let ownActionCount=0,analysisToken=0,guideSegments=[],metronomeNodes=[],cancelCountIn=null;
 const AUDIO_URL='./singing-samples/junji-original-vocals-intro.mp3?v=3';
 // Extracted offline from the same original vocal MP3 with spectral tracking.
 // A sung chorus has harmonics/overlapping voices; the old browser autocorrelation
@@ -32,13 +34,14 @@ function getAudio(){if(!ctx){const Audio=window.AudioContext||window.webkitAudio
 function setText(s){E.info.textContent=s}
 function setMode(next){
  mode=next;
- const playing=['listen','imitate','playback'].includes(next);
+ const playing=['countinTeacher','countinPlayer','listen','imitate','playback'].includes(next);
  E.main.disabled=playing||(!vocals&&next!=='error');
  E.repeat.disabled=playing||!vocals;
  E.preview.disabled=playing||!vocals;
  E.mouth.classList.toggle('singing',next==='listen'||next==='playback');
+ if(!next.startsWith('countin'))E.countdown.hidden=true;
  E.board.style.cursor=next==='imitate'?'crosshair':'default';
- const showReference=next==='listen'||(next==='done'&&comparison);
+ const showReference=next==='countinTeacher'||next==='listen'||(next==='done'&&comparison);
  E.guide.style.display=showReference?'inline':'none';
  E.guide.setAttribute('visibility',showReference?'visible':'hidden');
  E.trace.style.display=next==='done'&&comparison?'':'none';
@@ -47,16 +50,21 @@ function setMode(next){
  E.main.textContent=next==='empty'?'原版人聲載入中…':
   next==='error'?'↻ 重新載入原版人聲':
   next==='ready'?'▶ 班長先唱':
+  next==='countinTeacher'||next==='countinPlayer'?'答、答、答、答…':
   next==='listen'?'班長正在唱原版人聲…':
   next==='imitate'?'輪到你，憑記憶滑！':
   next==='playback'?'正在播放你的走音…':'↻ 再挑戰一次';
  E.stage.textContent=next==='empty'?'正在自動載入原唱':
   next==='error'?'原唱載入失敗':
   next==='ready'?'音檔就緒 · 原版人聲':
+  next==='countinTeacher'?'① 班長預備拍 · 3 2 1 唱':
+  next==='countinPlayer'?'② 玩家預備拍 · 3 2 1 唱':
   next==='listen'?'① 班長示範 · 原唱音準線':
   next==='imitate'?'② 你唱 · 答案完全隱藏':
   next==='playback'?'③ 公開播放玩家走音':'④ 鑑測報告';
  E.overlay.textContent=next==='empty'?'正在載入內建原版人聲…':next==='error'?'載入失敗，點擊重新載入':vocals?'按「班長先唱」開始':'正在載入內建原版人聲…';
+ if(next==='countinTeacher')E.speech.textContent='「聽好！先數四拍，第五拍開始！」';
+ if(next==='countinPlayer')E.speech.textContent='「3、2、1、唱！第五拍才開始！」';
  if(next==='listen')E.speech.textContent='「聽好！原唱只播人聲，不放伴奏！」';
  if(next==='imitate')E.speech.textContent='「換你！我把音準答案收起來了！」';
  if(next==='playback')E.speech.textContent='「讓我聽聽你剛才唱成怎樣！」';
@@ -81,35 +89,98 @@ function drawGrid(){
 drawGrid();
 function stopAudio(){
  session++;
+ if(cancelCountIn){const cancel=cancelCountIn;cancelCountIn=null;cancel()}
+ for(const node of metronomeNodes){try{node.stop()}catch{}}
+ metronomeNodes.length=0;
+ E.countdown.hidden=true;
  if(frame)cancelAnimationFrame(frame);frame=0;
  if(playSource){try{playSource.stop()}catch{}playSource=null}
  if(playPromise){playPromise();playPromise=null}
  E.mouth.classList.remove('singing');
 }
-function playBuffer(buffer,offset=0,duration=CLIP){
+function playBuffer(buffer,offset=0,duration=CLIP,when=null){
  const c=getAudio(),node=c.createBufferSource(),g=c.createGain();
  node.buffer=buffer;g.gain.value=.94;
  node.connect(g);g.connect(c.destination);
  let done=false,end;
  const promise=new Promise(resolve=>end=()=>{if(done)return;done=true;resolve()});
  node.onended=end;playSource=node;playPromise=end;
- node.start(c.currentTime+.015,offset,Math.max(.01,Math.min(duration,buffer.duration-offset)));
+ node.start(when===null?c.currentTime+.015:Math.max(c.currentTime+.005,when),offset,Math.max(.01,Math.min(duration,buffer.duration-offset)));
  return promise.finally(()=>{if(playSource===node)playSource=null;if(playPromise===end)playPromise=null});
 }
-async function animateAudio(promise){
- const which=session,start=performance.now();
+async function animateAudio(promise,startWhen=null){
+ const c=getAudio(),which=session,start=startWhen===null?c.currentTime:c.currentTime>startWhen+.03?c.currentTime:startWhen;
  return new Promise(resolve=>{
   let ended=false;
   promise.finally(()=>ended=true);
   const update=()=>{
    if(which!==session){resolve();return}
-   const t=(performance.now()-start)/1000;headAt(t);
+   const t=c.currentTime-start;headAt(Math.max(0,t));
    if(ended||t>=CLIP+.25){frame=0;resolve();return}
    frame=requestAnimationFrame(update);
   };
   frame=requestAnimationFrame(update);
  });
 }
+
+// Only a short wooden "答" click: no backing music, no pitched accompaniment.
+function makeCueBuffer(c){
+ const rate=c.sampleRate||44100,n=Math.ceil(rate*.075),buf=c.createBuffer(1,n,rate),data=buf.getChannelData(0);
+ for(let i=0;i<n;i++){
+  const t=i/rate,attack=Math.min(1,t/.0015),decay=Math.exp(-t*64);
+  // A short stick-like transient, with fast-decaying noisy and low resonant body.
+  const click=(Math.random()*2-1)*.69+Math.sin(2*Math.PI*(260-90*t)*t)*.31;
+  data[i]=click*attack*decay*.64;
+ }
+ return buf;
+}
+function scheduleFourBeats(c,firstBeat){
+ const cue=makeCueBuffer(c);
+ for(let i=0;i<COUNT_TEXT.length;i++){
+  const node=c.createBufferSource(),amp=c.createGain();
+  node.buffer=cue;amp.gain.value=i===3?.8:.7;
+  node.connect(amp);amp.connect(c.destination);
+  node.start(firstBeat+i*BEAT_SECONDS);
+  metronomeNodes.push(node);
+ }
+}
+// The fourth click says「唱」; the following fifth beat is the FIRST moment
+// when vocals or mouse pitch recording may begin.
+function countIn(which,c,firstBeat){
+ setMode(which);
+ E.countdown.hidden=false;
+ E.countdownLabel.textContent=which==='countinTeacher'?'班長準備開唱':'換你唱，記住旋律！';
+ E.countdownWord.textContent='3';
+ const id=session;
+ scheduleFourBeats(c,firstBeat);
+ return new Promise(resolve=>{
+  let settled=false,lastBeat=-1;
+  const end=ok=>{
+   if(settled)return;
+   settled=true;cancelCountIn=null;
+   E.countdown.hidden=true;
+   resolve(ok);
+  };
+  cancelCountIn=()=>end(false);
+  const tick=()=>{
+   if(id!==session){end(false);return}
+   const delta=c.currentTime-firstBeat;
+   if(delta>=4*BEAT_SECONDS){end(true);return}
+   const beat=clamp(Math.floor(delta/BEAT_SECONDS),0,3);
+   if(beat!==lastBeat){
+    lastBeat=beat;
+    E.countdownWord.textContent=COUNT_TEXT[beat];
+    E.countdown.classList.remove('pulse');
+    // Force reflow for the pulse on every distinct audible beat.
+    void E.countdown.offsetWidth;
+    E.countdown.classList.add('pulse');
+   }
+   frame=requestAnimationFrame(tick);
+  };
+  tick();
+ });
+}
+
 function frameWave(src,rate,start,n=2048,target=11025){
  const step=Math.max(1,Math.round(rate/target)),frame=new Float32Array(n);
  const begin=Math.floor(start*rate);
@@ -153,6 +224,81 @@ function onsetOf(buffer){
  for(let i=0;i<energy.length-2;i++)if(energy[i].r>threshold&&energy[i+1].r>threshold){first=energy[i].t;break}
  return clamp((first>=0?first:0)-.18,0,Math.max(0,buffer.duration-CLIP));
 }
+
+// Convert the recorded vocal contour to large, stable musical notes.
+// Only the GUIDE is quantized; the user's red trace stays freehand.
+// This deliberately ignores tremolo, micro-variations and tiny sub-0.35s runs.
+function buildGuideSegments(raw){
+ const median=arr=>{
+  const values=arr.filter(Number.isFinite).sort((a,b)=>a-b);
+  return values.length?values[Math.floor(values.length/2)]:null;
+ };
+ const spans=[];let start=-1;
+ for(let i=0;i<=raw.length;i++){
+  const has=i<raw.length&&Number.isFinite(raw[i]);
+  if(has&&start<0)start=i;
+  if(!has&&start>=0){spans.push([start,i]);start=-1}
+ }
+ const segments=[];
+ for(const [from,to] of spans){
+  if(to-from<3)continue;
+  const smooth=[];
+  for(let i=from;i<to;i++){
+   smooth.push(median(raw.slice(Math.max(from,i-3),Math.min(to,i+4))));
+  }
+  const blocks=[];
+  let blockStart=from,level=Math.round(median(smooth.slice(0,Math.min(9,smooth.length))));
+  for(let i=from+3;i<to-3;i++){
+   const candidate=Math.round(median(smooth.slice(i-from,Math.min(smooth.length,i-from+6))));
+   if(Math.abs(candidate-level)>=1.7&&i-blockStart>=5){
+    blocks.push({start:blockStart,end:i,midi:level});
+    blockStart=i;level=candidate;i+=2;
+   }
+  }
+  blocks.push({start:blockStart,end:to,midi:level});
+  // Merge transient notes shorter than 7 frames (0.35s) into a neighbor.
+  for(let k=0;k<blocks.length;k++){
+   if(blocks.length===1||blocks[k].end-blocks[k].start>=7)continue;
+   if(k===0){blocks[1].start=blocks[0].start;blocks.shift();k=-1;continue}
+   if(k===blocks.length-1){blocks[k-1].end=blocks[k].end;blocks.pop();k--;continue}
+   const left=Math.abs(blocks[k].midi-blocks[k-1].midi);
+   const right=Math.abs(blocks[k].midi-blocks[k+1].midi);
+   if(left<=right){blocks[k-1].end=blocks[k].end;blocks.splice(k,1);k--}
+   else{blocks[k+1].start=blocks[k].start;blocks.splice(k,1);k--}
+  }
+  for(const block of blocks){
+   block.midi=Math.round(median(raw.slice(block.start,block.end)));
+   block.startTime=block.start*STEP;
+   block.endTime=Math.min(CLIP,block.end*STEP);
+   if(block.endTime>block.startTime)segments.push(block);
+  }
+ }
+ return segments;
+}
+function pitchForGuide(t){
+ const frame=clamp(Math.floor(t/STEP),0,pitch.length-1);
+ const found=guideSegments.find(note=>frame>=note.start&&frame<note.end);
+ return found?found.midi:pitchAt(t);
+}
+function renderGuide(){
+ let d='';
+ for(const note of guideSegments){
+  const x=(VIEW_W*note.startTime/CLIP).toFixed(1);
+  const x2=(VIEW_W*note.endTime/CLIP).toFixed(1);
+  const y=toY(note.midi).toFixed(1);
+  // Each note is a flat block; use a vertical jump only at an actual note change.
+  // Silences begin a new move so no note bridges the gap.
+  const previous=guideSegments[guideSegments.indexOf(note)-1];
+  const linked=previous&&previous.end===note.start;
+  d+=(linked?' L':' M')+x+' '+y+' L'+x2+' '+y;
+ }
+ E.guide.setAttribute('d',d);
+ E.guide.setAttribute('stroke-width','10');
+ E.guide.setAttribute('stroke-linecap','butt');
+ E.guide.setAttribute('stroke-linejoin','miter');
+ E.guide.setAttribute('stroke','#f2d39b');
+}
+
 async function extractPitch(){
  if(!vocals)return;
  // A prepared reference is reliably visible on phones and avoids slow, very
@@ -167,17 +313,9 @@ async function extractPitch(){
    voiced:Number.isFinite(m),
    t:i*STEP
  }));
- let path='',drawing=false;
- for(let i=0;i<pitch.length;i++){
-  const p=pitch[i];
-  if(!p.voiced){drawing=false;continue}
-  const x=(i*STEP/CLIP*VIEW_W).toFixed(1),y=toY(p.m).toFixed(1);
-  path+=(drawing?' L':' M')+x+' '+y;
-  drawing=true;
- }
- E.guide.setAttribute('d',path);
- E.guide.setAttribute('stroke-width','9');
- E.guide.setAttribute('stroke','#f2d39b');
+ guideSegments=buildGuideSegments(SOURCE_PITCH_50MS);
+ if(!guideSegments.length)throw Error('無法建立旋律音階');
+ renderGuide();
  setText('✅ 原版人聲已載入。音準線由原唱聲音分析取得（有效 '+Math.round(validPitch*100)+'%），班長示範時顯示金色線；換玩家時隱藏。沒有伴奏。');
 }
 function pitchAt(t){
@@ -247,26 +385,38 @@ async function listen(){
  stopAudio();
  const id=session;
  lastScore=null;trace=[];comparison=false;E.feedback.hidden=true;
- E.trace.setAttribute('d','');resetHead();setMode('listen');
+ E.trace.setAttribute('d','');resetHead();
  try{
   const c=getAudio();await c.resume();
   if(id!==session)return;
-  const playing=playBuffer(vocals,clipStart,CLIP);
-  await animateAudio(playing);
+  // Schedule vocals at beat FIVE before sounding any of the four clicks.
+  // Web Audio clock ensures a consistent 4-click count-in on desktop and mobile.
+  const firstBeat=c.currentTime+.12,songStart=firstBeat+4*BEAT_SECONDS;
+  const playing=playBuffer(vocals,clipStart,CLIP,songStart);
+  if(!await countIn('countinTeacher',c,firstBeat)||id!==session)return;
+  setMode('listen');
+  await animateAudio(playing,songStart);
   await playing;
   if(id!==session)return;
-  startImitate();
- }catch(e){setText('無法播放原唱：'+e.message);setMode('ready')}
+  await startImitate();
+ }catch(e){console.error('[軍歌鑑測] 示範播放失敗',e);setText('無法播放原唱：'+e.message);setMode('ready')}
 }
-function startImitate(){
- setMode('imitate');E.guide.style.display='none';
+async function startImitate(){
+ const c=getAudio(),id=session;
+ if(id!==session)return;
+ // A NEW four-beat count-in before the player's take.
+ const firstBeat=c.currentTime+.12,playerStart=firstBeat+4*BEAT_SECONDS;
+ if(!await countIn('countinPlayer',c,firstBeat)||id!==session)return;
+ setMode('imitate');
+ E.guide.style.display='none';
+ E.guide.setAttribute('visibility','hidden');
  pointerId=null;playerHeld=false;midiValue=refBase;trace=[];ownActionCount=0;
- const id=session,start=performance.now();
- E.hint.textContent='記得剛才原唱的音準嗎？現在看不到答案！按住滑鼠／手指上下滑動，放開就停止發聲。';
+ E.hint.textContent='第五拍開唱！已隱藏班長音準線。按住滑鼠／手指上下滑動控制音高，放開會斷音。';
  const step=()=>{
   if(id!==session||mode!=='imitate')return;
-  const t=(performance.now()-start)/1000;
-  while(trace.length*STEP<=Math.min(CLIP,t)){
+  // Use the same AudioContext timeline as the four click sounds.
+  const t=c.currentTime-playerStart;
+  while(trace.length*STEP<=Math.min(CLIP,Math.max(0,t))){
    trace.push({m:midiValue,on:playerHeld});
   }
   headAt(t);
@@ -300,7 +450,7 @@ function calculate(){
   const t=i*STEP,ref=expectedVoiced(t),p=trace[i];
   if(!ref)continue;
   count++;
-  if(p?.on){held++;const diff=Math.abs((p.m||refBase)-pitchAt(t));totalError+=Math.min(20,diff);if(diff<=1.5)good++}
+  if(p?.on){held++;const diff=Math.abs((p.m||refBase)-pitchForGuide(t));totalError+=Math.min(20,diff);if(diff<=1.5)good++}
  }
  const coverage=held/Math.max(1,count),error=held?totalError/held:20;
  const points=clamp(Math.round(100-error*8.4-(1-coverage)*55),0,100);
@@ -353,7 +503,14 @@ E.repeat.addEventListener('click',()=>{if(mode==='ready'||mode==='done')listen()
 E.preview.addEventListener('click',async()=>{
  if(!vocals)return;
  stopAudio();const id=session;setMode('listen');
- try{await getAudio().resume();if(id!==session)return;const p=playBuffer(vocals,clipStart,CLIP);await animateAudio(p);await p;if(id===session)setMode('ready')}
+ try{
+  const c=getAudio();await c.resume();if(id!==session)return;
+  const firstBeat=c.currentTime+.12,start=firstBeat+4*BEAT_SECONDS;
+  const p=playBuffer(vocals,clipStart,CLIP,start);
+  if(!await countIn('countinTeacher',c,firstBeat)||id!==session)return;
+  setMode('listen');await animateAudio(p,start);await p;
+  if(id===session)setMode('ready');
+ }
  catch(e){setMode('ready');setText('原唱試聽失敗：'+e.message)}
 });
 E.replay.addEventListener('click',()=>{if(mode==='done')replay()});
@@ -366,9 +523,9 @@ E.compare.addEventListener('click',()=>{
 window.addEventListener('pagehide',()=>stopAudio());
 window.armySingingTest={
  get status(){return {mode,hasOriginalVocals:!!vocals,hasOriginalMusic:false,musicPlayback:false,embeddedAudio:true,
-   phraseSeconds:CLIP,referenceFrames:pitch.length,voicedPercent:Math.round(validPitch*100),referenceVisible:E.guide.style.display!=='none',guidePathPoints:SOURCE_PITCH_50MS.filter(Number.isFinite).length,samples:trace.length,score:lastScore}},
+   phraseSeconds:CLIP,referenceFrames:pitch.length,voicedPercent:Math.round(validPitch*100),referenceVisible:E.guide.style.display!=='none',guidePathPoints:SOURCE_PITCH_50MS.filter(Number.isFinite).length,flatGuideNotes:guideSegments.length,countdownVisible:!E.countdown.hidden,beatSeconds:BEAT_SECONDS,samples:trace.length,score:lastScore}},
  get refPitch(){return pitch.map(p=>({...p}))},
- analyzePitch:pitchOf,calculate
+ analyzePitch:pitchOf,calculate,buildGuideSegments
 };
 E.main.disabled=true;E.repeat.disabled=true;E.preview.disabled=true;
 E.guide.style.display='none';E.trace.style.display='none';E.dot.setAttribute('visibility','hidden');
