@@ -578,6 +578,7 @@ async function finishImitate(){
 async function showComparedPhrase(index){
  if(mode!=='done')return;
  await applyPhrase(index);
+ setMode('done');
  E.compareFirst.classList.toggle('selected',index===0);
  E.compareSecond.classList.toggle('selected',index===1);
  tracePathFor(takes[index]);
@@ -586,8 +587,13 @@ async function showComparedPhrase(index){
  E.trace.style.display='';
  E.compare.textContent='收起音準線';
 }
-E.main.addEventListener('click',()=>{if(mode==='error')autoLoadVocal();else if(mode==='ready'||mode==='done')listen()});
-E.repeat.addEventListener('click',()=>{if(mode==='ready'||mode==='done')listen()});
+async function startChallenge(){
+ takes=[];lastScore=null;comparison=false;
+ await applyPhrase(0);
+ if(mode==='ready'||mode==='done')await listen();
+}
+E.main.addEventListener('click',()=>{if(mode==='error')autoLoadVocal();else if(mode==='ready'||mode==='done')startChallenge()});
+E.repeat.addEventListener('click',()=>{if(mode==='ready'||mode==='done')startChallenge()});
 E.preview.addEventListener('click',async()=>{
  if(!vocals)return;
  stopAudio();const id=session;setMode('listen');
