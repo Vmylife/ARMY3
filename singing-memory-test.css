@@ -28,3 +28,36 @@
  .countdownCore small{font-size:11px}
 }
 @media(prefers-reduced-motion:reduce){.countdown.pulse .countdownCore{animation:none}}
+
+/* ARMY singing v0.6: fixed pitch rail to the right of the unchanged note board. */
+.boardShell{display:flex;gap:11px;align-items:stretch;width:100%;min-width:0}
+.boardShell .board{flex:1 1 0;min-width:0}
+.pitchControl{flex:0 0 94px;min-height:clamp(210px,28vw,275px);display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:4px;padding:8px 6px;background:#203e2b;border:1px solid #bda96f7e;border-radius:12px;box-shadow:inset 0 0 12px #071a103f;user-select:none}
+.pitchTitle{font-size:11px;font-weight:900;letter-spacing:.3px;color:#f6dc9c;white-space:nowrap}
+.pitchHigh,.pitchLow{font-size:11px;font-weight:800;color:#ddd7b1}
+.pitchRail{position:relative;flex:1 1 0;min-height:90px;width:66px;max-width:100%;touch-action:none;cursor:ns-resize;outline:none;border:1px solid #b5d0a27a;border-radius:15px;background:linear-gradient(90deg,#234535,#183726);display:flex;align-items:center;justify-content:center;-webkit-user-select:none;user-select:none}
+.pitchRail:focus-visible{border-color:#ffdc8b;box-shadow:0 0 0 3px #f6d88a77}
+.pitchRail.active{border-color:#ffe5a0;box-shadow:0 0 9px #f5cf7980}
+.pitchTrack{position:absolute;left:50%;top:12px;bottom:12px;transform:translateX(-50%);width:9px;background:linear-gradient(#d9ca97,#819b81);border-radius:999px;box-shadow:inset 0 1px 5px #26402a}
+.pitchThumb{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:54px;height:38px;border:2px solid #ffe1a0;border-radius:11px;display:grid;place-items:center;color:#183126;font-size:20px;font-weight:900;background:linear-gradient(145deg,#f5d99f,#ddb969);box-shadow:0 3px 10px #02140a8f;pointer-events:none;transition:box-shadow .12s}
+.pitchRail.active .pitchThumb{box-shadow:0 3px 13px #f3d18088}
+.pitchHint{font-size:9px;line-height:1.25;color:#b9d2b9;text-align:center}
+.phraseProgress{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:-4px 0 11px}
+.phraseProgress span{padding:8px 6px;text-align:center;font-size:11px;line-height:1.35;color:#aebfaa;background:#163225;border:1px solid #5d795e85;border-radius:9px}
+.phraseProgress span.active{background:#476039;color:#f7dfa6;border-color:#e4c683;font-weight:850}
+.phraseProgress span.completed{background:#224536;color:#c7dcc1}
+.phraseScores{margin:0 0 10px;border:1px solid #917d526e;border-radius:9px;padding:8px 11px;background:#234334;color:#f3e2ba;font-weight:850;font-size:12px;text-align:center}
+.phraseCompare{display:flex;gap:8px;margin-top:9px}
+.phraseCompare button{flex:1;min-height:32px;border-radius:8px;border:1px solid #b8a9757e;background:#294734;color:#f2dbac;font-size:12px;font-weight:850}
+.phraseCompare button.selected{color:#1c392a;background:#f2d69b;border-color:#e4c782}
+@media(max-width:680px){
+ .boardShell{gap:7px}
+ .pitchControl{flex-basis:67px;min-height:230px;padding:7px 3px;gap:2px}
+ .pitchTitle{font-size:9px;letter-spacing:0}
+ .pitchRail{width:54px;min-height:95px}
+ .pitchThumb{width:46px;height:35px}
+ .pitchHint{font-size:8px}
+ .phraseProgress span{font-size:9px;padding:6px 3px}
+ .phraseCompare button{font-size:11px}
+}
+@media(max-width:370px){.pitchControl{flex-basis:60px}.pitchRail{width:48px}.pitchThumb{width:42px}.boardShell{gap:5px}}
