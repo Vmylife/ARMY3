@@ -1,4 +1,4 @@
-/* ARMY3 v1.42 fixed 3D paper-target practice / 20 animated runners — reuse original Army3 GLB world and rifle. */
+/* ARMY3 v1.46 fixed 3D paper-target practice / 20 animated runners — reuse original Army3 GLB world and rifle. */
 import {loadGlb} from './src/core/glb111.js';
 import {RifleRenderer} from './src/training/rifleRenderer.js';
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -9,6 +9,7 @@ const matMul=(a,b)=>{const o=new Float32Array(16);for(let j=0;j<4;j++)for(let i=
 const matT=(x,y,z)=>new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,x,y,z,1]);
 const matS=s=>new Float32Array([s,0,0,0,0,s,0,0,0,0,s,0,0,0,0,1]);
 const matRY=a=>{const c=Math.cos(a),s=Math.sin(a);return new Float32Array([c,0,-s,0,0,1,0,0,s,0,c,0,0,0,0,1]);};
+const matRZ=a=>{const c=Math.cos(a),s=Math.sin(a);return new Float32Array([c,s,0,0,-s,c,0,0,0,0,1,0,0,0,0,1]);};
 function patch(src,needle,replace,label){if(!src.includes(needle))throw Error('原版軍營渲染器與打靶版本不相容（'+label+'）');return src.replace(needle,replace);}
 function batchFunction(){return `  drawHighFriendlySoldiers(vp){
     if(this.modelState!=='ready'||!this.soldierAssets?.high)return;
@@ -69,6 +70,27 @@ async function boot(){try{
     '固定 3D 靶紙／打靶步槍與軍營繪製');
   // 20 moving friendlies: use existing instanced cadet renderer, sharing one Running rig.
   src=patch(src, 'this.friendlyIdle.evaluate(dt);', "if(window.__armyShootingView&&!this.shootingRunningInitialized){const rig=this.friendlyIdle;rig.setClip(rig.hasClip('Running')?'Running':rig.hasClip('Walking')?'Walking':'Idle',{restart:true});this.shootingRunningInitialized=true;}this.friendlyIdle.evaluate(dt);", '友軍共同跑步骨架動畫');
+
+  // Patch the ACTUAL instanced cadet renderer; the earlier batchFunction is unused.
+  src=patch(src,'float fall=0.; // The hit pass uses the actual Knock_Down joint matrices, not a rigid plank tilt.',
+    'float fall=iState.y>.5?clamp(iState.z,0.,1.)*1.50:0.; // Individual forward impact tumble.',
+    '中彈倒地角度');
+  src=patch(src,'local+=iPose.xyz;\n    gl_Position=uVP*vec4(local,1.);',
+    'local+=iPose.xyz;\n    if(iState.y>.5)local.y=max(local.y,.205);\n    gl_Position=uVP*vec4(local,1.);',
+    '地面防穿透');
+  src=patch(src,`  if(this.friendlyKnockGroups)for(const rig of this.friendlyKnockGroups.values())rig.evaluate(dt);
+  const groups=[[actors.filter(a=>!a.hit),this.friendlyIdle]];
+  if(this.friendlyKnockGroups)for(const [bucket,rig] of this.friendlyKnockGroups){
+   const affected=actors.filter(a=>a.hit&&a.knockBucket===bucket);
+   if(affected.length)groups.push([affected,rig]);
+  }`,
+  `  if(!this.shootingDownRig){this.shootingDownRig=sa.makeAnim();this.shootingDownRig.setClip(this.shootingDownRig.hasClip('Idle')?'Idle':'Walking',{restart:true});}
+  this.shootingDownRig.evaluate(dt);
+  const groups=[[actors.filter(a=>!a.hit),this.friendlyIdle],[actors.filter(a=>a.hit),this.shootingDownRig]];`,
+  '命中者獨立落地姿勢');
+  src=patch(src,'instances[p+5]=a.hit?1:0;instances[p+6]=a.seed;',
+    'instances[p+5]=a.hit?1:0;instances[p+6]=a.hit?Math.max(0,Math.min(1,a.fall||0)):a.seed;',
+    '每位士兵的受擊進度');
   src=patch(src,'precision highp float;in vec2 vUV;in vec3 vN;uniform sampler2D uTex;out vec4 frag;',
     'precision highp float;in vec2 vUV;in vec3 vN;uniform sampler2D uTex;uniform float uRed;out vec4 frag;',
     '紅軍實例化染色 uniform');
@@ -158,7 +180,8 @@ async function boot(){try{
     const view=state.view,rifle=state.rifle;if(!view||!rifle?.weapon)return;
     const theta=view.yaw,phi=view.pitch,cy=Math.cos(theta),sy=Math.sin(theta),cp=Math.cos(phi),sp=Math.sin(phi);
     const forward=[sy*cp,sp,cy*cp],right=[-cy,0,sy],up=[-sy*sp,cp,-cy*sp];
-    const e=view.eye,recoil=(view.flinch||0)*.009;
+    const e=view.eye,shotAge=view.shotAge??10,pulse=shotAge<.30?Math.exp(-shotAge*14):0;
+    const recoil=pulse*.115,barrelKick=pulse*.24;
     // First-person iron-sight stance: center the existing rifle's bore instead
     // of leaving it shouldered off to the right. Match the shared breathing sway.
     const zoomed=!!view.zoom,dist=zoomed?1.26:1.13;
@@ -169,7 +192,7 @@ async function boot(){try{
     const px=e[0]+forward[0]*(dist-recoil)+right[0]*side-up[0]*drop;
     const py=e[1]+forward[1]*(dist-recoil)+right[1]*side-up[1]*drop;
     const pz=e[2]+forward[2]*(dist-recoil)+right[2]*side-up[2]*drop;
-    const model=matMul(matT(px,py,pz),matMul(matRY(theta-Math.PI/2),matS(.35)));
+    const model=matMul(matT(px,py,pz),matMul(matRY(theta-Math.PI/2),matMul(matRZ(barrelKick),matS(.35))));
     const g=world.gl;
     // Optional first-person weapon must NEVER stop the destructible camp render loop.
     // WebGL drawElements(mode, count, type, offset) REQUIRES the byte offset.
@@ -177,7 +200,7 @@ async function boot(){try{
       g.useProgram(rifle.program);g.uniformMatrix4fv(rifle.vp,false,vp);g.uniformMatrix4fv(rifle.model,false,model);
       g.disable(g.CULL_FACE);g.bindVertexArray(rifle.weapon.vao);
       g.drawElements(g.TRIANGLES,rifle.weapon.count,rifle.weapon.type,0);
-      if((view.flinch||0)>6){g.bindVertexArray(rifle.flash.vao);g.drawElements(g.TRIANGLES,rifle.flash.count,rifle.flash.type,0);}
+      if(shotAge<.115){g.bindVertexArray(rifle.flash.vao);g.drawElements(g.TRIANGLES,rifle.flash.count,rifle.flash.type,0);}
     }catch(error){
       console.warn('[Army Shooting] Optional rifle visual failed; continuing camp render',error);
       state.rifle=null;
@@ -189,7 +212,7 @@ async function boot(){try{
     if(w.modelState==='ready'&&!state.ready){state.ready=true;w.actors=[];}
     if(state.ready&&view&&!state.paused){
       w.actors=actors.map(a=>({uid:'shooting-'+a.id,id:a.id,px:a.x,pz:a.z,x:a.x,z:a.z,angle:a.angle,scale:1,
-        renderLift:a.lift||0,enemy:a.team==='red',hit:!a.alive,knockBucket:a.alive?undefined:0,seed:a.seed??0,shootingAction:'run'}));
+        renderLift:a.alive?0:(.18+(a.airY||0)),enemy:a.team==='red',hit:!a.alive,fall:a.fall||0,seed:a.seed??0,shootingAction:'run'}));
       if(!w.shootingKnockedIds)w.shootingKnockedIds=new Set();
       for(const a of w.actors){if(!a.hit||w.shootingKnockedIds.has(a.id))continue;w.shootingKnockedIds.add(a.id);
        a.knockBucket=0;if(!w.friendlyKnockGroups)w.friendlyKnockGroups=new Map();
