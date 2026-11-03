@@ -61,3 +61,18 @@
  .phraseCompare button{font-size:11px}
 }
 @media(max-width:370px){.pitchControl{flex-basis:60px}.pitchRail{width:48px}.pitchThumb{width:42px}.boardShell{gap:5px}}
+
+/* v0.8 — seven short lyric segments; same uncluttered pitch-board proportions. */
+.phraseProgress{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+.phraseProgress span{font-size:10px;padding:6px 4px;line-height:1.4;min-height:36px;display:grid;place-items:center}
+.phraseCompare{flex-wrap:wrap}
+.phraseCompare button{flex:1 1 21%;min-width:60px;padding:7px 3px}
+.phraseScores{line-height:1.9;overflow-wrap:anywhere;white-space:normal}
+#timeline{font-size:10px}
+#guideLine{stroke-linecap:butt!important}
+@media(max-width:680px){
+ .phraseProgress{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
+ .phraseProgress span{font-size:9px;min-height:29px;padding:5px 3px}
+ .phraseCompare button{flex-basis:22%;min-width:48px;font-size:10px}
+ .phraseScores{font-size:11px;line-height:1.75}
+}
