@@ -3,22 +3,22 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#172a20">
-<title>軍歌鑑測｜聽班長唱一句</title>
+<title>軍歌鑑測｜前兩句分開唱</title>
 <link rel="stylesheet" href="./singing-memory-test.css?v=6">
 </head>
 <body>
 <main class="app">
-<header class="top"><div class="brand">國軍實驗靶場 <span>/ 軍歌鑑測 V0.6 · 兩句接唱</span></div><a class="back" href="./index.html">← 返回軍營</a></header>
+<header class="top"><div class="brand">國軍實驗靶場 <span>/ 軍歌鑑測 V0.7 · 即時走音演唱</span></div><a class="back" href="./index.html">← 返回軍營</a></header>
 <section class="hero">
  <div class="scene" aria-hidden="true"><div class="badgeIcon">♪</div>
   <div class="sergeant"><div class="beret"></div><div class="face"><i class="eye one"></i><i class="eye two"></i><i id="mouth" class="mouth"></i></div><div class="neck"></div><div class="body"><i class="badgeMark">班</i></div></div>
   <div class="speech" id="speech">「跟著我唱，不准走音！」</div>
  </div>
  <div class="heading"><div class="eyebrow">軍歌記憶音準 · 原版音訊測試</div><h1>班長唱一句，你敢跟著唱嗎？</h1>
- <p>第一句「國家有綱常，軍隊有軍紀」先由班長示範、再換你唱；接著第二句「軍紀是軍隊的命脈」重複挑戰。右側固定滑桿控制音高，時間自動往前。</p></div>
+ <p>已重新按照原版人聲切開兩句：先唱「國家有綱常，軍隊有軍紀」，再唱「軍紀是軍隊的命脈」。拉右側音高滑桿時立即聽見自己的走音人聲，放開便停唱。</p></div>
 </section>
 <section class="controls">
- <div class="line"><span class="tag" id="stageTag">等待開始</span><span id="takeCount">第 1 / 2 句 · 8 秒</span></div>
+ <div class="line"><span class="tag" id="stageTag">等待開始</span><span id="takeCount">第 1 / 2 句 · 4 秒</span></div>
  <div class="words" id="words">國家有綱常　／　軍隊有軍紀</div>
  <div class="phraseProgress" aria-label="歌曲分段進度"><span id="phraseStep1" class="active">① 國家有綱常，軍隊有軍紀</span><span id="phraseStep2">② 軍紀是軍隊的命脈</span></div>
  <div class="boardShell">
@@ -50,7 +50,7 @@
  <div class="legend" id="legend"><span><b class="gold"></b>班長水平音階（只在示範時出現）</span><span><b class="red"></b>你的走音軌跡（回放後顯示）</span></div>
  <div class="actionArea"><button id="mainButton" class="primary" type="button">▶ 班長先唱</button>
  <button id="skipButton" class="secondary" type="button" disabled>重新聽示範</button></div>
- <p class="hint" id="hint">每句都先倒數 3、2、1、唱，第五拍開始。唱的時候只要按住<strong>右側音高控制條</strong>上下拖動，不必沿時間軸往右滑。</p>
+ <p class="hint" id="hint">每句都倒數 3、2、1、唱，第五拍才開唱。按住<strong>右側音高控制條</strong>上下拖動，會即時聽到原版人聲跟著走音；放開立刻靜音。</p>
  <div class="feedback" id="feedback" hidden>
    <div class="feedbackTitle"><span id="finalRank">F 級</span><strong id="finalScore">0 分</strong></div>
    <p id="comment"></p>
@@ -64,9 +64,9 @@
  <p><strong>原版人聲已內建在遊戲。</strong>直接按「班長先唱」就能玩，電腦或手機都不必選擇音檔。示範、模仿後的走音回放都只使用人聲，完全沒有背景伴奏。</p>
  <div class="voiceActions"><button id="previewClip" type="button" disabled>▶ 試聽原版人聲</button></div>
  <div id="voiceInfo" class="voiceInfo" role="status">正在從遊戲載入原版人聲並分析音準…</div>
- <p class="legal">使用你提供的原版 vocals 人聲分軌，取開頭演唱約 8 秒作為首版試玩。暫不使用 music 伴奏分軌，亦不生成新旋律。</p>
+ <p class="legal">直接使用你提供的原版 vocals 人聲分軌，依原唱停頓把前兩句分開；不使用 music 伴奏、不合成新旋律。</p>
 </section>
 <footer>獨立試玩版本 · 尚未加入軍營正式小遊戲</footer>
 </main>
-<script src="./singing-memory-test.js?v=6" defer></script>
+<script src="./singing-memory-test.js?v=7" defer></script>
 </body></html>
