@@ -104,6 +104,79 @@ function drawGrid(){
  E.timeline.innerHTML='<span>0:00</span><span>原唱片段 · '+CLIP.toFixed(1)+' 秒</span><span>0:'+CLIP.toFixed(1)+'</span>';
 }
 drawGrid();
+
+// Low-latency live human voice: small overlapped grains from the actual vocal MP3.
+// The player only changes pitch/phoneme playback, not the song timing.
+// No synthetic oscillator, backing track, microphone, or external service.
+function liveGain(on){
+ if(!liveVoice)return;
+ const c=getAudio(),p=liveVoice.master.gain,target=on?.40:0;
+ try{
+  if(typeof p.cancelScheduledValues==='function')p.cancelScheduledValues(c.currentTime);
+  if(typeof p.setTargetAtTime==='function')p.setTargetAtTime(target,c.currentTime,on?.014:.008);
+  else p.value=target;
+ }catch{p.value=target}
+ E.mouth.classList.toggle('singing',mode==='imitate'&&on);
+}
+function stopLiveVoice(){
+ if(!liveVoice)return;
+ const live=liveVoice;
+ liveVoice=null;
+ try{
+  const gain=live.master.gain;
+  if(typeof gain.cancelScheduledValues==='function')gain.cancelScheduledValues(getAudio().currentTime);
+  gain.value=0;
+ }catch{}
+ for(const node of live.nodes){
+  try{node.stop()}catch{}
+ }
+ try{live.master.disconnect()}catch{}
+ E.mouth.classList.remove('singing');
+}
+function beginLiveVoice(c,playerStart){
+ stopLiveVoice();
+ const master=c.createGain();
+ master.gain.value=0;
+ master.connect(c.destination);
+ liveVoice={master,start:playerStart,nextAt:playerStart+.025,grains:0,nodes:new Set()};
+}
+function pumpLiveVoice(){
+ const live=liveVoice;
+ if(!live||mode!=='imitate')return;
+ const c=getAudio(),now=c.currentTime;
+ if(live.nextAt<now+.012)live.nextAt=now+.012;
+ if(!playerHeld)return;
+ const GRAIN=.105,HOP=.027,lookAhead=.075;
+ const sr=vocals.sampleRate,original=vocals.getChannelData(0);
+ const length=Math.ceil(sr*GRAIN);
+ // Schedule only ~75ms ahead so slider movement changes heard pitch immediately.
+ let count=0;
+ while(live.nextAt<=now+lookAhead&&live.nextAt<live.start+CLIP&&count<5){
+  const t=live.nextAt-live.start;
+  const half=(length-1)/2;
+  const srcCenter=(clipStart+t+GRAIN/2)*sr;
+  const semitones=clamp(midiValue-pitchAt(t),-13,13);
+  const ratio=Math.pow(2,semitones/12);
+  const grain=c.createBuffer(1,length,sr);
+  const dst=grain.getChannelData(0);
+  for(let j=0;j<length;j++){
+   const at=srcCenter+(j-half)*ratio,index=Math.floor(at);
+   if(index<0||index+1>=original.length)continue;
+   const weight=.5-.5*Math.cos(2*Math.PI*j/(length-1));
+   dst[j]=(original[index]+(original[index+1]-original[index])*(at-index))*weight;
+  }
+  const node=c.createBufferSource();
+  node.buffer=grain;
+  node.connect(live.master);
+  live.nodes.add(node);
+  node.onended=()=>live.nodes.delete(node);
+  node.start(live.nextAt);
+  live.grains++;
+  live.nextAt+=HOP;
+  count++;
+ }
+}
+
 function stopAudio(){
  session++;
  stopLiveVoice();
@@ -446,12 +519,14 @@ async function startImitate(){
  E.guide.setAttribute('visibility','hidden');
  pointerId=null;playerHeld=false;midiValue=refBase;trace=[];ownActionCount=0;
  E.thumb.style.top='50%';
- E.hint.textContent='第五拍開始！只需按住右側滑桿上下移動控制音高；時間軸會自動往前。放開就斷音。';
+ beginLiveVoice(c,playerStart);
+ E.hint.textContent='第五拍開始！右側滑桿上下移動時會即時聽見走音人聲；放開就停唱。';
  const step=()=>{
   if(id!==session||mode!=='imitate')return;
   const t=c.currentTime-playerStart;
   while(trace.length*STEP<=Math.min(CLIP,Math.max(0,t)))trace.push({m:midiValue,on:playerHeld});
   headAt(t);
+  pumpLiveVoice();
   E.dot.setAttribute('cx',(VIEW_W*clamp(t/CLIP,0,1)).toFixed(1));
   if(t>=CLIP){frame=0;finishImitate();return}
   frame=requestAnimationFrame(step);
@@ -470,17 +545,19 @@ E.rail.addEventListener('pointerdown',e=>{
  if(mode!=='imitate'||pointerId!==null)return;
  e.preventDefault();pointerId=e.pointerId;playerHeld=true;ownActionCount++;
  E.rail.classList.add('active');updateFromRail(e);
+ liveGain(true);pumpLiveVoice();
  try{E.rail.setPointerCapture(e.pointerId)}catch{}
 });
 E.rail.addEventListener('pointermove',e=>{
  if(mode!=='imitate'||pointerId!==e.pointerId)return;
  e.preventDefault();updateFromRail(e);
+ pumpLiveVoice();
 });
 for(const event of ['pointerup','pointercancel','lostpointercapture']){
  E.rail.addEventListener(event,e=>{
   if(mode!=='imitate')return;
   if(pointerId!==null&&e.pointerId!==pointerId)return;
-  pointerId=null;playerHeld=false;E.rail.classList.remove('active');
+  pointerId=null;playerHeld=false;E.rail.classList.remove('active');liveGain(false);
  });
 }
 E.rail.addEventListener('keydown',e=>{
@@ -491,11 +568,11 @@ E.rail.addEventListener('keydown',e=>{
   const position=clamp((refBase+9.5-midiValue)/19,0,1);
   E.thumb.style.top=(position*100).toFixed(1)+'%';
   E.rail.setAttribute('aria-valuenow',String(Math.round((1-position)*100)));
-  E.dot.setAttribute('cy',String(toY(midiValue)));
- }else if(e.code==='Space'){e.preventDefault();playerHeld=true;E.rail.classList.add('active')}
+  E.dot.setAttribute('cy',String(toY(midiValue)));pumpLiveVoice();
+ }else if(e.code==='Space'){e.preventDefault();playerHeld=true;E.rail.classList.add('active');liveGain(true);pumpLiveVoice()}
 });
 E.rail.addEventListener('keyup',e=>{
- if(e.code==='Space'){playerHeld=false;E.rail.classList.remove('active')}
+ if(e.code==='Space'){playerHeld=false;E.rail.classList.remove('active');liveGain(false)}
 });
 function grade(s){return s>=92?'S':s>=80?'A':s>=65?'B':s>=45?'C':s>=25?'D':'F'}
 function calculate(){
@@ -561,6 +638,7 @@ async function replay(){
 }
 async function finishImitate(){
  playerHeld=false;pointerId=null;E.rail.classList.remove('active');
+ stopLiveVoice();
  const score=calculate(),warped=createWarp();
  takes[activePhrase]={index:activePhrase,score,trace:trace.slice(),buffer:warped};
  if(activePhrase===0){
@@ -633,7 +711,7 @@ window.armySingingTest={
    phraseSeconds:CLIP,referenceFrames:pitch.length,voicedPercent:Math.round(validPitch*100),
    referenceVisible:E.guide.style.display!=='none',guidePathPoints:sourcePitch.filter(Number.isFinite).length,
    flatGuideNotes:guideSegments.length,countdownVisible:!E.countdown.hidden,beatSeconds:BEAT_SECONDS,
-   samples:trace.length,score:lastScore}},
+   samples:trace.length,liveVoiceGrains:liveVoice?.grains||0,score:lastScore}},
  get refPitch(){return pitch.map(p=>({...p}))},
  analyzePitch:pitchOf,calculate,buildGuideSegments
 };
