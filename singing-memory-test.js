@@ -1,11 +1,12 @@
-/* ARMY3 singing memory v0.5 — ORIGINAL VOICE STEM ONLY.
+/* ARMY3 singing memory v0.6 — ORIGINAL VOICE STEM ONLY.
    Original isolated vocal MP3 is bundled with ARMY3; users never upload files. Music stem is NEVER played.
    Correct pitch is derived from the selected vocal waveform (no invented tune).
    Browser-only processing: Web Audio + short-time pitch detection + OLA pitch warp.
 */
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
-const CLIP=8, STEP=.05, VIEW_W=800, VIEW_H=240;
+let CLIP=8;
+const STEP=.05, VIEW_W=800, VIEW_H=240;
 const BEAT_SECONDS=.55, COUNT_TEXT=['3','2','1','唱'];
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const sleep=()=>new Promise(r=>setTimeout(r,0));
@@ -16,12 +17,14 @@ const E={
  feedback:$('feedback'),rank:$('finalRank'),points:$('finalScore'),comment:$('comment'),
  replay:$('replayButton'),compare:$('compareButton'),hint:$('hint'),count:$('takeCount'),
  countdown:$('countdown'),countdownWord:$('countdownWord'),countdownLabel:$('countdownLabel'),
+ rail:$('pitchRail'),thumb:$('pitchThumb'),phrase1:$('phraseStep1'),phrase2:$('phraseStep2'),
+ phraseScores:$('phraseScores'),compareFirst:$('comparePhrase1'),compareSecond:$('comparePhrase2'),
  preview:$('previewClip'),info:$('voiceInfo'),mode:$('voiceMode'),timeline:$('timeline')
 };
-let ctx=null,vocals=null,clipStart=0;
+let ctx=null,vocals=null,clipStart=0,activePhrase=0,audioBuffers=[],sourcePitch=[];
 let pitch=[],refBase=62,validPitch=0,mode='empty',session=0,frame=0,playerHeld=false;
 let midiValue=refBase,pointerId=null,trace=[],lastScore=null,playSource=null,playPromise=null,comparison=false;
-let ownActionCount=0,analysisToken=0,guideSegments=[],metronomeNodes=[],cancelCountIn=null;
+let ownActionCount=0,analysisToken=0,guideSegments=[],metronomeNodes=[],cancelCountIn=null,takes=[];
 const AUDIO_URL='./singing-samples/junji-original-vocals-intro.mp3?v=3';
 // Extracted offline from the same original vocal MP3 with spectral tracking.
 // A sung chorus has harmonics/overlapping voices; the old browser autocorrelation
@@ -29,6 +32,12 @@ const AUDIO_URL='./singing-samples/junji-original-vocals-intro.mp3?v=3';
 // This derived contour stays synchronized to the shipped original, with
 // nulls only for genuine pauses. No melody was composed or substituted.
 const SOURCE_PITCH_50MS=[null,null,null,null,null,null,null,null,null,66.7,66.7,66.6,66.6,66.6,66.5,66.4,66.4,66.4,66.7,67,67,67,66.6,66.6,66.6,66.6,66.7,66.9,66.9,71.4,72,72.1,72.2,72.2,72.2,72.1,71.5,71.5,71.5,71.5,71.6,72,72,72,72.1,72.1,72.2,72.2,72.2,71.7,65.3,65.2,65.2,65,65,65,64.8,64.7,64.6,64.3,63.9,63.9,64.3,64.6,64.6,64.7,64.7,64.7,64.7,65,65,67.2,67.4,67.4,67.2,66.9,66.7,66.7,66.7,66.7,66.5,66.3,65.9,65.2,65.5,65.3,65.1,64.9,null,null,null,62.1,61.9,61.6,60,60,60,60,60,60.8,60.8,61.1,61.5,61.5,61.6,61.8,61.9,61.9,62.1,62.1,62.1,65.3,65.3,65.3,65,64.8,64.8,65,65,64.8,65.2,65.4,68.8,68.9,68.9,68.8,68,66.6,66.6,66.6,67.3,68.2,68.5,68.5,68.5,68.5,68.5,68.8,68.9,68.9,68.8,68.7,68.5,68.5,68.5,68.7,68.9,68.9,68.9,68.9,68.9,68.9,68.9,74.8,76,76,76.5,76.5,76.5,76.5,76.3];
+// Measured from the second sung phrase in the user's original vocal audio.
+const SOURCE_PITCH_2_50MS=[null,null,null,null,null,null,null,null,68.8,68.7,68.7,68.7,67.6,67.7,67.7,67.4,66.7,66.8,66.9,67,69.5,68.2,67,66.9,66.9,66.8,66.5,66.2,65.1,65,65,64.5,64.5,64.5,64.5,65.1,65.3,64.5,64.5,64.5,64.5,64.5,64.5,null,null,null,null,null,63.2,62.7,62.5,62.3,62.4,60,61.5,62.7,60.5,60.6,64.3,64.3,65.8,66,65.8,65.9,65.9,66.1,62.7,62.7,62.8,62.5,62.7,62.7,59.8,59.8,63.3,65.8,65.7,64.3,63,63.7,63.6,62.4,62.2,59.7,61.5,62.8,62.4,61.5,60,62.7];
+const PHRASES=[
+ {text:'國家有綱常　／　軍隊有軍紀',duration:8,audioUrl:AUDIO_URL,pitch:SOURCE_PITCH_50MS},
+ {text:'軍紀是軍隊的命脈',duration:4.45,audioUrl:'./singing-samples/junji-original-vocals-phrase-2.mp3?v=6',pitch:SOURCE_PITCH_2_50MS}
+];
 const MIDI=f=>69+12*Math.log2(f/440);
 function getAudio(){if(!ctx){const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)throw Error('此裝置不支援 Web Audio');ctx=new Audio()}return ctx}
 function setText(s){E.info.textContent=s}
@@ -40,7 +49,8 @@ function setMode(next){
  E.preview.disabled=playing||!vocals;
  E.mouth.classList.toggle('singing',next==='listen'||next==='playback');
  if(!next.startsWith('countin'))E.countdown.hidden=true;
- E.board.style.cursor=next==='imitate'?'crosshair':'default';
+ E.board.style.cursor='default';
+ E.rail.style.cursor=next==='imitate'?'ns-resize':'default';
  const showReference=next==='countinTeacher'||next==='listen'||(next==='done'&&comparison);
  E.guide.style.display=showReference?'inline':'none';
  E.guide.setAttribute('visibility',showReference?'visible':'hidden');
@@ -62,6 +72,7 @@ function setMode(next){
   next==='listen'?'① 班長示範 · 原唱音準線':
   next==='imitate'?'② 你唱 · 答案完全隱藏':
   next==='playback'?'③ 公開播放玩家走音':'④ 鑑測報告';
+ E.stage.textContent='第 '+(activePhrase+1)+'/2 句 · '+E.stage.textContent;
  E.overlay.textContent=next==='empty'?'正在載入內建原版人聲…':next==='error'?'載入失敗，點擊重新載入':vocals?'按「班長先唱」開始':'正在載入內建原版人聲…';
  if(next==='countinTeacher')E.speech.textContent='「聽好！先數四拍，第五拍開始！」';
  if(next==='countinPlayer')E.speech.textContent='「3、2、1、唱！第五拍才開始！」';
@@ -84,7 +95,7 @@ function drawGrid(){
  let html='';
  for(let y=24;y<240;y+=40)html+='<line x1="0" x2="800" y1="'+y+'" y2="'+y+'" stroke="#486852" stroke-width="1" stroke-dasharray="3 7"/>';
  $('gridLines').innerHTML=html;
- E.timeline.innerHTML='<span>0:00</span><span>原唱片段 · '+CLIP+'秒</span><span>0:'+String(CLIP).padStart(2,'0')+'</span>';
+ E.timeline.innerHTML='<span>0:00</span><span>原唱片段 · '+CLIP.toFixed(1)+' 秒</span><span>0:'+CLIP.toFixed(1)+'</span>';
 }
 drawGrid();
 function stopAudio(){
@@ -303,17 +314,17 @@ async function extractPitch(){
  if(!vocals)return;
  // A prepared reference is reliably visible on phones and avoids slow, very
  // fragile autocorrelation on this multi-voice recording at 16 kHz.
- if(SOURCE_PITCH_50MS.length!==Math.round(CLIP/STEP)+1)throw Error('原唱音準資料不完整');
- const valid=SOURCE_PITCH_50MS.filter(Number.isFinite).sort((x,y)=>x-y);
+ if(sourcePitch.length!==Math.round(CLIP/STEP)+1)throw Error('原唱音準資料不完整');
+ const valid=sourcePitch.filter(Number.isFinite).sort((x,y)=>x-y);
  if(valid.length<CLIP/STEP*.5)throw Error('原唱音準有效資料不足');
  refBase=valid[Math.floor(valid.length/2)];
- validPitch=valid.length/SOURCE_PITCH_50MS.length;
- pitch=SOURCE_PITCH_50MS.map((m,i)=>({
+ validPitch=valid.length/sourcePitch.length;
+ pitch=sourcePitch.map((m,i)=>({
    m:Number.isFinite(m)?m:refBase,
    voiced:Number.isFinite(m),
    t:i*STEP
  }));
- guideSegments=buildGuideSegments(SOURCE_PITCH_50MS);
+ guideSegments=buildGuideSegments(sourcePitch);
  if(!guideSegments.length)throw Error('無法建立旋律音階');
  renderGuide();
  setText('✅ 原版人聲已載入。音準線由原唱聲音分析取得（有效 '+Math.round(validPitch*100)+'%），班長示範時顯示金色線；換玩家時隱藏。沒有伴奏。');
