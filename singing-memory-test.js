@@ -450,11 +450,13 @@ async function applyPhrase(index){
  vocals=audioBuffers[index];
  clipStart=0;
  E.words.textContent=part.text;
- E.count.textContent='原版人聲 · 第 '+(index+1)+'/2 句 · '+CLIP.toFixed(1)+' 秒';
- E.phrase1.classList.toggle('active',index===0);
- E.phrase2.classList.toggle('active',index===1);
- E.phrase1.classList.toggle('completed',index>0||!!takes[0]);
- E.phrase2.classList.toggle('completed',!!takes[1]);
+ E.count.textContent='原版人聲 · 第 '+(index+1)+'/'+PHRASES.length+' 句 · '+CLIP.toFixed(1)+' 秒';
+ for(let i=0;i<PHRASES.length;i++){
+  const marker=$('phraseStep'+(i+1));
+  if(!marker)continue;
+  marker.classList.toggle('active',index===i);
+  marker.classList.toggle('completed',!!takes[i]);
+ }
  drawGrid();
  await extractPitch();
  E.rail.setAttribute('aria-valuenow','50');
@@ -464,9 +466,19 @@ async function autoLoadVocal(){
  if(['listen','imitate','playback','countinTeacher','countinPlayer'].includes(mode))return;
  audioBuffers=[];vocals=null;takes=[];lastScore=null;activePhrase=0;
  setMode('empty');updateModeText();
- setText('正在自動載入兩段原版人聲（無伴奏），以及對應的原唱音高…');
+ setText('正在自動載入七段原版人聲（無伴奏），以及對應的原唱音高…');
  try{
   const c=getAudio();
+  // Precomputed source-derived pitch tracks for the five added verses.
+  const pitchResponse=await fetch(PITCH_URL,{cache:'force-cache'});
+  if(!pitchResponse.ok)throw Error('七句原唱音準資料 HTTP '+pitchResponse.status);
+  const extra=await pitchResponse.json();
+  for(let index=2;index<PHRASES.length;index++){
+   const line=extra['line'+(index+1)];
+   if(!Array.isArray(line)||line.length!==Math.round(PHRASES[index].duration/STEP)+1)
+    throw Error('第 '+(index+1)+' 句原唱音高資料不完整');
+   PHRASES[index].pitch=line;
+  }
   const decoded=await Promise.all(PHRASES.map(async part=>{
    const response=await fetch(part.audioUrl,{cache:'force-cache'});
    if(!response.ok)throw Error('音檔 HTTP '+response.status);
@@ -629,11 +641,11 @@ function tracePathFor(take){
  E.trace.setAttribute('d',path);
 }
 async function replay(){
- if(takes.length!==2||!lastScore)return;
+ if(takes.length!==PHRASES.length||!lastScore)return;
  stopAudio();const id=session;
  try{
   await getAudio().resume();
-  for(let i=0;i<2;i++){
+  for(let i=0;i<PHRASES.length;i++){
    if(id!==session)return;
    await applyPhrase(i);
    setMode('playback');
@@ -645,14 +657,14 @@ async function replay(){
    await p;
   }
   if(id!==session)return;
-  await applyPhrase(1);
+  await applyPhrase(PHRASES.length-1);
   setMode('done');comparison=false;E.feedback.hidden=false;
   E.rank.textContent=lastScore.grade+' 級';
   E.points.textContent=lastScore.points+' / 100';
-  E.comment.textContent=lastScore.comment+'（兩句平均跟唱率 '+lastScore.coverage+'%；平均走音 '+lastScore.error+' 個半音）';
-  E.phraseScores.textContent='第一句 '+takes[0].score.points+' 分 · 第二句 '+takes[1].score.points+' 分';
-  E.hint.textContent='兩句走音人聲已依序播放完畢，沒有伴奏。可以重播整段，或切換第一／第二句查看音準比較。';
-  tracePathFor(takes[1]);
+  E.comment.textContent=lastScore.comment+'（七句平均跟唱率 '+lastScore.coverage+'%；平均走音 '+lastScore.error+' 個半音）';
+  E.phraseScores.textContent=takes.map((take,index)=>'第'+(index+1)+'句 '+take.score.points+' 分').join(' · ');
+  E.hint.textContent='七句走音人聲已依序播放完畢，沒有伴奏。可以重播整段，或切換任一句查看音準比較。';
+  tracePathFor(takes[PHRASES.length-1]);
  }catch(err){console.error('[軍歌鑑測] 回放失敗',err);setText('播放走音人聲失敗：'+err.message);setMode('done')}
 }
 async function finishImitate(){
@@ -660,22 +672,23 @@ async function finishImitate(){
  stopLiveVoice();
  const score=calculate(),warped=createWarp();
  takes[activePhrase]={index:activePhrase,score,trace:trace.slice(),buffer:warped};
- if(activePhrase===0){
-  E.speech.textContent='「第一句唱完了，接著聽第二句！」';
-  await applyPhrase(1);
+ if(activePhrase<PHRASES.length-1){
+  const next=activePhrase+1;
+  E.speech.textContent='「第 '+(next)+' 句唱完了，接著聽第 '+(next+1)+' 句！」';
+  await applyPhrase(next);
   await listen();
   return;
  }
- const first=takes[0].score,second=takes[1].score;
- const averaged=(a,b)=>(a*PHRASES[0].duration+b*PHRASES[1].duration)/(PHRASES[0].duration+PHRASES[1].duration);
- const points=Math.round(averaged(first.points,second.points));
+ const total=PHRASES.reduce((sum,part)=>sum+part.duration,0);
+ const averaged=key=>takes.reduce((sum,take,index)=>sum+take.score[key]*PHRASES[index].duration,0)/total;
+ const points=Math.round(averaged('points'));
  lastScore={
-  points,grade:grade(points),coverage:Math.round(averaged(first.coverage,second.coverage)),
-  error:+averaged(first.error,second.error).toFixed(1),
-  comment:points>=90?'班長：兩句都唱對了？我本來還想叫你留營。':
-   points>=75?'班長：還行，至少沒有把軍紀歌唱成空襲警報。':
-   points>=50?'班長：第一句第二句都有唱，但音準有幾個直接逃兵。':
-   '班長：才兩句，你就把全連的耳朵唱到申請退伍。'
+  points,grade:grade(points),coverage:Math.round(averaged('coverage')),
+  error:+averaged('error').toFixed(1),
+  comment:points>=90?'班長：七句居然都唱得像樣？我連檢討報告都白印了。':
+   points>=75?'班長：七句唱下來，至少隔壁連沒以為是防空警報。':
+   points>=50?'班長：唱完七句還有力氣嗎？音準先去集合再說。':
+   '班長：七句軍歌被你唱成七種求救訊號，回去加強練習。'
  };
  await replay();
 }
@@ -683,8 +696,9 @@ async function showComparedPhrase(index){
  if(mode!=='done')return;
  await applyPhrase(index);
  setMode('done');
- E.compareFirst.classList.toggle('selected',index===0);
- E.compareSecond.classList.toggle('selected',index===1);
+ for(let i=0;i<PHRASES.length;i++){
+  $('comparePhrase'+(i+1))?.classList.toggle('selected',index===i);
+ }
  tracePathFor(takes[index]);
  comparison=true;
  E.guide.style.display='inline';E.guide.setAttribute('visibility','visible');
@@ -721,12 +735,13 @@ E.compare.addEventListener('click',()=>{
  E.trace.style.display=comparison?'':'none';
  E.compare.textContent=comparison?'收起音準線':'📈 查看音準差距';
 });
-E.compareFirst.addEventListener('click',()=>showComparedPhrase(0));
-E.compareSecond.addEventListener('click',()=>showComparedPhrase(1));
+for(let i=0;i<PHRASES.length;i++){
+ $('comparePhrase'+(i+1))?.addEventListener('click',()=>showComparedPhrase(i));
+}
 window.addEventListener('pagehide',()=>stopAudio());
 window.armySingingTest={
- get status(){return {mode,hasOriginalVocals:audioBuffers.length===2,hasOriginalMusic:false,musicPlayback:false,embeddedAudio:true,liveVoiceEnabled:!!liveVoice&&mode==='imitate',
-   phrase:activePhrase+1,phraseCount:2,completedTakes:takes.filter(Boolean).length,
+ get status(){return {mode,hasOriginalVocals:audioBuffers.length===PHRASES.length,hasOriginalMusic:false,musicPlayback:false,embeddedAudio:true,liveVoiceEnabled:!!liveVoice&&mode==='imitate',
+   phrase:activePhrase+1,phraseCount:PHRASES.length,completedTakes:takes.filter(Boolean).length,
    phraseSeconds:CLIP,referenceFrames:pitch.length,voicedPercent:Math.round(validPitch*100),
    referenceVisible:E.guide.style.display!=='none',guidePathPoints:sourcePitch.filter(Number.isFinite).length,
    flatGuideNotes:guideSegments.length,countdownVisible:!E.countdown.hidden,beatSeconds:BEAT_SECONDS,
