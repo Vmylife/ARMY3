@@ -1,4 +1,4 @@
-/* ARMY3 · 報告長官！我的子彈有上靶嗎？ — standalone target-paper shooting v1.45 */
+/* ARMY3 · 報告長官！我的子彈有上靶嗎？ — standalone target-paper shooting v1.46 */
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
 const canvas=$('shootingOverlay'),ctx=canvas.getContext('2d',{alpha:true}),min=Math.min,max=Math.max,clamp=(x,a,b)=>max(a,min(b,x));
@@ -22,11 +22,25 @@ function makeRunners(){
   const dir= i%2===0 ? 1:-1;
   runners.push({id:i+1,team:'green',x,z,angle:dir>0?Math.PI/2:-Math.PI/2,dir,
    speed:1.6+runnerRandom()*.85,phase:i*.813,alive:true,seed:i/20,
-   zig:runnerRandom()*Math.PI*2,zBase:z,turnTime:runnerRandom()*2.4});
+   zig:runnerRandom()*Math.PI*2,zBase:z,turnTime:runnerRandom()*2.4,
+   hitT:0,fall:0,airY:0,vx:0,vy:0,vz:0,landed:false,angleStart:0,targetAngle:0});
  }
 }
 function moveRunners(dt){
- for(const a of runners){if(!a.alive)continue;
+ for(const a of runners){
+  if(!a.alive){
+   a.hitT+=dt;
+   if(!a.landed){
+    a.x+=a.vx*dt;a.z+=a.vz*dt;
+    const friction=Math.exp(-1.15*dt);a.vx*=friction;a.vz*=friction;
+    a.airY+=a.vy*dt;a.vy-=12.5*dt;
+    if(a.airY<=0&&a.hitT>.15){a.airY=0;a.vy=0;a.vx=0;a.vz=0;a.landed=true;}
+   }
+   const t=clamp(a.hitT/.20,0,1),turn=Math.atan2(Math.sin(a.targetAngle-a.angleStart),Math.cos(a.targetAngle-a.angleStart));
+   a.angle=a.angleStart+turn*t;
+   const f=clamp((a.hitT-.025)/.53,0,1);a.fall=f*f*(3-2*f);
+   continue;
+  }
   a.turnTime-=dt;
   if(a.turnTime<=0){a.turnTime=1.1+runnerRandom()*2.5;a.dir=runnerRandom()>.5?1:-1;}
   let nextX=a.x+a.dir*a.speed*dt;
@@ -37,6 +51,12 @@ function moveRunners(dt){
   // The GLB's forward is +Z; angle faces the current running direction.
   a.angle=Math.atan2(a.dir*a.speed,dz);
  }
+}
+function knockRunner(a,tip){
+ const d=shotRay(tip),len=Math.hypot(d[0],d[2])||1,dx=d[0]/len,dz=d[2]/len;
+ a.alive=false;a.hitT=0;a.fall=0;a.airY=.035;a.landed=false;
+ a.vx=dx*(4.25+runnerRandom()*.6);a.vz=dz*(4.25+runnerRandom()*.6);a.vy=2.9;
+ a.angleStart=a.angle;a.targetAngle=Math.atan2(dx,dz);
 }
 function shotRay(tip){
  const f=focal(),nx=(tip.x-width*.5)/f,ny=-(tip.y-height*.5)/f;
@@ -61,7 +81,7 @@ function firstFriendlyInLine(tip){
 
 let width=1,height=1,dpr=1,ready=false,state='loading',zoom=false,rounds=MAX_ROUNDS,shots=0,hits=[],elapsed=0,remain=MAX_TIME,nextShot=0,holdFire=false,lastFrame=0,recoil=0,flinch=0,breathX=0,breathY=0;
 let yaw=Math.atan2(PAPER.x-FIELD.x,PAPER.z-FIELD.z),pitch=Math.atan2(PAPER.y-FIELD.y,PAPER.z-FIELD.z);
-let bullets=[],reviewElapsed=0,reviewOrigin=null,dragging=null,shotTick=0;
+let bullets=[],reviewElapsed=0,reviewOrigin=null,dragging=null,shotTick=0,shotAt=-10,kickReturn=0;
 // Continuous, constant-speed wandering: the path may curve unpredictably,
 // but there are no random speed changes, scripted holds, or spring deceleration.
 // The setting controls travel range; the shot ray and sight post still agree.
@@ -113,7 +133,37 @@ function resetSway(){Object.assign(sway,{x:0,y:0,heading:randomBreath()*Math.PI*
 let muted=false;try{muted=localStorage.getItem('ARMY3_shoot_muted')==='1'}catch{}
 $('muteBtn').textContent=muted?'🔇':'🔊';
 const audio=new Audio('./assets/audio/rifle/npc_rifle_B.mp3');audio.preload='auto';
-function sfx(){if(muted)return;const a=audio.cloneNode();a.volume=.4;a.play().catch(()=>{});a.addEventListener('ended',()=>{a.remove();a.src=''}, {once:true});}
+let shotAudioContext=null,noiseBuffer=null;
+function sfx(){
+ if(muted)return;
+ const a=audio.cloneNode();a.volume=.82;a.play().catch(()=>{});
+ a.addEventListener('ended',()=>{a.removeAttribute('src');a.load();},{once:true});
+ try{
+  const API=window.AudioContext||window.webkitAudioContext;if(!API)return;
+  if(!shotAudioContext)shotAudioContext=new API();
+  const ac=shotAudioContext;if(ac.state==='suspended')ac.resume().catch(()=>{});
+  const t=ac.currentTime+.003;
+  if(!noiseBuffer){
+   const frames=Math.floor(ac.sampleRate*.19);noiseBuffer=ac.createBuffer(1,frames,ac.sampleRate);
+   const data=noiseBuffer.getChannelData(0);
+   for(let i=0;i<frames;i++)data[i]=(Math.random()*2-1)*(1-i/frames);
+  }
+  const crack=ac.createBufferSource();crack.buffer=noiseBuffer;
+  const filter=ac.createBiquadFilter();filter.type='highpass';filter.frequency.value=900;
+  const crackGain=ac.createGain();crackGain.gain.setValueAtTime(.28,t);
+  crackGain.gain.exponentialRampToValueAtTime(.001,t+.11);
+  crack.connect(filter);filter.connect(crackGain);crackGain.connect(ac.destination);crack.start(t);crack.stop(t+.13);
+  const bass=ac.createOscillator(),bassGain=ac.createGain();bass.type='sine';
+  bass.frequency.setValueAtTime(160,t);bass.frequency.exponentialRampToValueAtTime(57,t+.16);
+  bassGain.gain.setValueAtTime(.26,t);bassGain.gain.exponentialRampToValueAtTime(.001,t+.17);
+  bass.connect(bassGain);bassGain.connect(ac.destination);bass.start(t);bass.stop(t+.18);
+  const click=ac.createOscillator(),clickGain=ac.createGain();click.type='triangle';
+  click.frequency.setValueAtTime(910,t+.025);click.frequency.exponentialRampToValueAtTime(270,t+.075);
+  clickGain.gain.setValueAtTime(.001,t);clickGain.gain.setValueAtTime(.045,t+.025);
+  clickGain.gain.exponentialRampToValueAtTime(.001,t+.082);
+  click.connect(clickGain);clickGain.connect(ac.destination);click.start(t);click.stop(t+.085);
+ }catch(err){console.debug('[ARMY rifle] optional audio layer',err);}
+}
 function resize(){width=innerWidth;height=innerHeight;dpr=min(devicePixelRatio||1,1.4);canvas.width=Math.ceil(width*dpr);canvas.height=Math.ceil(height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0)}
 addEventListener('resize',resize);resize();
 const focal=()=>height/(2*Math.tan(fovNow()/2));
@@ -129,9 +179,9 @@ function project(x,y,z){const dx=x-FIELD.x,dy=y-FIELD.y,dz=z-FIELD.z,{forward,ri
 // The physical front-post peak is local (0,-8), NOT the centre of the viewport.
 // Use this SAME exact transformed point for visuals, bullet ray and tracer.
 function sightPose(){
- const x=width*.5+breathX,y=height*.5+breathY-recoil*.28;
+ const x=width*.5+breathX,y=height*.5+breathY-recoil*.68;
  const scale=clamp(min(width/390,height/690),.67,1.34)*(zoom?1.06:1);
- const tilt=(sway.x*.012+sway.y*.007)*Math.pow(breathLevel/100,1.2)+flinch*.0016;
+ const tilt=(sway.x*.012+sway.y*.007)*Math.pow(breathLevel/100,1.2)+flinch*.0065;
  return {x,y,scale,tilt};
 }
 function sightTip(){const p=sightPose(),postTopY=-8;
@@ -193,8 +243,10 @@ function fire(){if(state!=='playing'||elapsed<nextShot)return;
  nextShot=elapsed+FIRE_DELAY;rounds--;shots++;
  // Snapshot the sight before firing recoil. The hole, post peak and tracer agree.
  const tip=sightTip(),friend=firstFriendlyInLine(tip),hit=friend?null:hitFromSight(tip);
- recoil=min(17,recoil+4.5);flinch=8.8;sfx();
- if(friend){friend.alive=false;friendlyHits++;toast('誤傷友軍！');}
+ shotAt=elapsed;recoil=24;flinch=15;
+ const oldPitch=pitch;pitch=clamp(pitch+.059,-1.1,.58);kickReturn+=pitch-oldPitch;
+ sfx();
+ if(friend){knockRunner(friend,tip);friendlyHits++;toast('誤傷友軍！');}
  if(hit){hits.push({...hit,shot:shots});toast('上靶！第 '+shots+' 發');}
  bullets.push({t:0,life:.12,x:tip.x,y:tip.y,hit:!!hit});setHUD();if(rounds<=0){holdFire=false;setTimeout(()=>{if(state==='playing')finish()},530)}
 }
@@ -235,18 +287,46 @@ function presentResult(){if(state==='result')return;
 }
 function update(dt){elapsed+=dt;remain=max(0,MAX_TIME-elapsed);
  updateBreathing(dt);moveRunners(dt);
- recoil=max(0,recoil-dt*28);flinch=max(0,flinch-dt*38);
+ const recovery=kickReturn*(1-Math.exp(-dt*12.5));pitch-=recovery;kickReturn-=recovery;
+ recoil=max(0,recoil-dt*125);flinch=max(0,flinch-dt*85);
  bullets=bullets.filter(b=>(b.t+=dt)<b.life);if(remain<=0)finish();setHUD();}
 function drawAnimation(dt){reviewElapsed+=dt;const t=clamp(reviewElapsed/.85,0,1),ease=1-Math.pow(1-t,3),start=reviewOrigin||{x:width/2,y:height/2,w:30,h:38};
  const desiredW=min(width*.76,360),desiredH=desiredW*760/600,dx=(width-desiredW)/2,dy=clamp((height-desiredH)/2,70,height*.3);
  const r={x:start.x+(dx-start.x)*ease,y:start.y+(dy-start.y)*ease,w:start.w+(desiredW-start.w)*ease,h:start.h+(desiredH-start.h)*ease};
  ctx.fillStyle=`rgba(8,25,18,${.72*ease})`;ctx.fillRect(0,0,width,height);ctx.save();ctx.shadowColor='#0009';ctx.shadowBlur=25*ease;ctx.drawImage(paperImage(),r.x,r.y,r.w,r.h);ctx.restore();
  if(t>=1)presentResult();}
-function render(dt){ctx.clearRect(0,0,width,height);if(state==='playing'){for(const b of bullets){ctx.globalAlpha=clamp(1-b.t/b.life,0,1);ctx.strokeStyle=b.hit?'#e5d1a2':'#d6ad6c';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(width*.5+26,height*.88);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.globalAlpha=1}drawIronSights();}
- else if(state==='reviewing')drawAnimation(dt);
- window.__armyShooting3D?.sync?.(runners,[],{yaw,pitch,fov:fovNow()*180/Math.PI,zoom,flinch,breathX,breathY,eye:[FIELD.x,FIELD.y,FIELD.z]});}
+function drawGunFlash(){
+ const age=elapsed-shotAt;if(age<0||age>.42)return;
+ const p=sightPose(),x=p.x,y=p.y+16,flash=clamp(1-age/.105,0,1);
+ if(flash>0){
+  ctx.save();ctx.globalCompositeOperation='lighter';
+  const radius=122*flash+16,g=ctx.createRadialGradient(x,y,2,x,y,radius);
+  g.addColorStop(0,'rgba(255,252,223,'+(.91*flash)+')');
+  g.addColorStop(.19,'rgba(255,204,100,'+(.74*flash)+')');
+  g.addColorStop(.58,'rgba(255,118,37,'+(.20*flash)+')');
+  g.addColorStop(1,'rgba(255,120,40,0)');
+  ctx.fillStyle=g;ctx.fillRect(x-radius,y-radius,radius*2,radius*2);
+  ctx.translate(x,y);ctx.rotate(shots*1.29);
+  for(let i=0;i<6;i++){ctx.rotate(Math.PI/3);ctx.fillStyle='rgba(255,222,132,'+(.70*flash)+')';
+   ctx.beginPath();ctx.moveTo(-5,0);ctx.lineTo(0,-(28+i%2*18)*flash);ctx.lineTo(5,0);ctx.closePath();ctx.fill();}
+  ctx.restore();
+ }
+ if(age>.045){
+  const t=(age-.045)/.375;ctx.save();ctx.globalAlpha=.22*(1-t);
+  ctx.strokeStyle='#c7cdc2';ctx.lineWidth=3+9*t;ctx.beginPath();
+  ctx.ellipse(x+20*t,y-18-32*t,14+17*t,7+11*t,-.23,0,Math.PI*1.7);ctx.stroke();ctx.restore();
+ }
+}
+function render(dt){
+ ctx.clearRect(0,0,width,height);
+ if(state==='playing'){
+  for(const b of bullets){ctx.globalAlpha=clamp(1-b.t/b.life,0,1);ctx.strokeStyle=b.hit?'#e5d1a2':'#d6ad6c';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(width*.5+26,height*.88);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.globalAlpha=1;}
+  drawGunFlash();drawIronSights();
+ }else if(state==='reviewing')drawAnimation(dt);
+ window.__armyShooting3D?.sync?.(runners,[],{yaw,pitch,fov:fovNow()*180/Math.PI,zoom,flinch,shotAge:Math.max(0,elapsed-shotAt),breathX,breathY,eye:[FIELD.x,FIELD.y,FIELD.z]});
+}
 function loop(now){const dt=clamp((now-lastFrame)/1000,0,.045);lastFrame=now;if(state==='playing')update(dt);if(state==='playing'||state==='reviewing')render(dt);if(state==='playing'||state==='reviewing')requestAnimationFrame(loop)}
-function reset(){cachedPaper=null;cachedPaperKey='';rounds=MAX_ROUNDS;shots=0;hits=[];elapsed=0;remain=MAX_TIME;nextShot=0;holdFire=false;zoom=false;recoil=0;flinch=0;breathX=0;breathY=0;bullets=[];reviewElapsed=0;reviewOrigin=null;
+function reset(){cachedPaper=null;cachedPaperKey='';rounds=MAX_ROUNDS;shots=0;hits=[];elapsed=0;remain=MAX_TIME;nextShot=0;holdFire=false;zoom=false;recoil=0;flinch=0;shotAt=-10;kickReturn=0;breathX=0;breathY=0;bullets=[];reviewElapsed=0;reviewOrigin=null;
  yaw=Math.atan2(PAPER.x-FIELD.x,PAPER.z-FIELD.z);pitch=Math.atan2(PAPER.y-FIELD.y,PAPER.z-FIELD.z);resetSway();makeRunners();window.__armyShooting3D?.restartNPCs?.();$('zoomBtn').classList.remove('active');$('zoomBtn').textContent='◎ 開鏡';document.body.classList.remove('scopeActive');setHUD();}
 function start(){if(!ready)return;reset();state='playing';$('hud').hidden=false;$('startScreen').hidden=true;$('resultScreen').hidden=true;lastFrame=performance.now();requestAnimationFrame(loop);}
 function changeAim(dx,dy){if(state!=='playing')return;const k=zoom?.0021:.0055;yaw-=dx*k;while(yaw>Math.PI)yaw-=Math.PI*2;while(yaw< -Math.PI)yaw+=Math.PI*2;pitch=clamp(pitch-dy*k,-1.1,.58)}
