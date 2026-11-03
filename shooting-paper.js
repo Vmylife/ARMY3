@@ -1,4 +1,4 @@
-/* ARMY3 · 報告長官！我的子彈有上靶嗎？ — standalone target-paper shooting v1.52 */
+/* ARMY3 · 報告長官！我的子彈有上靶嗎？ — standalone target-paper shooting v1.53 */
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
 const canvas=$('shootingOverlay'),ctx=canvas.getContext('2d',{alpha:true}),min=Math.min,max=Math.max,clamp=(x,a,b)=>max(a,min(b,x));
@@ -294,7 +294,11 @@ function finish(){
   return;
  }
  runFailures.push(outcome);
- showTransition('第 '+currentStage+' 關未達5發 · 原關重考',currentStage);
+ // A failed stage immediately ends the ENTIRE five-stage run.
+ // Never repeat the failed stage, and never show an intermediate report.
+ state='reviewing';holdFire=false;reviewElapsed=0;reviewOrigin=getPaperRect();
+ $('hud').hidden=true;$('shootBtn').classList.remove('pressed');
+ presentResult();
 }
 function presentResult(){
  if(state!=='reviewing')return;
@@ -369,8 +373,8 @@ function resetStage(){
  yaw=Math.atan2(PAPER.x-FIELD.x,PAPER.z-FIELD.z);pitch=Math.atan2(PAPER.y-FIELD.y,PAPER.z-FIELD.z);resetSway();makeRunners();window.__armyShooting3D?.restartNPCs?.();$('zoomBtn').classList.remove('active');$('zoomBtn').textContent='◎ 開鏡';document.body.classList.remove('scopeActive');setHUD();}
 function start(){
  if(!ready)return;
- currentStage=clamp(Math.floor(window.armyPaperReport?.selectedStage?.()||1),1,MAX_LEVEL);
- runStartStage=currentStage;runStages=[];runFailures=[];pendingStage=currentStage;
+ currentStage=1; // Every new attempt starts at stage one, regardless of past unlocks.
+ runStartStage=1;runStages=[];runFailures=[];pendingStage=1;
  resetStage();
  if($('shootTransition'))$('shootTransition').hidden=true;
  state='playing';$('hud').hidden=false;$('startScreen').hidden=true;$('resultScreen').hidden=true;lastFrame=performance.now();requestAnimationFrame(loop);}
@@ -387,14 +391,7 @@ $('muteBtn').addEventListener('click',()=>{muted=!muted;$('muteBtn').textContent
 function back(){state='result';holdFire=false;if(parent!==window){try{parent.postMessage({type:'ARMY3_SHOOTING_RETURN'},location.origin);return}catch{}}location.href='./index.html'}
 document.querySelectorAll('.backBtn').forEach(b=>b.addEventListener('click',back));
  $('startBtn').addEventListener('click',start);
- $('againBtn').addEventListener('click',()=>{
-  window.armyPaperReport?.selectStage?.(1);
-  start();
- });
- $('chooseStageBtn')?.addEventListener('click',()=>{
-  state='intro';holdFire=false;$('resultScreen').hidden=true;$('startScreen').hidden=false;$('hud').hidden=true;
-  window.armyPaperReport?.renderStagePicker?.();
- });
+ $('againBtn').addEventListener('click',start);
 addEventListener('keydown',e=>{if(e.code==='Space'&&state==='playing'&&!e.repeat){e.preventDefault();fire()}if(e.code==='KeyF')$('zoomBtn').click();if(e.code==='Enter'&&state==='playing'&&hits.length>=REQUIRED_HITS)finish()});addEventListener('keyup',e=>{if(e.code==='Space')holdFire=false});addEventListener('blur',()=>{holdFire=false;dragging=null});
 async function boot(){try{const r=await fetch('./shooting-paper-scene.json?v=140',{cache:'no-store'});if(!r.ok)throw Error('場景檔 HTTP '+r.status);
  const s=await r.json(),player=s.items.filter(o=>o.category==='soldier'),targets=s.items.filter(o=>o.assetId==='target');if(player.length!==1||targets.length!==1)throw Error('本次場景應有 1 位射手和 1 座靶架');
