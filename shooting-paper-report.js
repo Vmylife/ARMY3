@@ -1,4 +1,4 @@
-/* ARMY3 shooting field report + persistent achievement collection v1.50.
+/* ARMY3 shooting field report + persistent achievement collection v1.51.
    Presentation-only; live bullet hit detection and scene simulation remain unchanged. */
 (()=>{'use strict';
 const KEY='ARMY3_shooting_achievements_v1';
@@ -6,6 +6,15 @@ const $=id=>document.getElementById(id);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const int=v=>Math.max(0,Math.floor(Number(v)||0));
 const RARITY={'傳說':0,'史詩':1,'稀有':2,'普通':3};
+const LEVELS=[
+ {name:'新兵適應',hint:'單純射擊',friends:0},
+ {name:'友軍暖身',hint:'友軍開始亂跑',friends:4},
+ {name:'移動靶危機',hint:'小心自己人',friends:8},
+ {name:'全連大亂鬥',hint:'注意射線',friends:12},
+ {name:'班長的陰謀',hint:'最終鑑測',friends:16}
+];
+const REQUIRED_HITS=5;
+const clampStage=x=>clamp(int(x)||1,1,5);
 const ACH=[
  {id:'first',icon:'🪖',name:'報告！我有開槍',desc:'完成第一次實彈鑑測',rarity:'普通',test:s=>s.completed},
  {id:'one_hit',icon:'🎯',name:'靶紙終於受傷了',desc:'本次至少有1發上靶',rarity:'普通',test:s=>s.hits>=1},
@@ -25,12 +34,12 @@ const ACH=[
  {id:'high_score',icon:'🌟',name:'國軍之光候選人',desc:'總分達90分且0誤傷友軍',rarity:'稀有',test:s=>s.score>=90&&s.friends===0},
  {id:'score_seventy',icon:'🎖️',name:'鑑測及格有望',desc:'總分達70分',rarity:'普通',test:s=>s.score>=70},
  {id:'score_full',icon:'🏆',name:'長官申請調閱監視器',desc:'本次獲得100分',rarity:'傳說',secret:true,test:s=>s.score===100},
- {id:'clean',icon:'🤝',name:'友軍安全宣導大使',desc:'打滿10發且完全沒有誤傷友軍',rarity:'普通',test:s=>s.shots===10&&s.friends===0},
+ {id:'clean',icon:'🤝',name:'友軍安全宣導大使',desc:'第2關以後打滿10發，完全沒有誤傷友軍',rarity:'普通',test:s=>s.stage>=2&&s.shots===10&&s.friends===0},
  {id:'no_zoom',icon:'👀',name:'肉眼自帶四倍鏡',desc:'不開鏡打滿10發，且至少5發上靶',rarity:'史詩',test:s=>s.shots===10&&s.hits>=5&&s.zoomShots===0},
  {id:'scope',icon:'🔎',name:'瞄準鏡住戶',desc:'10發全部在開鏡狀態射擊',rarity:'普通',test:s=>s.shots===10&&s.zoomShots===10},
  {id:'quick',icon:'⚡',name:'比班長集合還快',desc:'20秒內打完10發，且至少5發上靶',rarity:'稀有',test:s=>s.shots===10&&s.elapsed<=20&&s.hits>=5},
  {id:'slow',icon:'🐢',name:'慢工出不了細活',desc:'耗時40秒以上才完成鑑測',rarity:'普通',test:s=>s.elapsed>=40},
- {id:'single',icon:'🪄',name:'一發入魂後下課',desc:'只射1發、命中9環以上就主動收靶紙',rarity:'史詩',secret:true,test:s=>s.shots===1&&s.center===1&&s.elapsed<44.9},
+ {id:'single',icon:'🪄',name:'五發打卡下班',desc:'只用5發子彈就過關，且5發全部上靶',rarity:'史詩',secret:true,test:s=>s.passed&&s.shots===5&&s.hits===5},
  {id:'nine_hit',icon:'😮‍💨',name:'就差那一個啊',desc:'打滿10發，恰好9發上靶且0誤傷',rarity:'稀有',test:s=>s.shots===10&&s.hits===9&&s.friends===0},
  {id:'edge',icon:'📎',name:'擦邊球專家',desc:'同一場至少3發上靶，但都落在靶圈外',rarity:'稀有',secret:true,test:s=>s.hits>=3&&s.ringHits===0},
  {id:'empty',icon:'🕊️',name:'愛好和平的射手',desc:'45秒結束時一發都沒射',rarity:'稀有',secret:true,test:s=>s.shots===0},
@@ -44,7 +53,25 @@ const ACH=[
  {id:'inside',icon:'🕵️',name:'紅軍不用來了',desc:'一張靶紙都沒打中，卻誤傷至少5名友軍',rarity:'史詩',secret:true,test:s=>s.hits===0&&s.friends>=5},
  {id:'teamwork',icon:'⚖️',name:'敵我不分的天才',desc:'同時上靶5發以上、誤傷3名以上友軍',rarity:'史詩',secret:true,test:s=>s.hits>=5&&s.friends>=3},
  {id:'oops_first',icon:'💔',name:'第一槍就出事',desc:'第一發子彈直接射中友軍',rarity:'稀有',test:s=>s.history[0]?.kind==='friendly'},
- {id:'perfect_discipline',icon:'🕯️',name:'班長今天沒寫檢討',desc:'10發全上靶，其中至少5發9環以上且0誤傷',rarity:'傳說',secret:true,test:s=>s.shots===10&&s.hits===10&&s.center>=5&&s.friends===0}
+ {id:'perfect_discipline',icon:'🕯️',name:'班長今天沒寫檢討',desc:'10發全上靶，其中至少5發9環以上且0誤傷',rarity:'傳說',secret:true,test:s=>s.shots===10&&s.hits===10&&s.center>=5&&s.friends===0},
+ {id:'level1',icon:'🪖',name:'新兵過了第一關',desc:'通過第1關：0名友軍、至少5發上靶',rarity:'普通',test:s=>s.stage===1&&s.passed},
+ {id:'level2',icon:'🏃',name:'終於有人來干擾',desc:'通過第2關：4名跑動友軍',rarity:'普通',test:s=>s.stage===2&&s.passed},
+ {id:'level3',icon:'🚧',name:'人體迷宮解題王',desc:'通過第3關：8名跑動友軍',rarity:'稀有',test:s=>s.stage===3&&s.passed},
+ {id:'level4',icon:'🫡',name:'全連讓你練膽量',desc:'通過第4關：12名跑動友軍',rarity:'稀有',test:s=>s.stage===4&&s.passed},
+ {id:'level5',icon:'🏆',name:'五關總算放你走',desc:'通過第5關：16名跑動友軍',rarity:'傳說',test:s=>s.stage===5&&s.passed},
+ {id:'level1perfect',icon:'🥇',name:'新兵不是新手',desc:'第1關10發全上靶',rarity:'稀有',test:s=>s.stage===1&&s.shots===10&&s.hits===10},
+ {id:'level2clean',icon:'🛡️',name:'四個弟兄平安無事',desc:'第2關過關且完全沒有誤傷友軍',rarity:'普通',test:s=>s.stage===2&&s.passed&&s.friends===0},
+ {id:'level3clean',icon:'🎖️',name:'八人穿梭零擦傷',desc:'第3關過關且完全沒有誤傷友軍',rarity:'稀有',test:s=>s.stage===3&&s.passed&&s.friends===0},
+ {id:'level4clean',icon:'🌟',name:'十二人都是自己人',desc:'第4關過關且完全沒有誤傷友軍',rarity:'史詩',test:s=>s.stage===4&&s.passed&&s.friends===0},
+ {id:'level5clean',icon:'👑',name:'全連無傷通關',desc:'第5關過關且完全沒有誤傷友軍',rarity:'傳說',test:s=>s.stage===5&&s.passed&&s.friends===0},
+ {id:'allclean',icon:'🕊️',name:'班長的醫療費歸零',desc:'五個關卡都曾在無誤傷狀態下通關',rarity:'傳說',secret:true,test:s=>s.cleanStages.length===5},
+ {id:'allhigh',icon:'💯',name:'五關全是榜首',desc:'五個關卡各取得90分以上的成績',rarity:'傳說',secret:true,test:s=>s.stageBests.every(v=>v>=90)},
+ {id:'fastpass',icon:'⏱️',name:'五發就收工',desc:'任一關只打5發就通過關卡',rarity:'稀有',test:s=>s.passed&&s.hits===5&&s.shots===5},
+ {id:'closecall',icon:'😵',name:'壓線過關的藝術',desc:'打滿10發，恰好5發上靶通關',rarity:'普通',test:s=>s.shots===10&&s.hits===5&&s.passed},
+ {id:'retest',icon:'📒',name:'班長再給你一次機會',desc:'任一關10發打完、上靶未滿5發',rarity:'普通',test:s=>s.shots===10&&!s.passed},
+ {id:'level5disaster',icon:'🚑',name:'最後一關全連住院',desc:'第5關誤傷至少5位友軍',rarity:'史詩',secret:true,test:s=>s.stage===5&&s.friends>=5},
+ {id:'level5perfect',icon:'💎',name:'班長懷疑你是機器人',desc:'第5關10發全上靶，無誤傷',rarity:'傳說',secret:true,test:s=>s.stage===5&&s.shots===10&&s.hits===10&&s.friends===0},
+ {id:'firstfail',icon:'🫠',name:'連無人靶場都會卡',desc:'第1關10發打完，仍未過關',rarity:'稀有',secret:true,test:s=>s.stage===1&&s.shots===10&&!s.passed}
 ];
 const COMMENTS=[
  {when:s=>s.shots===0,texts:['全程沒有開槍。你是來守護地球和平，還是忘記把槍帶來？','射擊鑑測唯一零傷亡的，是子彈和班長的信心。','你連扳機都捨不得扣，我要不要幫你申請文書兵？','這場最準的一件事，是你準時下課。']},
@@ -77,12 +104,48 @@ const titles=[
  {when:s=>s.hits>0,title:'靶紙擦邊球',stamp:'待加強'},
  {when:s=>true,title:'靶紙毫髮無傷',stamp:'重測'}
 ];
+function emptyProgress(){return {ids:[],best:0,played:0,last:null,unlockedStage:1,clearedStages:[],cleanStages:[],stageBests:[0,0,0,0,0]};}
 function load(){
- try{const raw=JSON.parse(localStorage.getItem(KEY)||'{}');
-  return {ids:Array.isArray(raw.ids)?[...new Set(raw.ids.filter(id=>typeof id==='string'&&ACH.some(a=>a.id===id)))]:[],best:clamp(int(raw.best),0,100),played:int(raw.played),last:raw.last||null};
- }catch{return {ids:[],best:0,played:0,last:null};}
+ try{
+  const raw=JSON.parse(localStorage.getItem(KEY)||'{}'),def=emptyProgress();
+  const cleared=Array.isArray(raw.clearedStages)?raw.clearedStages.map(clampStage).filter(v=>v>=1&&v<=5):[];
+  const clean=Array.isArray(raw.cleanStages)?raw.cleanStages.map(clampStage).filter(v=>cleared.includes(v)):[];
+  const savedLevel=clampStage(raw.unlockedStage??1);
+  const unlockedStage=Math.max(savedLevel,...cleared.map(v=>Math.min(5,v+1)),1);
+  return {ids:Array.isArray(raw.ids)?[...new Set(raw.ids.filter(id=>typeof id==='string'&&ACH.some(a=>a.id===id)))]:[],
+   best:clamp(int(raw.best),0,100),played:int(raw.played),last:raw.last||null,
+   unlockedStage,clearedStages:[...new Set(cleared)],cleanStages:[...new Set(clean)],
+   stageBests:Array.from({length:5},(_,i)=>clamp(int(raw.stageBests?.[i]),0,100))};
+ }catch{return emptyProgress();}
 }
-let progress=load(),current=null,filter='all',focusBefore=null;
+let progress=load(),current=null,filter='all',focusBefore=null,selectedStage=progress.unlockedStage;
+function save(){try{localStorage.setItem(KEY,JSON.stringify(progress));}catch{}}
+function selectStage(v){
+ const requested=clampStage(v);if(requested>progress.unlockedStage)return false;
+ selectedStage=requested;renderStagePicker();return true;
+}
+function renderStagePicker(){
+ const holder=$('shootStageChoices');if(!holder)return;
+ holder.replaceChildren();
+ for(let i=1;i<=5;i++){
+  const level=LEVELS[i-1],locked=i>progress.unlockedStage,cleared=progress.clearedStages.includes(i);
+  const card=make('button','shootStageCard'+(selectedStage===i?' selected':'')+(locked?' locked':''));card.type='button';
+  card.disabled=locked;card.setAttribute('aria-label','第'+i+'關 '+(locked?'尚未解鎖':level.name));
+  card.append(make('strong','',''+i),make('small','',locked?'🔒':cleared?'✓':''));
+  card.addEventListener('click',()=>selectStage(i));holder.append(card);
+ }
+ const lv=LEVELS[selectedStage-1];
+ if($('shootStageTitle'))$('shootStageTitle').textContent='第 '+selectedStage+' / 5 關 · '+lv.name;
+ if($('shootStageDetail'))$('shootStageDetail').textContent=lv.friends+' 名友軍干擾 · 10 發中 5 發上靶即可過關';
+ if($('shootProgressNote'))$('shootProgressNote').textContent=progress.clearedStages.length===5?'五關已全破 · 可自由重玩':'已完成 '+progress.clearedStages.length+' / 5 關';
+}
+function advanceAfterResult(){
+ if(!current)return selectedStage;
+ const stage=current.s.stage;
+ if(current.s.passed&&stage<5)selectStage(stage+1);
+ else selectStage(stage);
+ return selectedStage;
+}
 function getRing(hit){
  const x=Number(hit?.x),y=Number(hit?.y);
  if(!Number.isFinite(x)||!Number.isFinite(y))return 0;
@@ -103,7 +166,9 @@ function calculate(input={}){
  // up to 2.5 for ring quality. Every friendly hit deducts 12 points.
  const score=clamp(Math.round(hits*7.5+ringTotal*.25-friends*12),0,100);
  const grade=score>=90?'S':score>=75?'A':score>=55?'B':score>=35?'C':score>=20?'D':'F';
- const entry={completed:true,shots,hits,friends,misses:shots-hits-friends,accuracy:shots?Math.round(hits/shots*100):0,
+ const stage=clampStage(input.stage??selectedStage),passed=hits>=REQUIRED_HITS;
+ const entry={completed:true,shots,hits,friends,misses:shots-hits-friends,accuracy:shots?Math.round(hits/shots*100):0,stage,passed,requiredHits:REQUIRED_HITS,
+  cleanStages:progress.cleanStages.slice(),stageBests:progress.stageBests.slice(),
   center,tenRing,ringHits,ringTotal,zoomShots,streak,elapsed:Math.max(0,Number(input.elapsed)||0),history,score,grade};
  return entry;
 }
@@ -114,8 +179,21 @@ function evaluate(s){
  const fresh=earned.filter(a=>!prev.has(a.id));
  progress.ids=[...new Set([...progress.ids,...earned.map(a=>a.id)])];
  progress.best=Math.max(progress.best,s.score);progress.played++;
- progress.last={score:s.score,hits:s.hits,shots:s.shots,friends:s.friends,date:new Date().toISOString()};
- try{localStorage.setItem(KEY,JSON.stringify(progress))}catch{}
+ const stageIndex=s.stage-1;
+ progress.stageBests[stageIndex]=Math.max(progress.stageBests[stageIndex]||0,s.score);
+ if(s.passed){
+  if(!progress.clearedStages.includes(s.stage))progress.clearedStages.push(s.stage);
+  if(!s.friends&&!progress.cleanStages.includes(s.stage))progress.cleanStages.push(s.stage);
+  if(s.stage===progress.unlockedStage)progress.unlockedStage=Math.min(5,s.stage+1);
+ }
+ // Recompute cross-stage achievements from the latest saved progress.
+ s.cleanStages=progress.cleanStages.slice();s.stageBests=progress.stageBests.slice();
+ const additional=ACH.filter(a=>!earned.includes(a)&&a.test(s));
+ earned.push(...additional);earned.sort((a,b)=>RARITY[a.rarity]-RARITY[b.rarity]||ACH.indexOf(a)-ACH.indexOf(b));
+ for(const a of earned)if(!progress.ids.includes(a.id))progress.ids.push(a.id);
+ for(const a of additional)if(!prev.has(a.id)&&!fresh.includes(a))fresh.push(a);
+ progress.last={stage:s.stage,passed:s.passed,score:s.score,hits:s.hits,shots:s.shots,friends:s.friends,date:new Date().toISOString()};
+ save();
  try{window.dispatchEvent(new CustomEvent('army:shooting:result',{detail:{...progress.last,grade:s.grade,newAchievements:fresh.map(a=>a.id)}}))}catch{}
  return {earned,fresh};
 }
@@ -128,23 +206,46 @@ function card(parent,a,isNew){
  parent.append(el);
 }
 function show(input){
- const s=calculate(input),{earned,fresh}=evaluate(s);current={s,earned,fresh};
+ const s=calculate(input),{earned,fresh}=evaluate(s);current={s,earned,fresh};renderStagePicker();
  const t=titles.find(x=>x.when(s));
  const phrase=choose(COMMENTS.find(x=>x.when(s)).texts);
- $('resultTitle').textContent=t.title;$('resultRank').textContent='射擊等第：'+s.grade+' 級';
- $('resultStamp').textContent=t.stamp;$('reportText').textContent=phrase;
+ const clearComments=[
+  ['班長說第一關沒人擋你，這本來就該會。','恭喜跨過入伍最基本門檻。之後才是問題。'],
+  ['四個弟兄都活在你準星附近，你還過得了，算你有種。','班長表示友軍增加只是暖身，別太早驕傲。'],
+  ['八名友軍混在射線裡，你居然還瞄得到靶紙。','第三關通過。國軍的真正敵人可能是動線設計。'],
+  ['十二個跑來跑去，你的靶紙竟然還能收到五個洞。','第四關過了，連長開始懷疑你習慣被干擾。'],
+  ['五關全破！恭喜你在友軍干擾下完成不可能的鑑測。','第5關過了！班長本來準備的檢討報告可以先撕了。']
+ ];
+ const failComments=['班長：上靶未滿五發，下一梯還有你。','五發門檻都沒過，班長說重考不另外收費。','靶紙在等你，你的子彈卻去找其他人生目標。'];
+ const stageComment=s.passed?choose(clearComments[s.stage-1]):choose(failComments);
+ $('resultTitle').textContent=s.passed?(s.stage===5?'五關全破！':t.title):'第 '+s.stage+' 關，重測！';
+ $('resultRank').textContent='第 '+s.stage+' 關 · '+LEVELS[s.stage-1].name+' · '+s.grade+' 級';
+ $('resultStamp').textContent=s.passed?(s.stage===5?'五關制霸':'過關'):'未通過';
+ $('reportText').textContent=stageComment+' '+(s.friends>0?phrase:'');
+ if($('shootStageOutcome'))$('shootStageOutcome').textContent=s.passed?(s.stage===5?'🏆 全部五關通關':'✓ 第 '+s.stage+' 關過關！'):'✕ 第 '+s.stage+' 關未達標';
+ if($('shootStageOutcome'))$('shootStageOutcome').className='shootStageOutcome '+(s.passed?'pass':'fail');
+ if($('shootNextHint'))$('shootNextHint').textContent=s.passed?(s.stage===5?'五關完成，還可以自由挑戰高分。':'下一關增加4名友軍，準備好再進去。'):'上靶至少5發才能解鎖下一關。';
+ if($('againBtn'))$('againBtn').textContent=s.passed&&s.stage<5?'挑戰第 '+(s.stage+1)+' 關':s.passed?'再戰第 5 關':'重考第 '+s.stage+' 關';
+ if($('shootResultStageProgress')){
+  const holder=$('shootResultStageProgress');holder.replaceChildren();
+  for(let i=1;i<=5;i++){
+   const done=progress.clearedStages.includes(i);
+   const item=make('span','shootStageDot'+(done?' passed':'')+(i===s.stage?' active':''),done?'✓':String(i));
+   holder.append(item);
+  }
+ }
  $('shootScore').textContent=s.score;$('shootGrade').textContent=s.grade+' 級';
  $('shootHistoryBest').textContent='歷史最高 '+progress.best+' 分';
  $('resultHits').textContent=s.hits;$('resultShots').textContent=s.shots;
  $('resultRate').textContent=s.accuracy+'%';$('resultMisses').textContent=s.misses;
  $('resultFriendly').textContent=s.friends;$('shootCenter').textContent=s.center;
- $('shootScoreExplanation').textContent='命中 '+s.hits+' 發 · 9環以上 '+s.center+' 發 · 友軍 '+s.friends+' 人';
+ $('shootScoreExplanation').textContent='上靶 '+s.hits+' / 5 發過關 · 9環以上 '+s.center+' 發 · 友軍 '+s.friends+' 人';
  const list=$('shootAchCards');list.replaceChildren();
  const selected=[...fresh,...earned.filter(a=>!fresh.includes(a))].slice(0,3);
  if(selected.length)selected.forEach(a=>card(list,a,fresh.includes(a)));
  else list.append(make('div','shootAchEmpty','這次尚未達成成就。班長表示還有很多機會丟臉。'));
  $('shootAchMeta').textContent='本次達成 '+earned.length+' 項 · 新解鎖 '+fresh.length+' 項';
- updateCounts();
+ updateCounts();renderStagePicker();
  try{$('resultScreen').querySelector('.panel').scrollTop=0;}catch{}
  return s;
 }
@@ -210,6 +311,8 @@ window.addEventListener('keydown',e=>{
  else if(galleryLayer&&!galleryLayer.hidden){closeLayer(galleryLayer);e.preventDefault();}
 });
 for(const id of ['shootGalleryIntro','shootGalleryResult'])$(id)?.addEventListener('click',gallery);
-updateCounts();
-window.armyPaperReport={show,calculate,achievements:ACH.map(({test,...meta})=>meta),gallery,progress:()=>({...progress})};
+updateCounts();renderStagePicker();
+window.armyPaperReport={show,calculate,achievements:ACH.map(({test,...meta})=>meta),gallery,
+ selectedStage:()=>selectedStage,selectStage,advanceAfterResult,renderStagePicker,
+ stageInfo:stage=>LEVELS[clampStage(stage)-1],progress:()=>({...progress})};
 })();
