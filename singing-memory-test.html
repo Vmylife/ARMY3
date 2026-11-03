@@ -4,11 +4,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#172a20">
 <title>軍歌鑑測｜聽班長唱一句</title>
-<link rel="stylesheet" href="./singing-memory-test.css?v=2">
+<link rel="stylesheet" href="./singing-memory-test.css?v=3">
 </head>
 <body>
 <main class="app">
-<header class="top"><div class="brand">國軍實驗靶場 <span>/ 軍歌鑑測 V0.2 · 原版人聲</span></div><a class="back" href="./index.html">← 返回軍營</a></header>
+<header class="top"><div class="brand">國軍實驗靶場 <span>/ 軍歌鑑測 V0.3 · 原版人聲內建</span></div><a class="back" href="./index.html">← 返回軍營</a></header>
 <section class="hero">
  <div class="scene" aria-hidden="true"><div class="badgeIcon">♪</div>
   <div class="sergeant"><div class="beret"></div><div class="face"><i class="eye one"></i><i class="eye two"></i><i id="mouth" class="mouth"></i></div><div class="neck"></div><div class="body"><i class="badgeMark">班</i></div></div>
@@ -28,7 +28,7 @@
    <line id="playhead" x1="0" x2="0" y1="0" y2="240" stroke="#faf8e5" stroke-width="2" stroke-dasharray="5 5"/>
    <circle id="controlDot" cx="0" cy="120" r="11" fill="#fa9294" stroke="#fff" stroke-width="2" visibility="hidden"/>
   </svg>
-  <div class="boardOverlay" id="boardOverlay">請先載入原版人聲音檔</div>
+  <div class="boardOverlay" id="boardOverlay">原版人聲載入中…</div>
   <div class="timeline" id="timeline"></div>
  </div>
  <div class="legend" id="legend"><span><b class="gold"></b>班長音高（只在示範時出現）</span><span><b class="red"></b>你的走音軌跡（回放後顯示）</span></div>
@@ -42,14 +42,13 @@
  </div>
 </section>
 <section class="voiceSection">
- <div class="voiceHead"><strong>原版《軍紀歌》分軌</strong><span class="pill" id="voiceMode">未載入原版人聲</span></div>
- <p>選擇原本的 <strong>audio [vocals].mp3</strong> 和 <strong>audio [music].mp3</strong>（可一次選兩個）。<strong>只播放 vocals 人聲</strong>，music 伴奏預設完全靜音，不加入自創旋律、電子合成唱腔或背景音樂。</p>
- <div class="voiceActions"><label class="fileButton" for="originalTracks">↑ 載入兩份原版音檔</label><input type="file" accept="audio/*,.mp3,.wav,.m4a" id="originalTracks" multiple></div>
- <div class="clipControls"><label for="clipStart">人聲起點 <strong id="clipStartLabel">0.0 秒</strong></label><input id="clipStart" type="range" value="0" min="0" max="0" step="0.1" disabled><button id="previewClip" type="button" disabled>▶ 試聽原唱片段</button></div>
- <div id="voiceInfo" class="voiceInfo" role="status">請先載入原版人聲；音準會從原唱錄音分析，不使用自創音符。檔案只在你的瀏覽器處理，不會上傳。</div>
- <p class="legal">第一版練習片段約 8 秒，可調整人聲起點。因原始 MP3 尚未直接部署在 GitHub，首次需要手動載入；系統會嘗試將檔案暫存於此瀏覽器，方便下次試玩。</p>
+ <div class="voiceHead"><strong>原版《軍紀歌》人聲</strong><span class="pill" id="voiceMode">載入中…</span></div>
+ <p><strong>原版人聲已內建在遊戲。</strong>直接按「班長先唱」就能玩，電腦或手機都不必選擇音檔。示範、模仿後的走音回放都只使用人聲，完全沒有背景伴奏。</p>
+ <div class="voiceActions"><button id="previewClip" type="button" disabled>▶ 試聽原版人聲</button></div>
+ <div id="voiceInfo" class="voiceInfo" role="status">正在從遊戲載入原版人聲並分析音準…</div>
+ <p class="legal">使用你提供的原版 vocals 人聲分軌，取開頭演唱約 8 秒作為首版試玩。暫不使用 music 伴奏分軌，亦不生成新旋律。</p>
 </section>
 <footer>獨立試玩版本 · 尚未加入軍營正式小遊戲</footer>
 </main>
-<script src="./singing-memory-test.js?v=2" defer></script>
+<script src="./singing-memory-test.js?v=3" defer></script>
 </body></html>
