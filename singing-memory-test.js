@@ -1,4 +1,4 @@
-/* ARMY3 singing memory v0.7 — ORIGINAL VOICE STEM ONLY.
+/* ARMY3 singing memory v0.8 — ORIGINAL VOICE STEM ONLY.
    Original isolated vocal MP3 is bundled with ARMY3; users never upload files. Music stem is NEVER played.
    Correct pitch is derived from the selected vocal waveform (no invented tune).
    Browser-only processing: Web Audio + short-time pitch detection + OLA pitch warp.
@@ -7,7 +7,7 @@
 const $=id=>document.getElementById(id);
 let CLIP=8;
 const STEP=.05, VIEW_W=800, VIEW_H=240;
-const BEAT_SECONDS=.55, COUNT_TEXT=['3','2','1','唱'];
+const BEAT_SECONDS=.55, COUNT_TEXT=['3','2','1','唱'], PRE_ROLL=.5;
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const sleep=()=>new Promise(r=>setTimeout(r,0));
 const E={
@@ -17,7 +17,7 @@ const E={
  feedback:$('feedback'),rank:$('finalRank'),points:$('finalScore'),comment:$('comment'),
  replay:$('replayButton'),compare:$('compareButton'),hint:$('hint'),count:$('takeCount'),
  countdown:$('countdown'),countdownWord:$('countdownWord'),countdownLabel:$('countdownLabel'),
- rail:$('pitchRail'),thumb:$('pitchThumb'),phrase1:$('phraseStep1'),phrase2:$('phraseStep2'),
+ rail:$('pitchRail'),thumb:$('pitchThumb'),
  phraseScores:$('phraseScores'),compareFirst:$('comparePhrase1'),compareSecond:$('comparePhrase2'),
  preview:$('previewClip'),info:$('voiceInfo'),mode:$('voiceMode'),timeline:$('timeline')
 };
@@ -42,8 +42,19 @@ const PHRASES=[
   audioUrl:'./singing-samples/junji-vocals-line1-v7.mp3',pitch:SOURCE_PITCH_50MS.slice(7,88)},
  {text:'軍紀是軍隊的命脈',duration:3.82,
   audioUrl:'./singing-samples/junji-vocals-line2-v7.mp3',
-  pitch:SOURCE_PITCH_50MS.slice(89,161).concat([null,null,null,null,null])}
+  pitch:SOURCE_PITCH_50MS.slice(89,161).concat([null,null,null,null,null])},
+ {text:'以三民主義為根基',duration:3.80,
+  audioUrl:'./singing-samples/junji-line3-v8.mp3',pitch:null},
+ {text:'三信心，堅如鐵',duration:3.85,
+  audioUrl:'./singing-samples/junji-line4-v8.mp3',pitch:null},
+ {text:'上下團結成一體',duration:3.80,
+  audioUrl:'./singing-samples/junji-line5-v8.mp3',pitch:null},
+ {text:'號令嚴明，服從第一',duration:4.00,
+  audioUrl:'./singing-samples/junji-line6-v8.mp3',pitch:null},
+ {text:'革命軍人要牢記',duration:3.65,
+  audioUrl:'./singing-samples/junji-line7-v8.mp3',pitch:null}
 ];
+const PITCH_URL='./singing-samples/junji-pitches-v8.json?v=8';
 const MIDI=f=>69+12*Math.log2(f/440);
 function getAudio(){if(!ctx){const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)throw Error('此裝置不支援 Web Audio');ctx=new Audio()}return ctx}
 function setText(s){E.info.textContent=s}
@@ -78,7 +89,7 @@ function setMode(next){
   next==='listen'?'① 班長示範 · 原唱音準線':
   next==='imitate'?'② 你唱 · 答案完全隱藏':
   next==='playback'?'③ 公開播放玩家走音':'④ 鑑測報告';
- E.stage.textContent='第 '+(activePhrase+1)+'/2 句 · '+E.stage.textContent;
+ E.stage.textContent='第 '+(activePhrase+1)+'/'+PHRASES.length+' 句 · '+E.stage.textContent;
  E.overlay.textContent=next==='empty'?'正在載入內建原版人聲…':next==='error'?'載入失敗，點擊重新載入':vocals?'按「班長先唱」開始':'正在載入內建原版人聲…';
  if(next==='countinTeacher')E.speech.textContent='「聽好！先數四拍，第五拍開始！」';
  if(next==='countinPlayer')E.speech.textContent='「3、2、1、唱！第五拍才開始！」';
@@ -89,7 +100,12 @@ function setMode(next){
  if(next==='ready')E.speech.textContent='「記得剛才的旋律，等一下看你表現！」';
 }
 function resetHead(){E.head.setAttribute('x1','0');E.head.setAttribute('x2','0')}
-function headAt(t){const x=(VIEW_W*clamp(t/CLIP,0,1)).toFixed(1);E.head.setAttribute('x1',x);E.head.setAttribute('x2',x)}
+function plotX(t){return VIEW_W*(PRE_ROLL+(1-PRE_ROLL)*clamp(t/CLIP,0,1))}
+function headAt(t){const x=plotX(t).toFixed(1);E.head.setAttribute('x1',x);E.head.setAttribute('x2',x)}
+function headAtPre(t){
+ const x=(VIEW_W*PRE_ROLL*clamp(t/(4*BEAT_SECONDS),0,1)).toFixed(1);
+ E.head.setAttribute('x1',x);E.head.setAttribute('x2',x);
+}
 function toY(m){return clamp(216-(m-(refBase-9.5))/19*191,12,226)}
 function toMidi(e){
  const r=E.board.getBoundingClientRect();
@@ -100,8 +116,9 @@ function toMidi(e){
 function drawGrid(){
  let html='';
  for(let y=24;y<240;y+=40)html+='<line x1="0" x2="800" y1="'+y+'" y2="'+y+'" stroke="#486852" stroke-width="1" stroke-dasharray="3 7"/>';
+ html+='<line x1="'+(VIEW_W*PRE_ROLL)+'" x2="'+(VIEW_W*PRE_ROLL)+'" y1="0" y2="240" stroke="#d4c28c" stroke-width="1.5" stroke-dasharray="6 6" opacity=".65"/>';
  $('gridLines').innerHTML=html;
- E.timeline.innerHTML='<span>0:00</span><span>原唱片段 · '+CLIP.toFixed(1)+' 秒</span><span>0:'+CLIP.toFixed(1)+'</span>';
+ E.timeline.innerHTML='<span>3 · 2 · 1 · 唱</span><span>第 5 拍開唱</span><span>'+CLIP.toFixed(1)+' 秒</span>';
 }
 drawGrid();
 
@@ -243,6 +260,7 @@ function countIn(which,c,firstBeat){
  E.countdownLabel.textContent=which==='countinTeacher'?'班長準備開唱':'換你唱，記住旋律！';
  E.countdownWord.textContent='3';
  const id=session;
+ headAtPre(0);
  scheduleFourBeats(c,firstBeat);
  return new Promise(resolve=>{
   let settled=false,lastBeat=-1;
@@ -256,7 +274,8 @@ function countIn(which,c,firstBeat){
   const tick=()=>{
    if(id!==session){end(false);return}
    const delta=c.currentTime-firstBeat;
-   if(delta>=4*BEAT_SECONDS){end(true);return}
+   headAtPre(Math.max(0,delta));
+   if(delta>=4*BEAT_SECONDS){headAtPre(4*BEAT_SECONDS);end(true);return}
    const beat=clamp(Math.floor(delta/BEAT_SECONDS),0,3);
    if(beat!==lastBeat){
     lastBeat=beat;
@@ -374,8 +393,8 @@ function pitchForGuide(t){
 function renderGuide(){
  let d='';
  for(const note of guideSegments){
-  const x=(VIEW_W*note.startTime/CLIP).toFixed(1);
-  const x2=(VIEW_W*note.endTime/CLIP).toFixed(1);
+  const x=plotX(note.startTime).toFixed(1);
+  const x2=plotX(note.endTime).toFixed(1);
   const y=toY(note.midi).toFixed(1);
   // Each note is a flat block; use a vertical jump only at an actual note change.
   // Silences begin a new move so no note bridges the gap.
@@ -527,7 +546,7 @@ async function startImitate(){
   while(trace.length*STEP<=Math.min(CLIP,Math.max(0,t)))trace.push({m:midiValue,on:playerHeld});
   headAt(t);
   pumpLiveVoice();
-  E.dot.setAttribute('cx',(VIEW_W*clamp(t/CLIP,0,1)).toFixed(1));
+  E.dot.setAttribute('cx',plotX(t).toFixed(1));
   if(t>=CLIP){frame=0;finishImitate();return}
   frame=requestAnimationFrame(step);
  };
@@ -604,7 +623,7 @@ function tracePathFor(take){
  const records=take?.trace||trace;
  for(let i=0;i<records.length;i++){
   if(!records[i].on){drawing=false;continue}
-  path+=(drawing?' L':' M')+(VIEW_W*i*STEP/CLIP).toFixed(1)+' '+toY(records[i].m).toFixed(1);
+  path+=(drawing?' L':' M')+plotX(i*STEP).toFixed(1)+' '+toY(records[i].m).toFixed(1);
   drawing=true;
  }
  E.trace.setAttribute('d',path);
