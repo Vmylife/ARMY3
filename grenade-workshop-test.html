@@ -106,7 +106,8 @@ body.workmode #toast[data-grade="GOOD"]{border-color:#aabc90;background:#2b4030;
 body.workmode #toast[data-grade="BAD"],body.workmode #toast[data-grade="MISS"]{border-color:#c99a76;background:#493b2c;color:#f6d4ae}
 </style>
 </head>
-<body>
+<body data-army-minigame="grenade">
+<script type="module" src="./src/systems/minigameQuickExit.js?v=192"></script>
 <canvas id="world3d" aria-label="3D 爆炸戰場"></canvas><canvas id="scene" aria-label="遊戲場景"></canvas><div id="screenTint"></div>
 <div id="root">
   <header id="head">
