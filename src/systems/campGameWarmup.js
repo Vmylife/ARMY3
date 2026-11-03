@@ -1,19 +1,20 @@
 import './shootingRangeLauncher.js?v=100';
-/* ARMY3 v1.91 - staged network prefetch + reusable near-portal game frames.
+/* ARMY3 v1.92 - staged network prefetch + reusable near-portal game frames.
  * Never executes heavyweight GLB parsing for all three mini-games during camp travel.
  * Only one near-portal scene is GPU-warmed at a time. Standalone page links remain fallback.
  */
 import {clearCampSession} from './campSession.js?v=144';
 const ROOT = new URL('../../', import.meta.url);
 const urls = {
- blanket:'blanket-stack.html',
- grenade:'grenade-workshop-test.html',
- shooting:'shooting-paper-range.html?v=154'
+ blanket:'blanket-stack.html?v=192',
+ grenade:'grenade-workshop-test.html?v=192',
+ shooting:'shooting-paper-range.html?v=192'
 };
 const stage1 = [
- 'blanket-stack.html?fromCamp=1&armyPrewarmed=1','grenade-workshop-test.html?fromCamp=1&armyPrewarmed=1',
- 'shooting-paper-range.html?v=154','shooting-paper.css?v=153','shooting-paper.js?v=154','shooting-paper-report.js?v=153',
+ 'blanket-stack.html?v=192','grenade-workshop-test.html?v=192',
+ 'shooting-paper-range.html?v=192','shooting-paper.css?v=153','shooting-paper.js?v=154','shooting-paper-report.js?v=153',
  'shooting-paper-world.js?v=149','shooting-paper-scene.json?v=140',
+ 'src/systems/minigameQuickExit.js?v=192',
  'assets/audio/minigames/blanket-parade-loop.mp3','assets/audio/minigames/grenade-ordnance-loop.mp3',
  'src/systems/minigameBgm.js?v=190','src/systems/grenadeEarlyAudio.js?v=190','src/systems/blanketSfx.js?v=170',
  'src/systems/blanketAchievements.js?v=180','src/systems/grenadeWorkshopSfx.js?v=316',
@@ -35,7 +36,7 @@ const stage1 = [
  'assets/audio/grenade/collapse_3.mp3','assets/audio/grenade/debris_scatter.mp3',
  'assets/audio/grenade/collapse_1.mp3',
  'blanket-stack-scene.json?v=153','grenade-user-scene.json?v=130',
- 'blanket-stack.js?v=153','grenade-user-play.html?embedded=1&v=152',
+ 'blanket-stack.js?v=153','grenade-user-play.html?embedded=1&v=192',
  'grenade-user-play-3d.js?v=138'
 ];
 const status = {blanket:{},grenade:{},shooting:{}};
