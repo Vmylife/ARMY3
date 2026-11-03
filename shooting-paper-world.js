@@ -1,4 +1,4 @@
-/* ARMY3 v1.47 fixed 3D paper-target practice / 20 animated runners — reuse original Army3 GLB world and rifle. */
+/* ARMY3 v1.48 fixed 3D paper-target practice / 20 animated runners — reuse original Army3 GLB world and rifle. */
 import {loadGlb} from './src/core/glb111.js';
 import {RifleRenderer} from './src/training/rifleRenderer.js';
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -91,6 +91,17 @@ async function boot(){try{
   src=patch(src,'instances[p+5]=a.hit?1:0;instances[p+6]=a.seed;',
     'instances[p+5]=a.hit?1:0;instances[p+6]=a.hit?Math.max(0,Math.min(1,a.fall||0)):a.seed;',
     '每位士兵的受擊進度');
+  // v1.47 was still visibly face-down: reverse the rendered body's chest
+  // without reversing the projectile-aligned translation or fall direction.
+  // Rotating around local Y preserves the head-to-feet direction in world space.
+  src=patch(src,'float cs=cos(fall),sn=sin(fall);',
+    `float phase=clamp(iState.z,0.,1.);
+    float twist=3.14159265*(iState.y>.5?smoothstep(.035,.56,phase):0.);
+    float ct=cos(twist),st=sin(twist);
+    local=vec3(local.x*ct+local.z*st,local.y,-local.x*st+local.z*ct);
+    normal=vec3(normal.x*ct+normal.z*st,normal.y,-normal.x*st+normal.z*ct);
+    float cs=cos(fall),sn=sin(fall);`,
+    '倒地仰面面向修正');
   src=patch(src,'precision highp float;in vec2 vUV;in vec3 vN;uniform sampler2D uTex;out vec4 frag;',
     'precision highp float;in vec2 vUV;in vec3 vN;uniform sampler2D uTex;uniform float uRed;out vec4 frag;',
     '紅軍實例化染色 uniform');
