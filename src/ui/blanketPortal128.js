@@ -53,7 +53,7 @@ export function createBlanketPortal(renderer,{onTrainingStart=()=>{},resuming=fa
   shootingDraw=makeGroundRing(renderer,SHOOTING_PORTAL);
  const blanket=createPortalMenu({position:BLANKET_PORTAL,kind:'blanket',panelId:'blanketPortalMenu',startId:'blanketPortalStart',cancelId:'blanketPortalCancel',destination:'./blanket-stack.html?v=159',onStart:()=>onTrainingStart('blanket'),initialDismissed:resuming});
  const grenade=createPortalMenu({position:GRENADE_PORTAL,kind:'grenade',panelId:'grenadePortalMenu',startId:'grenadePortalStart',cancelId:'grenadePortalCancel',destination:'./grenade-workshop-test.html?v=153',onStart:()=>onTrainingStart('grenade'),initialDismissed:resuming});
- const shooting=createPortalMenu({position:SHOOTING_PORTAL,kind:'shooting',panelId:'shootingPortalMenu',startId:'shootingPortalStart',cancelId:'shootingPortalCancel',destination:'./shooting-paper-range.html?v=153',onStart:()=>onTrainingStart('shooting'),initialDismissed:resuming});
+ const shooting=createPortalMenu({position:SHOOTING_PORTAL,kind:'shooting',panelId:'shootingPortalMenu',startId:'shootingPortalStart',cancelId:'shootingPortalCancel',destination:'./shooting-paper-range.html?v=154',onStart:()=>onTrainingStart('shooting'),initialDismissed:resuming});
  return {
   draw(){blanketDraw();grenadeDraw();shootingDraw()},
   update(playerPos,blocked=false){blanket.update(playerPos,blocked);grenade.update(playerPos,blocked);shooting.update(playerPos,blocked)}
