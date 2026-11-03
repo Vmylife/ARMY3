@@ -8,11 +8,11 @@ const ROOT = new URL('../../', import.meta.url);
 const urls = {
  blanket:'blanket-stack.html',
  grenade:'grenade-workshop-test.html',
- shooting:'shooting-paper-range.html'
+ shooting:'shooting-paper-range.html?v=154'
 };
 const stage1 = [
  'blanket-stack.html?fromCamp=1&armyPrewarmed=1','grenade-workshop-test.html?fromCamp=1&armyPrewarmed=1',
- 'shooting-paper-range.html?v=153','shooting-paper.css?v=153','shooting-paper.js?v=153','shooting-paper-report.js?v=153',
+ 'shooting-paper-range.html?v=154','shooting-paper.css?v=153','shooting-paper.js?v=154','shooting-paper-report.js?v=153',
  'shooting-paper-world.js?v=149','shooting-paper-scene.json?v=140',
  'assets/audio/minigames/blanket-parade-loop.mp3','assets/audio/minigames/grenade-ordnance-loop.mp3',
  'src/systems/minigameBgm.js?v=190','src/systems/grenadeEarlyAudio.js?v=190','src/systems/blanketSfx.js?v=170',
@@ -166,7 +166,10 @@ function warm(kind){
   // An older cached return handler may navigate only the iframe. Recover safely.
   try{if(s.frame===frame&&active===kind&&/\/index\.html$/.test(frame.contentWindow.location.pathname))exit()}catch{}
  });
- frame.src=new URL(urls[kind]+'?fromCamp=1&armyPrewarmed=1',ROOT).href;
+ const target=new URL(urls[kind],ROOT);
+ target.searchParams.set('fromCamp','1');
+ target.searchParams.set('armyPrewarmed','1');
+ frame.src=target.href;
  document.body.appendChild(frame);
 }
 const lastApproach={blanket:0,grenade:0,shooting:0};
