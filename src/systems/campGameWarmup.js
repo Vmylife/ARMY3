@@ -1,16 +1,19 @@
 import './shootingRangeLauncher.js?v=100';
-/* ARMY3 v1.90 - staged network prefetch + reusable near-portal game frames.
- * Never executes heavyweight GLB parsing for both mini-games during camp travel.
+/* ARMY3 v1.91 - staged network prefetch + reusable near-portal game frames.
+ * Never executes heavyweight GLB parsing for all three mini-games during camp travel.
  * Only one near-portal scene is GPU-warmed at a time. Standalone page links remain fallback.
  */
 import {clearCampSession} from './campSession.js?v=144';
 const ROOT = new URL('../../', import.meta.url);
 const urls = {
  blanket:'blanket-stack.html',
- grenade:'grenade-workshop-test.html'
+ grenade:'grenade-workshop-test.html',
+ shooting:'shooting-paper-range.html'
 };
 const stage1 = [
  'blanket-stack.html?fromCamp=1&armyPrewarmed=1','grenade-workshop-test.html?fromCamp=1&armyPrewarmed=1',
+ 'shooting-paper-range.html?v=153','shooting-paper.css?v=153','shooting-paper.js?v=153','shooting-paper-report.js?v=153',
+ 'shooting-paper-world.js?v=149','shooting-paper-scene.json?v=140',
  'assets/audio/minigames/blanket-parade-loop.mp3','assets/audio/minigames/grenade-ordnance-loop.mp3',
  'src/systems/minigameBgm.js?v=190','src/systems/grenadeEarlyAudio.js?v=190','src/systems/blanketSfx.js?v=170',
  'src/systems/blanketAchievements.js?v=180','src/systems/grenadeWorkshopSfx.js?v=316',
@@ -35,7 +38,7 @@ const stage1 = [
  'blanket-stack.js?v=153','grenade-user-play.html?embedded=1&v=152',
  'grenade-user-play-3d.js?v=138'
 ];
-const status = {blanket:{},grenade:{}};
+const status = {blanket:{},grenade:{},shooting:{}};
 let enabled=false, active=null, warming=null, prefetching=false, pendingPrefetch=false;
 const seen = new Set();
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -120,6 +123,7 @@ function readyFrame(kind){
  try{
   const w=frame.contentWindow;
   if(kind==='blanket')return !!w.__blanketTest&&w.__blanketTest.state==='intro';
+  if(kind==='shooting')return !!w.__armyPaperTest?.status?.().ready;
   const nested=w.document.getElementById('grenadeArenaFrame');
   return !!nested?.contentWindow?.__grenadeTest?.world&&nested.contentWindow.__grenadeTest.world.modelState==='ready';
  }catch{return false}
@@ -131,7 +135,7 @@ function warm(kind){
  const frame=document.createElement('iframe');
  frame.dataset.armyPrewarmedGame=kind;
  frame.id='armyWarmGameFrame';
- frame.title=kind==='blanket'?'棉被疊疊樂預先載入':'手榴彈遊戲預先載入';
+ frame.title=kind==='blanket'?'棉被疊疊樂預先載入':kind==='grenade'?'手榴彈遊戲預先載入':'實彈射擊預先載入';
  frame.setAttribute('loading','eager');
  frame.setAttribute('aria-hidden','true');
  frame.setAttribute('allow','autoplay');
@@ -165,7 +169,7 @@ function warm(kind){
  frame.src=new URL(urls[kind]+'?fromCamp=1&armyPrewarmed=1',ROOT).href;
  document.body.appendChild(frame);
 }
-const lastApproach={blanket:0,grenade:0};
+const lastApproach={blanket:0,grenade:0,shooting:0};
 let rewarmAfter=0;
 function approach(kind,distance){
  if(!enabled||active||!isIdle())return;
