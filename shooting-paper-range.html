@@ -2,7 +2,7 @@
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#162e23"><title>國軍模擬器｜實彈射擊鑑測</title>
-<link rel="stylesheet" href="./shooting-paper.css?v=151"></head><body>
+<link rel="stylesheet" href="./shooting-paper.css?v=153"></head><body>
 <canvas id="world3d" aria-label="國軍三維射擊訓練場"></canvas>
 <canvas id="shootingOverlay" aria-label="拖曳控制步槍瞄準"></canvas>
 <div id="hud" hidden>
@@ -18,6 +18,7 @@
  </div>
  <button id="muteBtn" aria-label="切換音效">🔊</button>
 </div>
+<div id="shootTransition" class="shootTransition" role="status" aria-live="polite" hidden></div>
 <div id="startScreen" class="screen">
  <div class="panel introPanel">
   <div class="eyebrow">國軍射擊鑑測</div>
@@ -27,9 +28,9 @@
   <div class="introHint">上滑抬槍 · 點「開鏡」放大</div>
   <div class="shootStagesIntro">
    <div class="shootStageHeader"><strong>五關鑑測</strong><small id="shootProgressNote">已完成 0 / 5 關</small></div>
-   <div class="shootStageChoices" id="shootStageChoices" aria-label="選擇已解鎖的關卡"></div>
-   <div class="shootStageTitle" id="shootStageTitle">第 1 / 5 關 · 新兵適應</div>
-   <p class="shootStageDetail" id="shootStageDetail">0 名友軍干擾 · 10 發中 5 發上靶即可過關</p>
+   <div class="shootStageChoices" id="shootStageChoices" aria-label="五關歷史通關紀錄，僅供檢視"></div>
+   <div class="shootStageTitle" id="shootStageTitle">五關連續鑑測 · 一律從第1關開始</div>
+   <p class="shootStageDetail" id="shootStageDetail">上靶5發過關，未過關就直接結算，不可接關</p>
   </div>
   <div id="loadStatus" role="status">正在載入軍營…</div>
   <button id="startBtn" class="mainBtn" disabled>準備射擊…</button>
@@ -53,14 +54,16 @@
    </div>
    <div class="shootScoreRank"><span id="shootGrade">待評</span><strong id="shootHistoryBest">歷史最高 0 分</strong></div>
   </div>
-  <div class="shootScoreExplanation" id="shootScoreExplanation">依命中、環數與友軍損失計分</div>
+  <div class="shootScoreExplanation" id="shootScoreExplanation">五關鑑測總成績</div>
+  <div class="shootSectionHead shootRunHeading"><strong>逐關戰報</strong><small>只在整輪結束後公布</small></div>
+  <div class="shootRunRows" id="shootRunRows" aria-label="各關上靶及得分紀錄"></div>
   <div class="resultSummary">
-   <div class="resultMain"><small>上靶</small><strong id="resultHits">0</strong><span>/ <b id="resultShots">0</b> 發</span></div>
+   <div class="resultMain"><small>累計上靶</small><strong id="resultHits">0</strong><span>/ <b id="resultShots">0</b> 發</span></div>
    <div class="resultAccuracy"><small>命中率</small><strong id="resultRate">0%</strong></div>
   </div>
   <div class="shootEvidence">
    <div class="shootTarget">
-    <div class="paperLabel"><strong>靶紙證物</strong><span>彈孔有編號</span></div>
+    <div class="paperLabel"><strong>最後關卡靶紙</strong><span>彈孔有編號</span></div>
     <canvas id="resultPaper" width="600" height="760" aria-label="打靶紙與所有上靶彈孔"></canvas>
    </div>
    <div class="resultExtras">
@@ -75,15 +78,14 @@
    <button id="shootGalleryResult" class="shootGalleryButton" type="button">🏅 查看全部成就圖鑑</button>
   </div>
   <div class="officerComment"><small>班長講評</small><p id="reportText"></p></div>
-  <div id="shootNextHint" class="shootNextHint">上靶至少5發可進下一關。</div>
+  <div id="shootNextHint" class="shootNextHint">失敗即結算，重新挑戰從第1關開始。</div>
   <div class="shootResultActions">
-   <button id="againBtn" class="mainBtn">再打 10 發</button>
-   <button id="chooseStageBtn" class="secondaryBtn" type="button">選擇關卡</button>
+   <button id="againBtn" class="mainBtn">從第1關重新挑戰</button>
    <button class="backBtn secondaryBtn">返回軍營</button>
   </div>
  </div>
 </div>
 <script type="module" src="./shooting-paper-world.js?v=149"></script>
-<script src="./shooting-paper-report.js?v=151"></script>
-<script src="./shooting-paper.js?v=151"></script>
+<script src="./shooting-paper-report.js?v=153"></script>
+<script src="./shooting-paper.js?v=153"></script>
 </body></html>
