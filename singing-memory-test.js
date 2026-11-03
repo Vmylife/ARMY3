@@ -414,13 +414,11 @@ async function listen(){
  if(!vocals||!pitch.length)return;
  stopAudio();
  const id=session;
- lastScore=null;trace=[];comparison=false;E.feedback.hidden=true;
+ comparison=false;E.feedback.hidden=true;
  E.trace.setAttribute('d','');resetHead();
  try{
   const c=getAudio();await c.resume();
   if(id!==session)return;
-  // Schedule vocals at beat FIVE before sounding any of the four clicks.
-  // Web Audio clock ensures a consistent 4-click count-in on desktop and mobile.
   const firstBeat=c.currentTime+.12,songStart=firstBeat+4*BEAT_SECONDS;
   const playing=playBuffer(vocals,clipStart,CLIP,songStart);
   if(!await countIn('countinTeacher',c,firstBeat)||id!==session)return;
@@ -434,21 +432,18 @@ async function listen(){
 async function startImitate(){
  const c=getAudio(),id=session;
  if(id!==session)return;
- // A NEW four-beat count-in before the player's take.
  const firstBeat=c.currentTime+.12,playerStart=firstBeat+4*BEAT_SECONDS;
  if(!await countIn('countinPlayer',c,firstBeat)||id!==session)return;
  setMode('imitate');
  E.guide.style.display='none';
  E.guide.setAttribute('visibility','hidden');
  pointerId=null;playerHeld=false;midiValue=refBase;trace=[];ownActionCount=0;
- E.hint.textContent='第五拍開唱！已隱藏班長音準線。按住滑鼠／手指上下滑動控制音高，放開會斷音。';
+ E.thumb.style.top='50%';
+ E.hint.textContent='第五拍開始！只需按住右側滑桿上下移動控制音高；時間軸會自動往前。放開就斷音。';
  const step=()=>{
   if(id!==session||mode!=='imitate')return;
-  // Use the same AudioContext timeline as the four click sounds.
   const t=c.currentTime-playerStart;
-  while(trace.length*STEP<=Math.min(CLIP,Math.max(0,t))){
-   trace.push({m:midiValue,on:playerHeld});
-  }
+  while(trace.length*STEP<=Math.min(CLIP,Math.max(0,t)))trace.push({m:midiValue,on:playerHeld});
   headAt(t);
   E.dot.setAttribute('cx',(VIEW_W*clamp(t/CLIP,0,1)).toFixed(1));
   if(t>=CLIP){frame=0;finishImitate();return}
@@ -456,22 +451,45 @@ async function startImitate(){
  };
  frame=requestAnimationFrame(step);
 }
-E.board.addEventListener('pointerdown',e=>{
+function updateFromRail(e){
+ const r=E.rail.getBoundingClientRect();
+ const position=clamp((e.clientY-r.top)/Math.max(r.height,1),0,1);
+ midiValue=refBase+9.5-position*19;
+ E.thumb.style.top=(position*100).toFixed(1)+'%';
+ E.rail.setAttribute('aria-valuenow',String(Math.round((1-position)*100)));
+ E.dot.setAttribute('cy',String(toY(midiValue)));
+}
+E.rail.addEventListener('pointerdown',e=>{
  if(mode!=='imitate'||pointerId!==null)return;
  e.preventDefault();pointerId=e.pointerId;playerHeld=true;ownActionCount++;
- toMidi(e);try{E.board.setPointerCapture(e.pointerId)}catch{}
+ E.rail.classList.add('active');updateFromRail(e);
+ try{E.rail.setPointerCapture(e.pointerId)}catch{}
 });
-E.board.addEventListener('pointermove',e=>{
+E.rail.addEventListener('pointermove',e=>{
  if(mode!=='imitate'||pointerId!==e.pointerId)return;
- e.preventDefault();toMidi(e);
+ e.preventDefault();updateFromRail(e);
 });
-for(const ev of ['pointerup','pointercancel','lostpointercapture']){
- E.board.addEventListener(ev,e=>{
+for(const event of ['pointerup','pointercancel','lostpointercapture']){
+ E.rail.addEventListener(event,e=>{
   if(mode!=='imitate')return;
   if(pointerId!==null&&e.pointerId!==pointerId)return;
-  pointerId=null;playerHeld=false;
+  pointerId=null;playerHeld=false;E.rail.classList.remove('active');
  });
 }
+E.rail.addEventListener('keydown',e=>{
+ if(mode!=='imitate')return;
+ if(e.key==='ArrowUp'||e.key==='ArrowDown'){
+  e.preventDefault();
+  midiValue=clamp(midiValue+(e.key==='ArrowUp'?.7:-.7),refBase-9.5,refBase+9.5);
+  const position=clamp((refBase+9.5-midiValue)/19,0,1);
+  E.thumb.style.top=(position*100).toFixed(1)+'%';
+  E.rail.setAttribute('aria-valuenow',String(Math.round((1-position)*100)));
+  E.dot.setAttribute('cy',String(toY(midiValue)));
+ }else if(e.code==='Space'){e.preventDefault();playerHeld=true;E.rail.classList.add('active')}
+});
+E.rail.addEventListener('keyup',e=>{
+ if(e.code==='Space'){playerHeld=false;E.rail.classList.remove('active')}
+});
 function grade(s){return s>=92?'S':s>=80?'A':s>=65?'B':s>=45?'C':s>=25?'D':'F'}
 function calculate(){
  const n=Math.floor(CLIP/STEP);
