@@ -1,4 +1,4 @@
-/* ARMY3 · 報告長官！我的子彈有上靶嗎？ — standalone target-paper shooting v1.47 */
+/* ARMY3 · 報告長官！我的子彈有上靶嗎？ — standalone target-paper shooting v1.48 */
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
 const canvas=$('shootingOverlay'),ctx=canvas.getContext('2d',{alpha:true}),min=Math.min,max=Math.max,clamp=(x,a,b)=>max(a,min(b,x));
