@@ -38,7 +38,8 @@ html,body,body *,button,span,label,canvas{
 @media(max-width:390px){#hud{left:8px;right:8px}.pill{font-size:13px;padding:10px 10px}#layers{font-size:23px}}
 </style>
 </head>
-<body>
+<body data-army-minigame="blanket">
+<script type="module" src="./src/systems/minigameQuickExit.js?v=192"></script>
 <canvas id="field" aria-label="3D 操場棉被疊疊樂"></canvas>
 <div id="boomFlash"></div>
 <div id="hud" hidden><div class="pill">第 <span id="round">1</span> / 3 輪</div><div class="pill"><span id="layers">1</span> <small>層</small></div><div class="pill">收拾 <span id="left">3</span> 次</div></div>
