@@ -44,7 +44,7 @@ const ACH=[
  {id:'inside',icon:'🕵️',name:'紅軍不用來了',desc:'一張靶紙都沒打中，卻誤傷至少5名友軍',rarity:'史詩',secret:true,test:s=>s.hits===0&&s.friends>=5},
  {id:'teamwork',icon:'⚖️',name:'敵我不分的天才',desc:'同時上靶5發以上、誤傷3名以上友軍',rarity:'史詩',secret:true,test:s=>s.hits>=5&&s.friends>=3},
  {id:'oops_first',icon:'💔',name:'第一槍就出事',desc:'第一發子彈直接射中友軍',rarity:'稀有',test:s=>s.history[0]?.kind==='friendly'},
- {id:'perfect_discipline',icon:'🕯️',name:'班長今天沒寫檢討',desc:'10發至少8發上靶、0誤傷、0脫靶不可能？',rarity:'傳說',secret:true,test:s=>s.shots===10&&s.hits===10&&s.center>=5&&s.friends===0}
+ {id:'perfect_discipline',icon:'🕯️',name:'班長今天沒寫檢討',desc:'10發全上靶，其中至少5發9環以上且0誤傷',rarity:'傳說',secret:true,test:s=>s.shots===10&&s.hits===10&&s.center>=5&&s.friends===0}
 ];
 const COMMENTS=[
  {when:s=>s.shots===0,texts:['全程沒有開槍。你是來守護地球和平，還是忘記把槍帶來？','射擊鑑測唯一零傷亡的，是子彈和班長的信心。','你連扳機都捨不得扣，我要不要幫你申請文書兵？','這場最準的一件事，是你準時下課。']},
