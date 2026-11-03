@@ -1,0 +1,952 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#e8efdf">
+<title>國軍模擬器｜拔草鑑測</title>
+<style>
+:root{color-scheme:light;--green:#263f31;--muted:#6e806e;--light:#f8faf4;--edge:#d7e0d0}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;height:100dvh;margin:0;overflow:hidden;background:#e6eddd;color:var(--green);font-family:system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;user-select:none;-webkit-user-select:none}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#hud{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none;padding:calc(15px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom))}
+#head{display:flex;justify-content:space-between;align-items:start;gap:8px}
+.eyebrow{font-size:10px;font-weight:850;letter-spacing:.18em;color:#789275}
+h1{font-size:23px;letter-spacing:.025em;font-weight:850;margin:4px 0 4px}
+.note{font-size:12px;color:#71846f}
+.counter{padding:8px 12px;background:#fbfcf4ef;border:1px solid #fff;border-radius:15px;white-space:nowrap;box-shadow:0 7px 19px #52644f18}
+.counter b{font-size:21px;font-variant-numeric:tabular-nums}.counter small{font-size:11px;color:#7b8d7b}
+#banner{align-self:center;margin-top:9vh;opacity:0;transform:translateY(8px);transition:opacity .22s,transform .22s;border:1px solid #fff5c6;background:#fff9e8ed;border-radius:15px;text-align:center;padding:10px 24px;box-shadow:0 10px 28px #594d2921;min-width:160px}
+#banner.show{opacity:1;transform:translateY(0)}
+#banner small{display:block;font-size:11px;letter-spacing:.1em;color:#a38c56}
+#banner strong{display:block;font-size:27px;color:#88612f;font-variant-numeric:tabular-nums}
+#footer{width:min(100%,535px);align-self:center;text-align:center}
+#tip{min-height:24px;font-size:13px;font-weight:700;color:#49634a;text-shadow:0 1px 2px #f5f9eb;margin-bottom:8px}
+#buttons{display:flex;justify-content:center;gap:7px;pointer-events:auto;flex-wrap:wrap}
+button{border:1px solid #d4decf;background:#fcfff6ed;color:#47634b;border-radius:13px;min-height:43px;padding:0 11px;box-shadow:0 5px 14px #4d63421b;font:750 12px system-ui,-apple-system,"PingFang TC",sans-serif;touch-action:manipulation;cursor:pointer}
+button:active{transform:scale(.97);background:#eef3e8}
+button.primary{background:#315c41;border-color:#315c41;color:#fff}
+#message{position:fixed;top:32%;left:50%;max-width:93vw;text-align:center;pointer-events:none;transform:translate(-50%,-7px) scale(.96);opacity:0;transition:opacity .2s,transform .2s;background:#fbfdf4f2;color:#274632;padding:12px 18px;border-radius:16px;border:1px solid #ffffffea;box-shadow:0 12px 32px #43523f35;font-weight:850;font-size:18px;white-space:nowrap}
+#message.show{opacity:1;transform:translate(-50%,0) scale(1)}
+#help{position:fixed;left:50%;top:58%;transform:translate(-50%,-50%);pointer-events:none;color:#fdfde8;text-shadow:0 2px 5px #274226aa;opacity:0;font-weight:850;font-size:14px;transition:opacity .4s;white-space:nowrap}
+#help.show{opacity:1}
+#finish{position:fixed;inset:0;display:none;background:#273b2d71;backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:18px}
+#finish.show{display:flex}
+.card{width:min(94vw,332px);padding:30px 25px;background:#f9fcf4;border-radius:25px;text-align:center;box-shadow:0 22px 60px #1e352f60}
+.card .big{font-size:40px}.card h2{font-size:24px;margin:8px 0}.card p{font-size:14px;color:#687d6b;line-height:1.8}.card button{margin-top:10px;min-width:160px}
+.version{position:fixed;bottom:calc(67px + env(safe-area-inset-bottom));right:10px;font-size:10px;color:#8a9b81;pointer-events:none}
+@media(max-width:390px){h1{font-size:21px}.note{font-size:11px}button{padding:0 9px;font-size:11px;min-height:40px}#hud{padding-left:9px;padding-right:9px}}
+@media(max-height:630px){h1{font-size:18px}.eyebrow{font-size:9px}.note{display:none}#banner{margin-top:1vh}.version{display:none}#tip{margin-bottom:3px}}
+
+#tools{position:fixed;right:calc(11px + env(safe-area-inset-right));bottom:calc(105px + env(safe-area-inset-bottom));display:flex;gap:9px;pointer-events:auto}
+#tools button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;width:65px;height:68px;border-radius:18px;border:2px solid #d6e3d0;background:#ffffffed;box-shadow:0 6px 20px #2e4a3825;color:#4e6d50;padding:3px;font-size:12px;transition:background .12s,border-color .12s,transform .12s}
+#tools button.selected{background:#32583d;color:#fff;border-color:#b3d0aa;box-shadow:0 6px 19px #315c4169}
+#tools button:active{transform:scale(.95)}
+.toolIcon{font-size:29px;line-height:34px;width:37px;height:36px;display:flex;align-items:center;justify-content:center}
+#tools svg.toolIcon{width:38px;height:38px;padding:3px}
+#modeGuide{position:fixed;bottom:calc(182px + env(safe-area-inset-bottom));right:13px;background:#fbfff3e0;padding:5px 9px;border:1px solid #d9e5ce;border-radius:10px;font-size:11px;color:#4c644b;pointer-events:none}
+#head .counter{margin-left:8px}
+@media(max-height:640px){#tools{bottom:calc(64px + env(safe-area-inset-bottom))}#tools button{width:55px;height:55px}#modeGuide{bottom:calc(126px + env(safe-area-inset-bottom))}}
+
+#challengebar{position:fixed;top:calc(93px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;background:#fcfff3e8;border:1px solid #fff;border-radius:15px;padding:7px 13px;box-shadow:0 4px 13px #52644f17;font-size:12px;font-weight:800;z-index:2;white-space:nowrap}
+.timevalue{display:flex;align-items:baseline;gap:3px;color:#36533e}.timevalue b{font-size:23px;font-variant-numeric:tabular-nums;min-width:44px;text-align:right}.timevalue span{font-size:11px}
+#challengebar.urgent{border-color:#dfb39d;background:#fff1e6ef}.urgent .timevalue{color:#b64d38}
+#bossStats{position:fixed;top:calc(145px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);text-align:center;background:#fdf9e7ed;border:1px solid #f5e5ba;border-radius:13px;padding:8px 16px;min-width:146px;z-index:2;white-space:nowrap}
+#bossStats[hidden]{display:none!important}#bossStats b{font-size:27px;font-variant-numeric:tabular-nums;color:#84633b}#bossStats span{font-size:11px;color:#a58c60}#rootReadout{display:block;font-size:16px;color:#77552f;font-variant-numeric:tabular-nums;margin-top:3px}
+.modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:18px;background:#253d2f91;backdrop-filter:blur(5px);z-index:10}
+.modal.hidden{display:none}.card .big{font-size:40px}.card p{margin:12px 0 14px}
+#finish{z-index:12}
+#tools.hidden,#modeGuide.hidden{display:none!important}
+@media(max-height:640px){#challengebar{top:calc(56px + env(safe-area-inset-top));padding:3px 9px}.timevalue b{font-size:19px}#bossStats{top:calc(103px + env(safe-area-inset-top))}}
+@media(max-width:390px){#challengebar{top:calc(98px + env(safe-area-inset-top))}#bossStats{top:calc(151px + env(safe-area-inset-top))}}
+#challengebar{position:fixed}#timeBonus{font-weight:900;color:#2e8744;opacity:0;transform:translateY(4px) scale(.8);transition:opacity .16s,transform .16s;white-space:nowrap;font-variant-numeric:tabular-nums;font-size:14px}#timeBonus.show{opacity:1;transform:translateY(0) scale(1)}
+
+#bossMeter{position:fixed;top:28%;left:50%;width:max-content;max-width:95vw;transform:translate(-50%,-50%);pointer-events:none;z-index:6;text-align:center;filter:drop-shadow(0 6px 13px #32281840)}
+#bossMeter[hidden]{display:none!important}
+#bossMeter .meterCaption{font-size:13px;letter-spacing:.18em;font-weight:950;color:#fff9db;text-shadow:0 2px 6px #503f2c,0 0 10px #77552d;white-space:nowrap}
+.meterNumbers{display:flex;align-items:baseline;justify-content:center;gap:4px;line-height:1;margin-top:5px;transform-origin:center bottom;will-change:transform}
+.meterNumbers strong{font-size:clamp(71px,19vw,124px);font-weight:1000;line-height:1;letter-spacing:-.07em;font-variant-numeric:tabular-nums;color:#fff7bd;-webkit-text-stroke:2px #84562c;text-shadow:0 3px 0 #b87d37,0 7px 0 #6a472b,0 11px 22px #302517bf}
+.meterNumbers span{font-weight:950;font-size:25px;color:#fff0be;-webkit-text-stroke:.65px #704b2b;text-shadow:0 3px 6px #483420}
+.meterUnderline{margin:9px auto 0;width:70%;height:5px;border-radius:20px;background:linear-gradient(90deg,transparent,#fff7c4,transparent);box-shadow:0 0 17px #f8d96ca8}
+#bossStats.charging{background:#fff0c9f5;border:2px solid #edc87a;box-shadow:0 3px 19px #b67b365e}
+#bossStats.charging b{font-size:32px;color:#854319}
+#bossStats.charging .meterTapCount{display:inline-block;transform-origin:center}
+@media(max-height:640px){#bossMeter{top:29%}.meterNumbers strong{font-size:clamp(65px,16vh,110px)}}
+
+/* Keep sound control at the top right, above the weed count, without blocking play. */
+.headActions{display:flex;flex-direction:column;align-items:flex-end;gap:7px;pointer-events:auto;flex-shrink:0}
+#head .headActions .counter{margin-left:0}
+#sound{min-height:34px;padding:0 12px;font-size:12px;border-radius:12px;background:#fcfff6ef;box-shadow:0 4px 12px #52644f18}
+@media(max-width:390px){.headActions{gap:5px}#sound{min-height:32px;padding:0 9px;font-size:11px}}
+
+/* Touch controls sit at the bottom-right, clear of the iPhone browser bar. */
+#tools{right:calc(10px + env(safe-area-inset-right));bottom:calc(11px + env(safe-area-inset-bottom));z-index:7;gap:8px}
+#modeGuide{right:calc(12px + env(safe-area-inset-right));bottom:calc(91px + env(safe-area-inset-bottom));z-index:7}
+#footer{margin-bottom:84px}
+.version{right:auto;left:12px;bottom:calc(8px + env(safe-area-inset-bottom));font-size:9px}
+@media(max-height:640px){
+  #tools{bottom:calc(10px + env(safe-area-inset-bottom))}
+  #modeGuide{bottom:calc(72px + env(safe-area-inset-bottom))}
+  #footer{margin-bottom:68px}
+}
+
+/* Clean in-game HUD: only stage/time, weed count, audio and tools remain. */
+#head{justify-content:flex-end}
+#challengebar{left:calc(12px + env(safe-area-inset-left));top:calc(13px + env(safe-area-inset-top));transform:none;min-width:132px;align-items:flex-start;flex-direction:column;gap:0;padding:8px 12px;border-radius:15px;box-shadow:0 5px 16px #52644f15}
+#stageText{font-size:11px;color:#688169;letter-spacing:.03em;line-height:1.4}
+#challengebar .timevalue{line-height:1.15;gap:3px}
+#challengebar .timevalue b{font-size:27px;min-width:0;text-align:left}
+#challengebar .timevalue span{font-size:12px}
+#timeBonus{position:absolute;left:100%;top:27px;margin-left:5px;background:#e2f2df;padding:4px 8px;border-radius:9px;box-shadow:0 3px 9px #477c3a1c}
+#footer,#modeGuide,#help,.version{display:none!important}
+#bossStats{top:calc(110px + env(safe-area-inset-top))}
+@media(max-height:640px){#challengebar{top:calc(9px + env(safe-area-inset-top));padding:6px 10px}#challengebar .timevalue b{font-size:23px}#bossStats{top:calc(86px + env(safe-area-inset-top))}}
+@media(max-width:390px){#challengebar{top:calc(12px + env(safe-area-inset-top));min-width:116px;padding:7px 10px}}
+/* Actual ARMY3 report motif: paper-style sheet, score/grade, achievement ledger and officer comment. */
+#finish{overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;align-items:flex-start;justify-content:center;padding:calc(14px + env(safe-area-inset-top)) 12px calc(14px + env(safe-area-inset-bottom));background:#14291cc7;z-index:12}
+.reportPanel{width:min(100%,430px);max-height:calc(100dvh - 28px - env(safe-area-inset-top) - env(safe-area-inset-bottom));overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch;background:#f8faf2;border:1px solid #ebefdf;border-radius:20px;padding:20px 18px 16px;box-shadow:0 21px 60px #05190e78;color:#2c4332}
+.reportTop{display:flex;justify-content:space-between;gap:8px;font-weight:850;font-size:10px;color:#849380;letter-spacing:.08em;padding-bottom:12px;border-bottom:1px solid #dfe7d9}
+.reportHeading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:15px 0 8px}
+.reportHeading h2{font-weight:950;font-size:24px;line-height:1.22;margin:0 0 5px}
+.reportSub{font-size:12px;color:#87967f;font-weight:750}
+.reportStamp{border:2px solid #b8794e;color:#a86d47;border-radius:7px;padding:8px 7px;font-size:13px;font-weight:950;letter-spacing:.10em;transform:rotate(-9deg);flex-shrink:0}
+.reportScore{display:flex;align-items:baseline;justify-content:center;gap:5px;margin:5px 0 13px;color:#315c41}
+.reportScore strong{font-size:76px;font-weight:950;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.07em}
+.reportScore>span{font-weight:850;font-size:16px}
+.reportScore>b{margin-left:12px;font-size:20px;color:#9a763c}
+.reportStats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-bottom:19px}
+.reportStats>div{background:#eef3e8;border:1px solid #e0e8da;border-radius:12px;text-align:center;padding:9px 3px}
+.reportStats small{display:block;color:#7e927a;font-size:10px;font-weight:750;margin-bottom:3px}
+.reportStats b{font-size:23px;font-weight:900;color:#315c41;font-variant-numeric:tabular-nums}
+.reportStats span{font-size:10px;color:#799177;margin-left:3px}
+.reportSectionTitle{display:flex;justify-content:space-between;align-items:baseline;margin:5px 0 10px;gap:8px}
+.reportSectionTitle strong{font-size:15px}.reportSectionTitle small{font-size:11px;color:#859580}
+.achGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.achItem{display:flex;align-items:flex-start;gap:8px;padding:10px 8px;background:#edf3e9;border:1px solid #dce6d7;border-radius:12px;min-width:0}
+.achIcon{font-size:22px;flex-shrink:0;line-height:1.1}
+.achBody{min-width:0;flex:1}
+.achName{font-size:12px;line-height:1.25;font-weight:900;color:#36553a;overflow-wrap:anywhere}
+.achDesc{font-size:10px;line-height:1.5;color:#71846f;margin-top:3px}
+.achItem.isNew{border-color:#c9ad68;background:#faf4df}
+.achItem.isLocked{opacity:.50;filter:grayscale(.85)}
+.achNew{margin-left:4px;font-size:9px;color:#a1732c;font-weight:950}
+.achEmpty{grid-column:1/-1;padding:14px 8px;text-align:center;color:#8b9485;font-size:12px}
+.achGallery{margin:9px 0 18px;border:1px solid #dde8d6;border-radius:11px;background:#f7faf3}
+.achGallery summary{cursor:pointer;list-style:none;padding:11px 12px;font-size:12px;font-weight:850;color:#5d755f;touch-action:manipulation}
+.achGallery summary::-webkit-details-marker{display:none}
+.achGallery summary::after{content:'＋';float:right}
+.achGallery[open] summary::after{content:'－'}
+.achGalleryList{padding:0 9px 10px;max-height:290px;overflow-y:auto;touch-action:pan-y}
+.officerComment{border-radius:13px;background:#eaf0e5;border-left:4px solid #5a8664;padding:12px 14px;margin:15px 0 10px}
+.officerComment small{font-size:11px;color:#658369;font-weight:950}
+.officerComment p{font-size:14px;font-weight:700;color:#2d4a35;line-height:1.6;margin:5px 0 0}
+.reportAgain{width:100%;min-height:48px;font-size:14px;margin-top:9px;border-radius:12px}
+@media(max-width:370px){.reportPanel{padding:16px 12px}.reportScore strong{font-size:65px}.reportStats b{font-size:20px}.achItem{padding:8px 6px;gap:6px}.achIcon{font-size:19px}}
+
+/* The official ARMY3 quick-exit button occupies the upper-left corner.
+   Keep the stage timer visible and tappable without overlapping it. */
+body[data-army-minigame="weed"] #challengebar{
+ top:calc(63px + env(safe-area-inset-top));
+ left:calc(12px + env(safe-area-inset-left));
+}
+body[data-army-minigame="weed"] #bossStats{
+ top:calc(154px + env(safe-area-inset-top));
+}
+@media(max-height:640px){
+ body[data-army-minigame="weed"] #challengebar{
+  top:calc(57px + env(safe-area-inset-top));
+ }
+ body[data-army-minigame="weed"] #bossStats{
+  top:calc(126px + env(safe-area-inset-top));
+ }
+}
+</style>
+</head>
+<body data-army-minigame="weed">
+<canvas id="scene" aria-label="2.5D 拔草遊戲，按住雜草往畫面上方拉"></canvas>
+<div id="hud">
+ <div id="head"><div class="headActions"><button id="sound" aria-label="音效開關">🔊 音效</button><div class="counter" id="plantCounter"><b id="done">0</b><small> / <span id="total">0</span> 叢</small></div></div></div>
+ <div id="challengebar"><div id="stageText">第 1 / 3 片</div><div class="timevalue"><b id="seconds">60.0</b><span>秒</span></div><span id="timeBonus" aria-live="polite"></span></div>
+ <div id="bossStats" hidden><b id="tapCount">0</b><span> 次蓄力</span><strong id="rootReadout"></strong></div>
+ <div id="bossMeter" aria-live="off" hidden><div class="meterCaption">草根長度 · 正在爆衝</div><div class="meterNumbers"><strong id="bossMeters">0.0</strong><span>m</span></div><div class="meterUnderline"></div></div>
+ <div id="footer"><div id="tip"></div></div>
+ <div id="tools" role="group" aria-label="選擇操作工具">
+ <button id="handTool" aria-label="切換成手拔草"><span class="toolIcon">✋</span><span>手</span></button>
+ <button id="shovelTool" class="selected" aria-label="切換成鏟子鬆土"><svg class="toolIcon" viewBox="0 0 42 42" aria-hidden="true"><path d="M24 7L14 25" fill="none" stroke="currentColor" stroke-width="4.6" stroke-linecap="round"/><path d="M28.2 4.7l-4.4-2.4-6 10.6 4.4 2.3z" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/><path d="M13.6 24.6c-3.9 1.4-8.1 4.7-6.9 10.2l7.6 4.3c4.8-3.7 5.6-8.6 4.5-12.3z" fill="currentColor" opacity=".91"/></svg><span>鏟子</span></button>
+ </div>
+ </div>
+<div id="modeGuide"></div><div id="message"></div><div id="help"></div>
+<div id="welcome" class="modal"><div class="card"><div class="big">🌱</div><h2>60 秒拔草挑戰</h2><p>清空三片草地，挑戰最後的草王。<br>60 秒內拔得越多，越有機會打到 Boss。</p><button id="start" class="primary">開始挑戰</button></div></div>
+<div id="finish" role="dialog" aria-modal="true" aria-labelledby="finishTitle"><div class="reportPanel">
+  <div class="reportTop"><span>國軍拔草鑑測 / 結算報告</span><span>NO. G-003</span></div>
+  <div class="reportHeading"><div><h2 id="finishTitle">拔草鑑測結算</h2><div class="reportSub" id="resultRank">鑑定中</div></div><div id="resultStamp" class="reportStamp">待審</div></div>
+  <div class="reportScore"><strong id="resultScore">0</strong><span>分</span><b id="resultGrade">— 級</b></div>
+  <div class="reportStats">
+    <div><small>清除雜草</small><b id="statCleared">0</b><span>株</span></div>
+    <div><small>完美拔出</small><b id="statPerfect">0</b><span>株</span></div>
+    <div><small>拔斷草根</small><b id="statBroken">0</b><span>株</span></div>
+    <div><small>最大連拔</small><b id="statCombo">0</b><span>株</span></div>
+    <div><small>Boss 狂點</small><b id="statTaps">—</b><span>次</span></div>
+    <div><small>Boss 根長</small><b id="statRoot">—</b><span>m</span></div>
+  </div>
+  <div class="reportSectionTitle"><strong>本次成就</strong><small id="achMeta">—</small></div>
+  <div id="achGrid" class="achGrid"></div>
+  <details id="achGallery" class="achGallery"><summary id="achGallerySummary">🏅 查看全部成就</summary><div id="achGalleryList" class="achGrid achGalleryList"></div></details>
+  <div class="officerComment"><small>班長講評</small><p id="report">等待班長鑑定……</p></div>
+  <button id="again" class="primary reportAgain">再挑戰一次</button>
+</div></div>
+
+<script>
+
+
+(function(){
+'use strict';
+const canvas=document.getElementById('scene'),ctx=canvas.getContext('2d',{alpha:false});
+const UI={done:document.getElementById('done'),total:document.getElementById('total'),tip:document.getElementById('tip'),toast:document.getElementById('message'),help:document.getElementById('help'),finish:document.getElementById('finish'),report:document.getElementById('report'),guide:document.getElementById('modeGuide'),hand:document.getElementById('handTool'),shovel:document.getElementById('shovelTool')};
+const R=Math.PI*2,DURATION_MS=60000,MAPS=3;
+const stageUI={welcome:document.getElementById('welcome'),start:document.getElementById('start'),
+timer:document.getElementById('seconds'),timeBonus:document.getElementById('timeBonus'),stage:document.getElementById('stageText'),
+challenge:document.getElementById('challengebar'),bossStats:document.getElementById('bossStats'),
+tapCount:document.getElementById('tapCount'),rootReadout:document.getElementById('rootReadout'),bossMeter:document.getElementById('bossMeter'),bossMeters:document.getElementById('bossMeters'),
+finishTitle:document.getElementById('finishTitle'),counter:document.getElementById('plantCounter'),
+tools:document.getElementById('tools')};
+let W=0,H=0,DPR=1,S=38,SX=38,SZ=38,baseY=450,time=0,last=0,tool='shovel',plants=[],soilMarks=[],holes=[],groups=[],particles=[],rings=[],shovels=[],strokeSerial=0,lastDigDustAt=-1000,lastDigSoundAt=-1000;
+let pointer=null,total=0,removed=0,brokenTotal=0,toastUntil=0,finishAt=0,audioCtx=null,noise=null,mute=false,seed=Math.random()*999;
+let runPhase='intro',mapNumber=1,deadline=0,remainingMs=DURATION_MS,completedMaps=0,totalWeedsCleared=0,allBreaks=0,bonusDisplayUntil=0;
+let boss={taps:0,pulse:0,extractionTime:0,rootNow:0,rootGoal:0,rootDuration:0,lastSoundAt:0,hitShake:0,hitSparks:[]};
+const newRunStats=()=>({perfect:0,broken:0,recovered:0,overdig:0,maxCombo:0,bonusSeconds:0});
+let runStats=newRunStats();
+const rand=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),lerp=(a,b,t)=>a+(b-a)*t;
+function smooth(x){x=clamp(x,0,1);return x*x*(3-2*x)}
+function key(ix,iz){return ix+','+iz}
+function coord(x,z){return{ix:Math.floor(x/CELL),iz:Math.floor(z/CELL)}}
+function inside(x,z){return x*x/(4.78*4.78)+z*z/(4.39*4.39)<.97}
+// Independent perspective axes fill the available screen instead of letterboxing a tiny patch.
+function project(x,z,y=0){const k=1-z*.021;return{x:W*.5+x*SX*k,y:baseY+z*SZ-x*S*.08-y*S*.98}}
+function unproject(px,py){
+ let z=(py-baseY)/SZ,x=0;
+ for(let i=0;i<5;i++){x=(px-W*.5)/(SX*(1-z*.021));z=(py-baseY+x*S*.08)/SZ}
+ return{x,z};
+}
+function resize(){
+ W=innerWidth;H=innerHeight;DPR=Math.min(2,devicePixelRatio||1);
+ canvas.width=Math.round(W*DPR);canvas.height=Math.round(H*DPR);
+ ctx.setTransform(DPR,0,0,DPR,0,0);
+ S=Math.min(96,W/7.4,H/8.1);  // Large, finger-friendly individual grass
+ SX=W/8.85;                  // Wide terrain reaches beyond the left/right edges
+ SZ=H*.075;                 // Stronger depth perspective fills the vertical space
+ baseY=H*.545;
+}
+addEventListener('resize',resize,{passive:true});resize();
+function enableSound(){if(mute)return;try{if(!audioCtx){const AC=window.AudioContext||window.webkitAudioContext;audioCtx=new AC();noise=audioCtx.createBuffer(1,Math.round(audioCtx.sampleRate*.26),audioCtx.sampleRate);const p=noise.getChannelData(0);for(let i=0;i<p.length;i++)p[i]=Math.random()*2-1}if(audioCtx.state==='suspended')audioCtx.resume()}catch(e){}}
+function noiseSound(volume,freq,dur){if(!audioCtx||mute||!noise)return;try{const now=audioCtx.currentTime,s=audioCtx.createBufferSource(),f=audioCtx.createBiquadFilter(),g=audioCtx.createGain();s.buffer=noise;f.type='bandpass';f.frequency.value=freq;f.Q.value=.6;g.gain.setValueAtTime(Math.max(.0001,volume),now);g.gain.exponentialRampToValueAtTime(.0001,now+dur);s.connect(f);f.connect(g);g.connect(audioCtx.destination);s.start(now);s.stop(now+dur)}catch(e){}}
+function pop(vol=.75){if(!audioCtx||mute)return;try{const now=audioCtx.currentTime,o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='sine';o.frequency.setValueAtTime(rand(245,310),now);o.frequency.exponentialRampToValueAtTime(rand(80,110),now+.115);g.gain.setValueAtTime(.0001,now);g.gain.exponentialRampToValueAtTime(.18*vol,now+.008);g.gain.exponentialRampToValueAtTime(.0001,now+.13);o.connect(g);g.connect(audioCtx.destination);o.start(now);o.stop(now+.14);noiseSound(.055*vol,950,.083)}catch(e){}}
+function digSound(){noiseSound(.075,430,.16);if(audioCtx&&!mute)try{const now=audioCtx.currentTime,o=audioCtx.createOscillator(),g=audioCtx.createGain();o.frequency.setValueAtTime(108,now);o.frequency.exponentialRampToValueAtTime(61,now+.09);g.gain.setValueAtTime(.05,now);g.gain.exponentialRampToValueAtTime(.0001,now+.11);o.connect(g);g.connect(audioCtx.destination);o.start(now);o.stop(now+.12)}catch(e){}}
+function buzz(v){try{if(navigator.vibrate)navigator.vibrate(v)}catch(e){}}
+function toast(text,ms=1350){UI.toast.textContent=text;UI.toast.classList.add('show');toastUntil=performance.now()+ms}
+function makePlant(x,z,type){return{x,z,type,need:(r=>r<.60?1:r<.90?2:3)(Math.random()),loose:0,state:'live',broken:false,recoveryDig:0,breakCause:'',height:rand(.72,1.19),seed:rand(0,999),leaves:Math.floor(rand(5,9)),tug:0,lastStroke:-1}}
+function grassCondition(p){
+ if(p.broken)return p.recoveryDig>=2&&p.loose>=p.need?'stump-ready':'stump';
+ if(p.loose<p.need)return 'tight';
+ if(p.loose===p.need)return 'ready';
+ return 'rotten';
+}
+function canPull(p){const s=grassCondition(p);return s==='ready'||s==='stump-ready'}
+function loadPatch(index){
+  plants=[];soilMarks=[];holes=[];groups=[];particles=[];rings=[];shovels=[];
+  lastDigDustAt=-1000;lastDigSoundAt=-1000;removed=0;brokenTotal=0;total=0;
+  pointer=null;finishAt=0;seed=Math.random()*900;
+  UI.help.classList.remove('show');
+  const count=7+(index-1)*2;
+  let attempts=0;
+  while(plants.length<count&&attempts++<1600){
+    const x=rand(-3.7,3.7),z=rand(-3.28,3.37);if(!inside(x,z))continue;
+    let valid=true;
+    for(const p of plants)if(Math.hypot((p.x-x)*1.04,(p.z-z)*.92)<.90){valid=false;break}
+    if(valid)plants.push(makePlant(x,z,Math.random()<.25?'tough':'normal'));
+  }
+  total=plants.length;
+  plants.sort((a,b)=>a.z-b.z);
+  UI.done.textContent='0';UI.total.textContent=String(total);
+  stageUI.stage.textContent='第 '+index+' / '+MAPS+' 片';
+  setTool('shovel');
+  UI.tip.textContent='每點一次鏟一下；滑動不會連鏟。清空後自動換下一片！';
+}
+function startGame(){
+  enableSound();
+  mapNumber=1;completedMaps=0;totalWeedsCleared=0;allBreaks=0;runStats=newRunStats();runPhase='field';
+  document.getElementById('achGallery').open=false;
+  remainingMs=DURATION_MS;deadline=performance.now()+DURATION_MS;
+  boss={taps:0,pulse:0,extractionTime:0,rootNow:0,rootGoal:0,rootDuration:0,lastSoundAt:0,hitShake:0,hitSparks:[]};
+  bonusDisplayUntil=0;stageUI.timeBonus.classList.remove('show');stageUI.timeBonus.textContent='';
+  stageUI.welcome.classList.add('hidden');UI.finish.classList.remove('show');
+  stageUI.counter.style.display='';stageUI.tools.classList.remove('hidden');
+  UI.guide.classList.remove('hidden');
+  stageUI.bossStats.hidden=true;stageUI.bossStats.classList.remove('charging');stageUI.bossMeter.hidden=true;stageUI.bossMeters.textContent='0.0';stageUI.challenge.classList.remove('urgent');
+  stageUI.timer.textContent='60.0';loadPatch(1);
+}
+function enterBoss(){
+ runPhase='bossCharge';plants=[];soilMarks=[];holes=[];groups=[];particles=[];rings=[];shovels=[];
+ pointer=null;stageUI.tools.classList.add('hidden');UI.guide.classList.add('hidden');
+ stageUI.counter.style.display='none';
+ stageUI.bossStats.hidden=false;stageUI.bossStats.classList.add('charging');stageUI.bossMeter.hidden=true;stageUI.stage.textContent='最終 BOSS';
+ stageUI.tapCount.textContent='0';stageUI.rootReadout.textContent=''; 
+ UI.tip.textContent='剩餘時間瘋狂點螢幕！每點一下草根就更長！';
+ toast('大草王出現！快點擊蓄力！',1450);
+}
+function timerExpired(){
+ remainingMs=0;stageUI.timer.textContent='0.0';
+ if(runPhase==='bossCharge'){
+   runPhase='bossPull';boss.rootGoal=Math.round((1.8+boss.taps*.43)*10)/10;
+   boss.rootDuration=clamp(2.3+boss.taps*.026,2.3,9.3);
+   stageUI.rootReadout.textContent='蓄力完成！長度未知';stageUI.bossStats.classList.remove('charging');
+   UI.tip.textContent='時間到！從大草王往上滑，拔出超長草根！';
+   toast('時間到！現在可以拔草王！',1850);
+   pop(.95);buzz([30,80,25]);
+ }else if(runPhase==='field'||runPhase==='transition'){
+   showResults(false);
+ }
+}
+// Army-style field report: grade, stats, witty officer remarks and persistent achievements.
+const ACH_STORE='ARMY3_weed_achievements_v1';
+const ACHIEVEMENTS=[
+ {id:'first',icon:'🪖',name:'報告！我有在拔',desc:'完成第一次拔草鑑測',test:s=>true},
+ {id:'clean1',icon:'🌱',name:'粉刺拔除師',desc:'完整拔出第一株草',test:s=>s.perfect>=1},
+ {id:'clean5',icon:'✨',name:'越拔越上癮',desc:'單局完美拔出 5 株草',test:s=>s.perfect>=5},
+ {id:'clean15',icon:'🎖️',name:'草見你都要敬禮',desc:'單局完美拔出 15 株草',test:s=>s.perfect>=15},
+ {id:'no_break',icon:'🫧',name:'溫柔的破壞王',desc:'拔完三片草地而且沒有拉斷',test:s=>s.maps>=3&&s.broken===0},
+ {id:'break3',icon:'🩹',name:'草的創傷後壓力症',desc:'單局拉斷至少 3 株草',test:s=>s.broken>=3},
+ {id:'break7',icon:'🪓',name:'你在拔草還是在處刑',desc:'單局拉斷至少 7 株草',test:s=>s.broken>=7},
+ {id:'rescued',icon:'🛠️',name:'斷根回收部隊',desc:'清出至少 3 株殘根',test:s=>s.recovered>=3},
+ {id:'overdig',icon:'🧹',name:'再鏟就到地心了',desc:'單局把至少 4 株草鏟爛',test:s=>s.overdig>=4},
+ {id:'combo2',icon:'🔗',name:'一拔兩得',desc:'一次連拔至少 2 株完美草',test:s=>s.maxCombo>=2},
+ {id:'combo4',icon:'💥',name:'草根串燒',desc:'一次連拔至少 4 株完美草',test:s=>s.maxCombo>=4},
+ {id:'bonus5',icon:'⏱️',name:'時間管理班長',desc:'靠完美拔草累積加時 5 秒',test:s=>s.bonusSeconds>=5},
+ {id:'three',icon:'🏕️',name:'寸草不生',desc:'清空全部三片草地',test:s=>s.maps>=3},
+ {id:'boss',icon:'👑',name:'草王退伍令',desc:'親手拔出最終大草王',test:s=>s.won},
+ {id:'tap40',icon:'👆',name:'手機螢幕：我受夠了',desc:'Boss 階段點擊至少 40 次',test:s=>s.taps>=40},
+ {id:'tap100',icon:'🔥',name:'手指已申請職災',desc:'Boss 階段點擊至少 100 次',test:s=>s.taps>=100},
+ {id:'root20',icon:'📏',name:'這根草有祖譜',desc:'Boss 草根長度達 20 公尺',test:s=>s.won&&s.root>=20},
+ {id:'root50',icon:'⛏️',name:'國土重劃局來了',desc:'Boss 草根長度達 50 公尺',test:s=>s.won&&s.root>=50},
+ {id:'root100',icon:'🌎',name:'地心探險家',desc:'Boss 草根長度達 100 公尺',test:s=>s.won&&s.root>=100}
+];
+function getUnlocked(){
+ try{const x=JSON.parse(localStorage.getItem(ACH_STORE)||'[]');return Array.isArray(x)?x:[]}catch{return []}
+}
+function persistUnlocked(ids){
+ try{localStorage.setItem(ACH_STORE,JSON.stringify(ids))}catch{}
+}
+function drawAchievement(a,newly,locked){
+ const el=document.createElement('div');el.className='achItem'+(newly?' isNew':'')+(locked?' isLocked':'');
+ const icon=document.createElement('span');icon.className='achIcon';icon.textContent=locked?'🔒':a.icon;
+ const body=document.createElement('div');body.className='achBody';
+ const name=document.createElement('div');name.className='achName';name.textContent=a.name;
+ if(newly){const newTag=document.createElement('span');newTag.className='achNew';newTag.textContent='NEW';name.append(newTag)}
+ const desc=document.createElement('div');desc.className='achDesc';desc.textContent=a.desc;
+ body.append(name,desc);el.append(icon,body);
+ return el;
+}
+function chooseComment(s){
+ let texts;
+ if(s.won&&s.root>=60)texts=['班長問你拔的是草還是地下電纜，怎麼會這麼長？','你拔的不是草根，是地心引力的耐力測試。','工兵連已經來了，他們說下面可能有石油。'];
+ else if(s.won&&s.taps>=60)texts=['草王都認輸了，你的手指卻還在加班。','你是在拔草還是在跟手機討債？','這點擊速度，班長懷疑你偷帶了電動馬達。'];
+ else if(s.won)texts=['草王已經被你請出來了。班長說明天還有一片。','你拔得很乾淨，但這個動作不要拿去拔班長的頭髮。','恭喜除草結束！剩下的是班長的要求。'];
+ else if(s.maps===0&&s.perfect===0)texts=['60 秒過去了，草地的心情完全沒有受到影響。','草長得好好的，班長的血壓倒是長高了。','你不是在拔草，你是在做土壤田野調查。'];
+ else if(s.broken>=6)texts=['你這不是除草，是給全營區的草做截肢手術。','根還在土裡，班長已經在幫你寫檢討報告。','我只問一次：你跟這片草地有什麼私人恩怨？'];
+ else if(s.perfect>=12)texts=['你拔草的聲音，隔壁連聽了都覺得舒壓。','草看到你過來，已經自動把離營單填好了。','技術很好！可惜拔草不列入榮譽假計算。'];
+ else if(s.maxCombo>=3)texts=['這是一拔多得，還是連根株連九族？','其他人一株一株拔，你直接把草的家族帶走。','班長說要你拔草，沒叫你把親戚都找來。'];
+ else if(s.maps>=2)texts=['就差一點，班長已經幫你預約明天補訓。','你努力過了，但草王表示還沒見到你。','兩片草地已經夠辛苦，第三片留給下一梯？'];
+ else texts=['有拔到草，至少這次不是只會在旁邊喊加油。','這份成績還可以，班長說你明天繼續。','草還沒拔完，太陽都快下山了，辛苦啦。','你在與時間賽跑，草在旁邊看戲。'];
+ return texts[Math.floor(Math.random()*texts.length)];
+}
+function showResults(won){
+ const prior=runPhase;
+ const maps=Math.min(MAPS,completedMaps+(prior==='transition'&&removed>=total?1:0));
+ const cleared=totalWeedsCleared+(won?0:removed);
+ runPhase='result';finishAt=0;pointer=null;
+ const s={won,maps,cleared,perfect:runStats.perfect,broken:runStats.broken,
+  recovered:runStats.recovered,overdig:runStats.overdig,maxCombo:runStats.maxCombo,bonusSeconds:runStats.bonusSeconds,
+  taps:won?boss.taps:0,root:won?boss.rootGoal:0};
+ const score=clamp(Math.round(cleared*1.6+s.perfect*.9+maps*5+(won?10+Math.min(8,s.root*.15):0)-s.broken*2-s.overdig*.6),0,100);
+ const grade=score>=90?'S':score>=75?'A':score>=55?'B':score>=35?'C':score>=20?'D':'F';
+ const labels={S:'國軍之光',A:'鑑測優等',B:'合格新兵',C:'有待加強',D:'繼續努力',F:'明天補訓'};
+ const set=(id,v)=>document.getElementById(id).textContent=String(v);
+ set('finishTitle',won?'拔草鑑測完成':'拔草鑑測結算');
+ set('resultScore',score);set('resultGrade',grade+' 級');
+ set('resultRank','完成 '+maps+' / 3 片草地 · '+labels[grade]);
+ set('resultStamp',won?'草王退役':maps===3?'完成鑑測':'補訓');
+ set('statCleared',s.cleared);set('statPerfect',s.perfect);set('statBroken',s.broken);
+ set('statCombo',s.maxCombo);set('statTaps',maps>=3?s.taps:'—');
+ set('statRoot',won?s.root.toFixed(1):'—');
+ UI.report.textContent=chooseComment(s);
+ const old=getUnlocked(),earned=ACHIEVEMENTS.filter(a=>a.test(s));
+ const fresh=earned.filter(a=>!old.includes(a.id));
+ const ids=[...new Set([...old,...earned.map(a=>a.id)])];persistUnlocked(ids);
+ const grid=document.getElementById('achGrid');grid.replaceChildren();
+ for(const a of earned.slice(0,6))grid.append(drawAchievement(a,fresh.includes(a),false));
+ if(!earned.length){const empty=document.createElement('div');empty.className='achEmpty';empty.textContent='尚未解鎖成就，班長已經在等了。';grid.append(empty)}
+ set('achMeta','達成 '+earned.length+' 項 · 新 '+fresh.length+' 項');
+ set('achGallerySummary','🏅 成就圖鑑 '+ids.length+' / '+ACHIEVEMENTS.length);
+ const gallery=document.getElementById('achGalleryList');gallery.replaceChildren();
+ for(const a of ACHIEVEMENTS)gallery.append(drawAchievement(a,fresh.includes(a),!ids.includes(a.id)));
+ document.getElementById('achGallery').open=false;
+ UI.finish.classList.add('show');
+}
+stageUI.start.addEventListener('click',startGame);
+document.getElementById('again').addEventListener('click',startGame);
+
+function setTool(next){if(pointer)pointer=null;tool=next;UI.hand.classList.toggle('selected',tool==='hand');UI.shovel.classList.toggle('selected',tool==='shovel');UI.guide.textContent='目前：'+(tool==='shovel'?'鏟子':'手');UI.tip.textContent=tool==='shovel'?'每點一下鏟一次；滑動不會連鏟，對準草根才會鬆草':'抓住草往上拉；相連的鬆土可以連根拔起'}
+UI.hand.addEventListener('click',()=>setTool('hand'));UI.shovel.addEventListener('click',()=>setTool('shovel'));
+document.getElementById('sound').addEventListener('click',function(){mute=!mute;this.textContent=mute?'🔇 靜音':'🔊 音效';if(!mute)enableSound()});
+function stamp(x,z,stroke){
+ let nearest=null,nearDist=.13;
+ for(const m of soilMarks){const d=Math.hypot(m.x-x,m.z-z);if(d<nearDist){nearest=m;nearDist=d}}
+ if(nearest){nearest.strength=Math.min(5,nearest.strength+1);nearest.r=Math.min(.76,nearest.r+.006)}
+ else soilMarks.push({x,z,r:rand(.57,.66),strength:1,seed:rand(0,6000)});
+ for(const p of plants){if(p.state!=='live'||p.lastStroke===stroke)continue;
+   // Terrain smoothing has a wide brush, but only a DIRECT hit at a stem changes grass health.
+   // Connecting bare soil must never accidentally count as another shovel hit on nearby grass.
+   if(Math.hypot(p.x-x,p.z-z)<.32){if(!p.broken&&p.loose===p.need)runStats.overdig++;p.loose=Math.min(7,p.loose+1);if(p.broken)p.recoveryDig=Math.min(3,p.recoveryDig+1);p.lastStroke=stroke}}
+}
+function emit(x,y,count,color='#b49a78',force=1){for(let i=0;i<count;i++){const theta=rand(-Math.PI+.17,-.06),v=rand(30,105)*force;particles.push({x:x+rand(-6,6),y:y+rand(-3,3),vx:Math.cos(theta)*v,vy:Math.sin(theta)*v,gravity:rand(130,300),size:rand(1.3,4.8),color,life:rand(.35,.94),age:0})}if(particles.length>500)particles.splice(0,particles.length-500)}
+function ring(x,y,r=40){rings.push({x,y,r,age:0})}
+function dig(x,z,stroke,showEffect=true){
+if(!inside(x,z))return false;
+const currentStroke=stroke===undefined?++strokeSerial:stroke;
+stamp(x,z,currentStroke);
+// The brush samples many positions per drag, but the shovel is ONE physical tool.
+// Never spawn a copy at each sample; keep the same animated shovel following the tip.
+if(showEffect){
+ const p=project(x,z),now=performance.now();
+ if(shovels.length){const shovel=shovels[0];shovel.x=p.x;shovel.y=p.y;shovel.age=0}
+ else shovels.push({x:p.x,y:p.y,age:0});
+ // Dirt particles, sounds and haptics are throttled separately from soil editing.
+ // Fast dragging still paints continuous soil without dozens of stacked effects.
+ if(now-lastDigDustAt>=80){emit(p.x,p.y,11,'#a48666',1.11);emit(p.x,p.y,4,'#d0b38b',.62);ring(p.x,p.y,26);lastDigDustAt=now}
+ if(now-lastDigSoundAt>=105){digSound();buzz(7);lastDigSoundAt=now}
+}
+return true;
+}
+function mobileGrassScale(){return W<=560?clamp(1.62-(W-340)*.00108,1.38,1.62):1.12}
+function grassHeight(p){
+ const phase=grassCondition(p),extra=phase==='rotten'?.62:phase==='ready'?.96:1.08;
+ return p.broken?18:p.height*S*mobileGrassScale()*extra;
+}
+function nearestLeaf(screen,limit){
+ let pick=null,best=limit;
+ for(const p of plants){
+  if(p.state!=='live')continue;
+  const pos=project(p.x,p.z,p.tug*.20),h=grassHeight(p),centerY=pos.y-(p.broken?9:h*.45);
+  // Touch targets cover the actual foliage, including large leaves and broken stumps.
+  // Pick the visually closest weed; do not snap shovel hits to the weed.
+  const d=Math.hypot((screen.x-pos.x)*.86,(screen.y-centerY)*.84);
+  if(d<best){best=d;pick=p}
+ }
+ return pick;
+}
+function digSpot(screen){
+ // Shovel is ground-directed, not weed-directed. No snapping to grass or foliage.
+ return unproject(screen.x,screen.y);
+}
+function connected(seedPlant){
+const attached=soilMarks.filter(m=>Math.hypot(m.x-seedPlant.x,m.z-seedPlant.z)<=m.r*1.23+.12);
+if(!attached.length)return null;
+const todo=[...attached],seen=new Set(),all=[];
+for(let i=0;i<todo.length;i++){
+const m=todo[i];if(seen.has(m))continue;seen.add(m);all.push(m);
+for(const other of soilMarks){if(seen.has(other))continue;
+ if(Math.hypot(other.x-m.x,other.z-m.z)<=(m.r+other.r)*1.16)todo.push(other)}
+}
+const members=plants.filter(p=>p.state==='live'&&all.some(m=>Math.hypot(p.x-m.x,p.z-m.z)<=m.r*1.23+.12));
+return{marks:all,members};
+}
+function startLift(p){
+const area=connected(p);
+if(!area||!area.members.length){toast('這株旁邊還沒有鬆土',1100);return}
+if(!canPull(p)){return}
+const list=area.members.filter(v=>!v.broken||canPull(v));
+list.sort((a,b)=>Math.hypot(a.x-p.x,a.z-p.z)-Math.hypot(b.x-p.x,b.z-p.z));
+const result=new Map();
+for(const m of list)result.set(m,canPull(m)?'extract':'snap');
+const g={members:list,results:result,age:0,delay:.135,duration:2.16+(list.length-1)*.135,fired:new Set(),cx:p.x,cz:p.z};
+for(const member of g.members){member.state='lifting';member.tug=0}
+groups.push(g);pointer=null;
+const origin=project(p.x,p.z);ring(origin.x,origin.y,29);emit(origin.x,origin.y,10,'#c1a17b',1.05);pop(.68);buzz([12,30,15]);
+const successes=list.filter(m=>result.get(m)==='extract').length,broken=list.length-successes;
+if(successes>1){toast('啵啵啵！準備連拔 '+successes+' 株',1550)}
+UI.tip.textContent='只有剛剛好的草會完整拔出'+(broken?'，其餘 '+broken+' 株會斷掉':'');
+}
+function markBroken(p,reason,announce=true){
+if(p.broken)return;
+p.broken=true;p.breakCause=reason;p.recoveryDig=0;p.tug=0;brokenTotal++;runStats.broken++;
+const q=project(p.x,p.z);emit(q.x,q.y-15,10,reason==='rotten'?'#bda676':'#72984a',1);ring(q.x,q.y,24);
+noiseSound(.075,720,.12);pop(.28);buzz([15,60,14]);
+if(announce){
+toast(reason==='rotten'?'啪！鏟太多，草已經爛掉了！':'啪！還沒鏟夠，硬拉斷了！',1800);
+UI.tip.textContent='只剩殘根，改用鏟子再刨鬆幾下，就能收拾乾淨';
+}
+}
+function breakStem(p){markBroken(p,grassCondition(p)==='rotten'?'rotten':'tight',true);pointer=null}
+
+function eventXY(e){const box=canvas.getBoundingClientRect();return{x:e.clientX-box.left,y:e.clientY-box.top}}
+function pointerDown(e){
+if(e.target!==canvas||UI.finish.classList.contains('show')||runPhase==='intro'||runPhase==='result')return;
+enableSound();const pos=eventXY(e);UI.help.classList.remove('show');
+if(runPhase==='bossCharge'){
+ // Every pointer-down must have a separate visual, audio and haptic reaction.
+ boss.taps++;boss.pulse=1;boss.hitShake=1;
+ stageUI.tapCount.textContent=String(boss.taps);
+ boss.hitSparks.push({x:pos.x,y:pos.y,age:0,life:.34,angle:rand(-1,1),label:boss.taps});
+ if(boss.hitSparks.length>38)boss.hitSparks.shift();
+ const base=project(0,.50);
+ ring(pos.x,pos.y,rand(23,40));
+ ring(base.x,base.y,rand(38,65));
+ emit(base.x+rand(-12,12),base.y,5,'#e7c892',.95);
+ emit(pos.x,pos.y,3,'#ffebad',.68);
+ pop(.52);noiseSound(.085,440,.09);buzz(10);
+ // Count updated synchronously on each tap. Rendering uses individual hit events,
+ // so several quick taps inside one frame still each get their own impact.
+ e.preventDefault();return;
+}
+if(runPhase==='bossPull'){
+ pointer={id:e.pointerId,type:'boss',lastY:pos.y,dy:0};
+ try{canvas.setPointerCapture(e.pointerId)}catch(err){}
+ e.preventDefault();return;
+}
+if(runPhase!=='field')return;
+if(pointer&&tool==='shovel')return;
+if(tool==='shovel'){
+const spot=digSpot(pos);
+const ok=dig(spot.x,spot.z);
+if(ok){const nearby=plants.find(p=>p.state==='live'&&Math.hypot(p.x-spot.x,p.z-spot.z)<.33);
+if(nearby){
+ const state=grassCondition(nearby);
+ UI.tip.textContent=state==='tight'?'草還很挺立，可以再鏟':state==='ready'?'葉片舒展！剛好能拔，快換成手':state==='rotten'?'糟糕！鏟過頭了，葉子已經爛掉':state==='stump-ready'?'殘根已鬆動，可以用手清理':'再刨一下殘根，清理完就能拔';
+}else UI.tip.textContent='已鏟你點的地面。空地連接不會增加附近草的鏟土次數';
+pointer={id:e.pointerId,type:'shovel'};}
+}else{
+const weed=nearestLeaf(pos,Math.max(57,S*1.65));
+if(!weed){UI.tip.textContent='請先抓住草葉或斷掉的草根';return}
+const condition=grassCondition(weed);
+if(condition==='stump'){toast('殘根還沒鬆，請再鏟幾下',1350);UI.tip.textContent='把斷掉的根再鏟鬆，才能從土裡拔出';return}
+pointer={id:e.pointerId,type:'hand',weed,lastY:pos.y,dy:0,started:performance.now()};
+if(condition==='tight'){UI.tip.textContent='這株還很緊！放手再鏟 '+(weed.need-weed.loose)+' 下，硬拔會斷';noiseSound(.03,410,.075)}
+else if(condition==='rotten'){UI.tip.textContent='葉片已經發黃下垂！鏟過頭了，硬拔會斷'}
+else{UI.tip.textContent=weed.broken?'殘根處理好了，往上拔！':'葉片舒展，現在拔最剛好！'}
+}
+try{canvas.setPointerCapture(e.pointerId)}catch(e2){}e.preventDefault();
+}
+function pointerMove(e){
+if(!pointer||e.pointerId!==pointer.id)return;
+e.preventDefault();const pos=eventXY(e);
+if(pointer.type==='boss'){
+ const delta=Math.max(0,pointer.lastY-pos.y);pointer.lastY=pos.y;pointer.dy+=delta;
+ if(pointer.dy>42&&runPhase==='bossPull'){pointer=null;runPhase='bossExtract';boss.extractionTime=0;boss.rootNow=0;boss.lastSoundAt=0;stageUI.bossMeter.hidden=false;stageUI.bossMeters.textContent='0.0';stageUI.bossStats.hidden=true;UI.tip.textContent='拔出多少才知道！草根正在瘋狂噴出！';toast('啵——！草根開始抽出！',1250);pop(1.1);buzz([25,45,22]);}
+ return;
+}
+if(runPhase!=='field')return;
+if(pointer.type==='shovel'){
+ // Dragging a held shovel must not dig again; only a new pointerdown stamps.
+ return;
+}else{
+const p=pointer.weed,dy=Math.max(0,pointer.lastY-pos.y);pointer.lastY=pos.y;pointer.dy+=dy;
+const condition=grassCondition(p);
+if(condition==='tight'||condition==='rotten'){
+ const tooMuch=condition==='rotten';
+ p.tug=Math.min(tooMuch?.26:.16,pointer.dy/(tooMuch?310:500));
+ if(pointer.dy>(tooMuch?74:119))breakStem(p);
+ else if(dy>2&&Math.random()<.24)noiseSound(tooMuch?.040:.026,tooMuch?700:360,.06);
+}else if(canPull(p)){
+ p.tug=Math.min(.80,pointer.dy/100);
+ if(pointer.dy>68)startLift(p);else if(dy>2&&Math.random()<.25)noiseSound(.038,620,.06);
+}
+}
+}
+function pointerUp(e){if(!pointer||pointer.id!==e.pointerId)return;if(pointer.type==='hand'&&pointer.weed.state==='live'){pointer.weed.tug=0;if(grassCondition(pointer.weed)==='tight')UI.tip.textContent='放手得好！再鏟幾下，到葉片舒展就能拔'}pointer=null}
+canvas.addEventListener('pointerdown',pointerDown);canvas.addEventListener('pointermove',pointerMove);
+canvas.addEventListener('pointerup',pointerUp);canvas.addEventListener('pointercancel',pointerUp);canvas.addEventListener('contextmenu',e=>e.preventDefault());
+function polygon(pts,fill,stroke=null,width=1){ctx.beginPath();for(let i=0;i<pts.length;i++){const p=pts[i];if(i)ctx.lineTo(p.x,p.y);else ctx.moveTo(p.x,p.y)}ctx.closePath();if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=width;ctx.stroke()}}
+function oval(x,y,rx,ry,color){ctx.beginPath();ctx.ellipse(x,y,Math.max(.1,rx),Math.max(.1,ry),0,0,R);ctx.fillStyle=color;ctx.fill()}
+
+function drawBackground(){
+const sky=ctx.createLinearGradient(0,0,0,H);sky.addColorStop(0,'#eaf1e3');sky.addColorStop(.55,'#d9e8d2');sky.addColorStop(1,'#d8e2d0');ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+ctx.fillStyle='#c9dcc1';ctx.beginPath();ctx.moveTo(0,H*.40);for(let x=0;x<=W+20;x+=14)ctx.lineTo(x,H*.43+Math.sin(x*.015+3)*11);ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.fill();
+ctx.fillStyle='#b9cfaf';ctx.beginPath();ctx.moveTo(0,H*.49);for(let x=0;x<=W+20;x+=14)ctx.lineTo(x,H*.51+Math.sin(x*.015+2)*13);ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.fill();
+ctx.save();ctx.globalAlpha=.19;ctx.strokeStyle='#648364';const yy=baseY-4.1*S;ctx.lineWidth=1.6;for(let x=0;x<W+S;x+=S*1.35){ctx.beginPath();ctx.moveTo(x,yy);ctx.lineTo(x,yy-51);ctx.stroke()}for(let k=0;k<2;k++){ctx.beginPath();ctx.moveTo(0,yy-42+k*19);ctx.lineTo(W,yy-42+k*19);ctx.stroke()}ctx.restore();
+const perimeter=[],lower=[];
+for(let i=0;i<=72;i++){const a=i/72*R,r=1+Math.sin(a*11+seed)*.012;const x=Math.cos(a)*4.95*r,z=Math.sin(a)*4.55*r;perimeter.push(project(x,z));lower.push(project(x,z,-.46))}
+ctx.save();ctx.shadowColor='#4a594547';ctx.shadowBlur=28;ctx.shadowOffsetY=14;polygon(lower,'#695c4c');ctx.restore();polygon(lower,'#887052','#66513c',1);
+for(let i=0;i<72;i++)if(perimeter[i].y>baseY-2*S)polygon([perimeter[i],perimeter[i+1],lower[i+1],lower[i]],i%2?'#977a5b':'#8b6f51','#7a6049',.6);
+const soil=ctx.createLinearGradient(0,baseY-3*S,0,baseY+3*S);soil.addColorStop(0,'#899777');soil.addColorStop(.45,'#8b9872');soil.addColorStop(1,'#ac9673');polygon(perimeter,soil,'#c6b28d',2.1);
+ctx.save();ctx.globalAlpha=.30;for(let i=0;i<100;i++){const x=Math.sin(i*12.18+seed)*4.23,z=Math.sin(i*7.33+seed)*4.02;if(!inside(x,z))continue;const p=project(x,z),sz=(i%4+1)*.42;oval(p.x,p.y,sz*2.2,sz*.8,i%4?'#526444':'#d7c69a')}ctx.restore();
+}
+function drawSurface(){
+ // Draw soft, organically blending loosened soil. Connectivity is based on overlapping dig marks,
+ // never on square tiles; the ground is not lifted when weeds are pulled.
+ for(const m of soilMarks){
+   const p=project(m.x,m.z),rx=m.r*SX*(1-m.z*.021),ry=m.r*SZ;
+   ctx.save();ctx.translate(p.x,p.y);ctx.scale(1,ry/rx);
+   const soft=ctx.createRadialGradient(0,0,1,0,0,rx*1.26);
+   const weight=clamp(m.strength,1,5);
+   soft.addColorStop(0,'rgba(83,65,45,'+(.58+weight*.052)+')');
+   soft.addColorStop(.43,'rgba(107,78,53,'+(.54+weight*.042)+')');
+   soft.addColorStop(.68,'rgba(125,97,65,.49)');
+   soft.addColorStop(.88,'rgba(143,108,76,.25)');
+   soft.addColorStop(1,'rgba(143,108,76,0)');
+   ctx.fillStyle=soft;ctx.beginPath();ctx.arc(0,0,rx*1.26,0,R);ctx.fill();
+   ctx.restore();
+ }
+ ctx.save();
+ for(const m of soilMarks){
+   const p=project(m.x,m.z),r=m.r*S;ctx.globalAlpha=clamp(.24+m.strength*.055,.24,.50);
+   for(let i=0;i<4;i++){
+     const j=m.seed+i*17.4,ox=Math.sin(j*12.81)*r*.47,oy=Math.cos(j*7.1)*r*.23;
+     ctx.strokeStyle=i%2?'#d4b48b':'#604c36';
+     ctx.lineWidth=i%2?1.4:1.1;
+     ctx.lineCap='round';
+     ctx.beginPath();ctx.moveTo(p.x+ox-3,p.y+oy+2);
+     ctx.quadraticCurveTo(p.x+ox+2,p.y+oy-3,p.x+ox+7,p.y+oy+1);
+     ctx.stroke();
+   }
+ }
+ ctx.restore();
+ for(const hole of holes){const p=project(hole.x,hole.z),size=hole.size||9;
+   oval(p.x,p.y+1,size,size*.42,'#4f4030');
+   oval(p.x,p.y+2,size*.75,size*.28,'#69553a');
+   ctx.strokeStyle='#d6b68b';ctx.lineWidth=1.6;ctx.beginPath();ctx.ellipse(p.x,p.y+1,size*1.13,size*.52,-.09,0,R);ctx.stroke();
+ }
+}
+function leaf(x,y,dx,dy,width,color){
+ ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(x,y);
+ ctx.bezierCurveTo(x+dx*.13-width,y+dy*.3,x+dx*.74-width*.67,y+dy*.94,x+dx,y+dy);
+ ctx.bezierCurveTo(x+dx*.72+width*.6,y+dy*.65,x+dx*.25+width*.5,y+dy*.23,x,y);ctx.fill();
+ ctx.strokeStyle='#b2d08d72';ctx.lineWidth=.7;ctx.beginPath();ctx.moveTo(x,y);ctx.quadraticCurveTo(x+dx*.45,y+dy*.48,x+dx*.87,y+dy*.9);ctx.stroke();
+}
+function wiltLeaf(x,y,dx,dy,width,color){
+ ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(x,y);
+ ctx.bezierCurveTo(x+dx*.25-width*.6,y-12,x+dx*.92-width*.3,y+dy*.22,x+dx,y+dy);
+ ctx.bezierCurveTo(x+dx*.95+width*.6,y+dy*.53,x+dx*.42+width*.5,y+6,x,y);
+ ctx.fill();ctx.strokeStyle='#755f3a77';ctx.lineWidth=1;ctx.beginPath();
+ ctx.moveTo(x,y);ctx.quadraticCurveTo(x+dx*.65,y+dy*.05,x+dx*.91,y+dy*.84);ctx.stroke();
+}
+function plantAt(p,pt,alpha=1){
+ ctx.save();ctx.globalAlpha=alpha;
+ const phase=grassCondition(p),baseH=p.height*S*mobileGrassScale(),sway=Math.sin(time*2+p.seed);
+ if(p.broken){
+  ctx.strokeStyle=phase==='stump-ready'?'#dfc99e':'#756443';ctx.lineCap='round';ctx.lineWidth=4;
+  ctx.beginPath();ctx.moveTo(pt.x,pt.y);ctx.lineTo(pt.x+2,pt.y-10);ctx.stroke();
+  ctx.strokeStyle='#e9d3a7';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(pt.x-.4,pt.y-11);ctx.lineTo(pt.x+4,pt.y-11);ctx.stroke();
+  leaf(pt.x-1,pt.y,-8,-7,2,'#837a4b');
+  ctx.restore();return;
+ }
+ const rotten=phase==='rotten',ready=phase==='ready';
+ const height=rotten?baseH*.62:ready?baseH*.96:baseH*1.08;
+ const greenColors=ready?['#376e3b','#5c9f4d','#86b965','#6eaa5a']:['#285e36','#397a41','#4a8947','#547f40'];
+ const rotColors=['#706a40','#9c8d49','#b8a667','#7e7c4b'];
+ if(ready){
+  ctx.save();ctx.globalAlpha=.33+.11*Math.sin(time*3+p.seed);
+  oval(pt.x,pt.y+1,14,5,'#d5c59d');
+  ctx.restore();
+ }
+ for(let i=0;i<p.leaves;i++){
+  const off=i-(p.leaves-1)/2,theta=off*(rotten?.36:ready?.44:.21)+Math.sin(p.seed+i)*.09;
+  const length=height*(.64+(i%3)*.14),wind=sway*(rotten?.4:ready?3.0:1.0);
+  let dx=Math.sin(theta)*length+wind,dy=-Math.cos(theta)*length;
+  if(rotten){
+   dx+=Math.sign(off||1)*height*.26;
+   dy=-(height*.16)+Math.abs(off)*height*.035+(i%3)*height*.036;
+   wiltLeaf(pt.x,pt.y,dx,dy,Math.max(3,height*.13),rotColors[i%rotColors.length]);
+  }else{
+   leaf(pt.x,pt.y,dx,dy,Math.max(3.6,height*(ready?.10:.075)),greenColors[i%greenColors.length]);
+  }
+ }
+ if(rotten){
+  ctx.fillStyle='#675034';for(let i=0;i<4;i++){const a=p.seed+i*3.71;oval(pt.x+Math.sin(a)*13,pt.y-2-Math.abs(Math.cos(a))*8,2.2,1.6,'#76643b')}
+ }
+ ctx.restore();
+}
+function groundPlant(p){
+ const pos=project(p.x,p.z,p.tug*.22);oval(pos.x,pos.y+2,12,4,'#3f4c3370');
+ if(p.tug>.01){ctx.strokeStyle='#dcc29a';ctx.lineWidth=2.5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(pos.x,pos.y+14);ctx.quadraticCurveTo(pos.x+9,pos.y+4,pos.x,pos.y-7);ctx.stroke()}
+ plantAt(p,pos);
+}
+function drawRoots(p,origin,travel,progress){
+  // Root emerges in a long flexible strand while the hole stays fixed in the soil.
+  const rise=travel,seed=p.seed,wiggle=Math.sin(time*12+seed)*progress*2.7;
+  const n=32,coords=[];
+  for(let i=0;i<=n;i++){
+    const t=i/n,osc=Math.sin(t*12.5+seed+time*3)*t*(4+progress*6);
+    coords.push({x:origin.x+osc+wiggle*t,y:origin.y-rise*t+Math.sin(t*Math.PI*2.3+seed)*progress*2});
+  }
+  ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
+  ctx.strokeStyle='#68503b';ctx.lineWidth=8;ctx.beginPath();
+  for(let i=0;i<coords.length;i++){const q=coords[i];if(i)ctx.lineTo(q.x,q.y);else ctx.moveTo(q.x,q.y)}ctx.stroke();
+  ctx.strokeStyle='#d9be93';ctx.lineWidth=5.4;ctx.stroke();
+  ctx.strokeStyle='#f1ddaf';ctx.lineWidth=1.3;ctx.stroke();
+  for(let i=3;i<n-2;i+=4){
+    const a=coords[i],b=coords[i+1],dir=i%3?1:-1;
+    ctx.strokeStyle=i%2?'#e0cba7':'#b99e73';ctx.lineWidth=1.45;
+    const length=(7+(i%4)*2)*progress;
+    ctx.beginPath();ctx.moveTo(a.x,a.y);
+    ctx.quadraticCurveTo(a.x+dir*length*.52,a.y+6,a.x+dir*length,a.y+8+(i%3)*3);
+    ctx.stroke();
+    if(i%8===3){oval(a.x+dir*length,a.y+11,2.2,1.6,'#aa855e')}
+  }
+  ctx.restore();
+  return coords[n];
+}
+function drawExtraction(g){
+ for(let i=0;i<g.members.length;i++){
+   const p=g.members[i],elapsed=g.age-i*g.delay,origin=project(p.x,p.z),result=g.results.get(p);
+   if(elapsed<=0){groundPlant(p);continue}
+   if(result==='snap'){
+     const snapped=elapsed>.32;
+     const s=smooth(elapsed/.32);
+     if(!snapped){
+      plantAt(p,{x:origin.x+Math.sin(time*35+i)*s*5,y:origin.y-Math.sin(s*Math.PI)*4});
+     }else{
+      plantAt(p,origin);
+      const fade=1-smooth((elapsed-.44)/.55);
+      if(fade>0){
+       ctx.save();ctx.globalAlpha=fade;
+       const severed={...p,broken:false,loose:p.breakCause==='rotten'?p.need+1:0};
+       const fly=clamp((elapsed-.32)/.72,0,1);
+       plantAt(severed,{x:origin.x+9+fly*20,y:origin.y-22-fly*62},1);
+       ctx.restore();
+      }
+     }
+     continue;
+   }
+   const q=clamp(elapsed/1.57,0,1),pressure=smooth(q/.19),released=smooth((q-.17)/.72);
+   const height=S*(.13*pressure+2.35*released),fade=1-smooth((elapsed-1.43)/.64);
+   if(fade<=.002)continue;
+   ctx.save();ctx.globalAlpha=fade;
+   oval(origin.x,origin.y,7+released*4,3+released*1.4,'#4d3b2e');
+   ctx.strokeStyle='#cdb189';ctx.lineWidth=1.45;
+   ctx.beginPath();ctx.ellipse(origin.x,origin.y,11+released*3,5+released*1.2,0,0,R);ctx.stroke();
+   if(released>.006){
+     const top=drawRoots(p,origin,height,released);
+     plantAt(p,{x:top.x,y:top.y},1);
+   }else plantAt(p,{x:origin.x+Math.sin(time*14+p.seed)*pressure*2,y:origin.y-pressure*S*.10},1);
+   ctx.restore();
+ }
+}
+function drawHandRing(){if(!pointer||pointer.type!=='hand')return;const p=pointer.weed,q=project(p.x,p.z);ctx.save();ctx.strokeStyle=p.loose<p.need?'#d99a689f':'#fcf3bcbd';ctx.lineWidth=2;ctx.setLineDash([4,5]);ctx.beginPath();ctx.ellipse(q.x,q.y,20,8,0,0,R);ctx.stroke();ctx.restore()}
+function drawShovels(){for(const s of shovels){const fade=1-s.age/.28;if(fade<=0)continue;ctx.save();ctx.globalAlpha=fade;ctx.translate(s.x+8,s.y-22-(1-fade)*11);ctx.rotate(.30-fade*.26);ctx.lineWidth=5;ctx.lineCap='round';ctx.strokeStyle='#6a4d37';ctx.beginPath();ctx.moveTo(0,-45);ctx.lineTo(0,-8);ctx.stroke();ctx.fillStyle='#78877f';ctx.beginPath();ctx.moveTo(-9,-8);ctx.lineTo(9,-8);ctx.lineTo(8,6);ctx.quadraticCurveTo(0,18,-8,6);ctx.closePath();ctx.fill();ctx.strokeStyle='#566b60';ctx.lineWidth=2;ctx.stroke();ctx.restore()}}
+function effects(dt){
+for(let i=particles.length-1;i>=0;i--){const p=particles[i];p.age+=dt;p.vy+=p.gravity*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;if(p.age>=p.life){particles.splice(i,1);continue}ctx.globalAlpha=1-p.age/p.life;oval(p.x,p.y,p.size*(1-p.age/p.life*.45),p.size*.72,p.color)}ctx.globalAlpha=1;
+for(let i=rings.length-1;i>=0;i--){const a=rings[i];a.age+=dt;if(a.age>.5){rings.splice(i,1);continue}const t=a.age/.5;ctx.strokeStyle='rgba(245,222,171,'+((1-t)*.6)+')';ctx.lineWidth=3*(1-t);ctx.beginPath();ctx.ellipse(a.x,a.y,7+a.r*t,3+a.r*t*.46,0,0,R);ctx.stroke()}
+for(let i=shovels.length-1;i>=0;i--){const a=shovels[i];a.age+=dt;if(a.age>.28)shovels.splice(i,1)}drawShovels();
+}
+function finalize(g){
+let successful=0,perfect=0;
+for(const p of g.members){
+ if(g.results.get(p)==='extract'){
+  if(!p.broken)perfect++; // Fully intact grass counts as perfect; recovered snapped roots never award time.
+  p.state='gone';removed++;successful++;holes.push({x:p.x,z:p.z,size:p.broken?7.5:9});
+ }else p.state='live';
+}
+UI.done.textContent=String(removed);
+runStats.perfect+=perfect;runStats.recovered+=successful-perfect;
+runStats.maxCombo=Math.max(runStats.maxCombo,perfect);
+if(perfect>0&&runPhase==='field'){
+  deadline+=perfect*500;runStats.bonusSeconds+=perfect*.5;
+  remainingMs=Math.max(0,deadline-performance.now());
+  stageUI.timer.textContent=(remainingMs/1000).toFixed(1);
+  bonusDisplayUntil=performance.now()+1050;
+  stageUI.timeBonus.textContent='+'+(perfect*.5).toFixed(1)+' 秒';
+  stageUI.timeBonus.classList.add('show');
+}
+const at=project(g.cx,g.cz);ring(at.x,at.y,Math.min(95,25+successful*5));
+emit(at.x,at.y,11,'#c9ae8a',.9);if(successful)pop(successful>1?1.03:.87);
+if(successful>1)toast('完整拔出 '+successful+' 株！',1350);
+if(removed>=total&&runPhase==='field'){
+  runPhase='transition';
+  finishAt=performance.now()+800;
+  UI.tip.textContent=mapNumber<3?'這片清乾淨了！準備下一片！':'第三片也完成了！準備挑戰大草王！';
+  if(mapNumber<=3)toast('第 '+mapNumber+' 片清除完成！',850);
+}
+}
+function bossPlantAt(x,y,scale=1){
+ ctx.save();
+ const stems=12;
+ for(let layer=0;layer<3;layer++){
+  for(let i=0;i<stems;i++){
+   const ang=(i-(stems-1)/2)*.245+layer*.06,len=S*(2.5+layer*.35)*(1+Math.sin(i*12.6)*.07)*scale;
+   const sway=Math.sin(time*2+i*.4)*2+Math.sin(time*17+i*2)*boss.pulse*7;
+   const dx=Math.sin(ang)*len+sway,dy=-Math.cos(ang)*len;
+   leaf(x,y,dx,dy,Math.max(9,15*scale),i%4===0?'#376f3e':i%3===0?'#48894a':i%2===0?'#74a656':'#82b469');
+  }
+ }
+ ctx.restore();
+}
+function drawBossRoot(){
+ // The boss leaf crown is pulled directly upward and exits the top of the screen.
+ // The root stays at the hole while its highlights and feeder roots STREAM upward.
+ const origin=project(0,.50),sec=boss.extractionTime;
+ const speed=clamp(H*.65+boss.taps*15,430,1800);
+ const lifted=sec*speed;
+ const headY=origin.y-lifted;
+ const streamTop=Math.max(-80,headY);
+ const visibleLength=origin.y-streamTop;
+ if(visibleLength<3){bossPlantAt(origin.x,origin.y,1);return}
+ const wavyX=y=>origin.x+Math.sin(y*.024+sec*16)*3+Math.sin(y*.053-sec*8)*2;
+ ctx.save();
+ ctx.lineCap='round';ctx.lineJoin='round';
+ const n=Math.max(2,Math.ceil(visibleLength/8));
+ ctx.beginPath();
+ for(let i=0;i<=n;i++){
+  const y=origin.y-visibleLength*i/n,x=wavyX(y);
+  if(i)ctx.lineTo(x,y);else ctx.moveTo(x,y);
+ }
+ // Central heavy root with two lighter moving highlights.
+ ctx.shadowColor='#4e3c2b88';ctx.shadowBlur=8;ctx.shadowOffsetX=3;
+ ctx.strokeStyle='#563a2a';ctx.lineWidth=34;ctx.stroke();
+ ctx.shadowBlur=0;ctx.shadowOffsetX=0;
+ ctx.strokeStyle='#cda879';ctx.lineWidth=27;ctx.stroke();
+ ctx.strokeStyle='#f6deb4';ctx.lineWidth=6;
+ const travel=sec*clamp(430+boss.taps*20,480,1900);
+ ctx.setLineDash([37,22]);ctx.lineDashOffset=-travel;
+ ctx.stroke();ctx.setLineDash([]);
+ // Secondary fibrous texture scrolls upward. The whole strand never curls or loops.
+ const gap=26,phase=travel%gap;
+ for(let j=0;j<Math.ceil(visibleLength/gap)+2;j++){
+  const dist=j*gap+phase;if(dist<4||dist>=visibleLength-4)continue;
+  const y=origin.y-dist,x=wavyX(y),dir=j%2?1:-1,twig=14+(j%4)*4;
+  ctx.strokeStyle=j%3?'#e6c598':'#a98860';ctx.lineWidth=1.7;
+  ctx.beginPath();ctx.moveTo(x,y);
+  ctx.quadraticCurveTo(x+dir*twig*.76,y+3,x+dir*twig,y+8+(j%3)*3);ctx.stroke();
+ }
+ // Continuous upward motion streaks make the visible root feel like it is being expelled.
+ for(let i=0;i<6;i++){
+  const d=(travel*.82+i*97)%(visibleLength+48);
+  const y=origin.y-d;if(y<streamTop||y>origin.y)continue;
+  ctx.strokeStyle=i%2?'#fff2d099':'#9b754b77';ctx.lineWidth=i%2?1.7:2.2;
+  ctx.beginPath();ctx.moveTo(wavyX(y)+(i%2?5:-5),y);
+  ctx.lineTo(wavyX(y-17)+(i%2?5:-5),y-17);ctx.stroke();
+ }
+ ctx.restore();
+ // Big crown exits entirely; the root continues erupting for the remaining duration.
+ if(headY>-S*3.5)bossPlantAt(wavyX(headY),headY,.92);
+}
+function drawBossHitSparks(){
+ for(const spark of boss.hitSparks){
+  const t=clamp(spark.age/spark.life,0,1),o=1-t;
+  ctx.save();ctx.translate(spark.x,spark.y-t*52);
+  ctx.rotate(spark.angle*.10);ctx.globalAlpha=o;
+  const radius=22+t*26;
+  ctx.strokeStyle='#fff0aa';ctx.lineWidth=3.7*o;
+  ctx.beginPath();ctx.arc(0,0,radius,0,R);ctx.stroke();
+  // Each tap gets its own burst, including taps occurring between consecutive frames.
+  for(let j=0;j<7;j++){
+   const a=j*R/7+spark.angle,inner=13+t*21,outer=inner+15*o;
+   ctx.beginPath();ctx.moveTo(Math.cos(a)*inner,Math.sin(a)*inner);
+   ctx.lineTo(Math.cos(a)*outer,Math.sin(a)*outer);
+   ctx.stroke();
+  }
+  ctx.font='900 '+Math.round(25+15*o)+'px system-ui';
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.lineWidth=3.5;ctx.strokeStyle='#754829';ctx.strokeText('+'+1,0,-9);
+  ctx.fillStyle='#fff5c6';ctx.fillText('+1',0,-9);
+  ctx.restore();
+ }
+ ctx.globalAlpha=1;
+}
+function drawBoss(){
+ const origin=project(0,.50);
+ ctx.save();
+ const hit=runPhase==='bossCharge'?boss.hitShake:0;
+ ctx.translate(origin.x,origin.y);
+ if(hit>.01){
+  const wave=Math.sin(time*48+boss.taps*1.31);
+  ctx.translate((boss.taps%2?1:-1)*hit*(8+Math.abs(wave)*5),hit*(3+wave*2));
+  ctx.scale(1+hit*.075,1-hit*.10);
+ }
+ ctx.translate(-origin.x,-origin.y);
+ oval(origin.x,origin.y,43,17,'#65533898');
+ ctx.strokeStyle='#d7bd91';ctx.lineWidth=2.5;
+ ctx.beginPath();ctx.ellipse(origin.x,origin.y,44,18,0,0,R);ctx.stroke();
+ if(runPhase==='bossExtract')drawBossRoot();
+ else if(runPhase==='bossCharge'){
+  const swell=1+Math.min(.17,boss.taps*.002)+boss.pulse*.09;
+  bossPlantAt(origin.x,origin.y,swell);
+  if(boss.pulse>.05){
+   ctx.strokeStyle='rgba(251,225,139,'+boss.pulse*.72+')';
+   ctx.lineWidth=4;ctx.beginPath();ctx.ellipse(origin.x,origin.y,49+boss.pulse*45,20+boss.pulse*16,0,0,R);ctx.stroke();
+  }
+ }else if(runPhase==='bossPull')bossPlantAt(origin.x,origin.y,1.1);
+ ctx.restore();
+ if(runPhase==='bossCharge')drawBossHitSparks();
+}
+function frame(now){
+const dt=Math.min(.05,(now-last||16)/1000);last=now;time+=dt;
+if(runPhase==='field'||runPhase==='transition'||runPhase==='bossCharge'){
+ remainingMs=Math.max(0,deadline-now);
+ stageUI.timer.textContent=(remainingMs/1000).toFixed(1);
+ stageUI.challenge.classList.toggle('urgent',remainingMs<=10000);
+ if(remainingMs<=0)timerExpired();
+}
+if(runPhase==='field'||runPhase==='transition'){
+ for(let i=groups.length-1;i>=0;i--){
+  const g=groups[i];g.age+=dt;
+  for(let j=0;j<g.members.length;j++){
+   const p=g.members[j],threshold=j*g.delay+.43;
+   if(g.age>=threshold&&!g.fired.has(p)){
+     g.fired.add(p);
+     if(g.results.get(p)==='snap')markBroken(p,p.loose>p.need?'rotten':'tight',false);
+     else{pop(.58+rand(0,.22));noiseSound(.046,620,.075);
+       const at=project(p.x,p.z);emit(at.x,at.y,11,'#c8a67e',.98);
+       ring(at.x,at.y,19);if(j%3===0)buzz(8)}
+   }
+  }
+  if(g.age>=g.duration){finalize(g);groups.splice(i,1)}
+ }
+ if(runPhase==='transition'&&finishAt&&now>=finishAt&&groups.length===0){
+  finishAt=0;completedMaps++;totalWeedsCleared+=removed;allBreaks+=brokenTotal;
+  if(mapNumber<MAPS){mapNumber++;runPhase='field';loadPatch(mapNumber)}
+  else enterBoss();
+ }
+}
+if(runPhase==='bossCharge'){
+ boss.pulse=Math.max(0,boss.pulse-dt*6.5);
+ boss.hitShake=Math.max(0,boss.hitShake-dt*9.0);
+ for(let i=boss.hitSparks.length-1;i>=0;i--){
+  const s=boss.hitSparks[i];s.age+=dt;
+  if(s.age>=s.life)boss.hitSparks.splice(i,1);
+ }
+}
+if(runPhase==='bossExtract'){
+ boss.extractionTime+=dt;
+ const fraction=clamp(boss.extractionTime/boss.rootDuration,0,1);
+ // Fast accelerating number reveal. No maximum is shown until the result.
+ const shown=Math.pow(fraction,.78);
+ boss.rootNow=boss.rootGoal*shown;
+ stageUI.bossMeters.textContent=boss.rootNow.toFixed(1);
+ stageUI.bossMeter.querySelector('.meterNumbers').style.transform='scale('+(1+.035*Math.sin(boss.extractionTime*53)+.022*Math.sin(boss.extractionTime*17))+')';
+ if(boss.extractionTime-boss.lastSoundAt>.092){
+   boss.lastSoundAt=boss.extractionTime;
+   if(boss.extractionTime<boss.rootDuration){pop(.20+rand(0,.17));noiseSound(.06,780,.06);const at=project(0,.50);emit(at.x,at.y,5,'#d0ad82',.76)}
+ }
+ if(boss.extractionTime>=boss.rootDuration){boss.rootNow=boss.rootGoal;stageUI.bossMeters.textContent=boss.rootGoal.toFixed(1);showResults(true)}
+}
+for(const p of plants)if(p.state==='live'&&p.tug>.001&&(!pointer||pointer.weed!==p))p.tug=Math.max(0,p.tug-dt*.8);
+if(toastUntil&&now>toastUntil){UI.toast.classList.remove('show');toastUntil=0}
+if(bonusDisplayUntil&&now>=bonusDisplayUntil){stageUI.timeBonus.classList.remove('show');bonusDisplayUntil=0}
+drawBackground();drawSurface();
+if(runPhase==='bossCharge'||runPhase==='bossPull'||runPhase==='bossExtract'||(runPhase==='result'&&completedMaps===3))drawBoss();
+else{
+ for(const p of plants)if(p.state==='live')groundPlant(p);
+ for(const g of groups)drawExtraction(g);
+ drawHandRing();
+}
+effects(dt);requestAnimationFrame(frame);
+}
+
+loadPatch(1);stageUI.welcome.classList.remove('hidden');requestAnimationFrame(frame);
+})();
+
+</script>
+<script type="module" src="./src/systems/minigameQuickExit.js?v=192"></script>
+</body>
+</html>
