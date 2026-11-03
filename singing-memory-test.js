@@ -40,6 +40,7 @@ function setMode(next){
  E.dot.setAttribute('visibility',next==='imitate'?'visible':'hidden');
  E.overlay.hidden=playing||next==='done';
  E.main.textContent=next==='empty'?'先載入原版人聲':
+  next==='ready'?'▶ 班長先唱':
   next==='listen'?'班長正在唱原版人聲…':
   next==='imitate'?'輪到你，憑記憶滑！':
   next==='playback'?'正在播放你的走音…':'↻ 再挑戰一次';
@@ -248,10 +249,11 @@ E.file.addEventListener('change',async e=>{
  const files=[...(e.target.files||[])];if(!files.length)return;
  let vocal=files.find(x=>/vocals|人聲|vocal/i.test(x.name));
  let music=files.find(x=>/music|伴奏|instrumental/i.test(x.name));
- if(!vocal&&files.length===1)vocal=files[0];
- if(!vocal&&files.length>1)vocal=files.find(x=>x!==music)||files[0];
+ if(!vocal&&files.length===1&&!music)vocal=files[0];
+ if(!vocal&&files.length>1)vocal=files.find(x=>x!==music)||null;
  if(music){musicBlob=music;saveBlob(musicKey,music)}
  if(vocal)await loadVocals(vocal);
+ else if(!vocals)setText('已辨識原版伴奏，但還需要 audio [vocals].mp3。這版不會播放伴奏。');
  updateModeText();
  e.target.value='';
 });
