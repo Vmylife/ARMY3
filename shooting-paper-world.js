@@ -1,4 +1,4 @@
-/* ARMY3 v1.48 fixed 3D paper-target practice / 20 animated runners — reuse original Army3 GLB world and rifle. */
+/* ARMY3 v1.49 fixed 3D paper-target practice / 20 animated runners — reuse original Army3 GLB world and rifle. */
 import {loadGlb} from './src/core/glb111.js';
 import {RifleRenderer} from './src/training/rifleRenderer.js';
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -73,10 +73,10 @@ async function boot(){try{
 
   // Patch the ACTUAL instanced cadet renderer; the earlier batchFunction is unused.
   src=patch(src,'float fall=0.; // The hit pass uses the actual Knock_Down joint matrices, not a rigid plank tilt.',
-    'float fall=iState.y>.5?-clamp(iState.z,0.,1.)*1.50:0.; // Backward tumble: chest faces up, head still downrange.',
+    'float fall=iState.y>.5?clamp(iState.z,0.,1.)*1.57079633:0.; // Supine after turn, head downrange.',
     '中彈倒地角度');
   src=patch(src,'local+=iPose.xyz;\n    gl_Position=uVP*vec4(local,1.);',
-    'local+=iPose.xyz;\n    if(iState.y>.5)local.y=max(local.y,.205);\n    gl_Position=uVP*vec4(local,1.);',
+    'local+=iPose.xyz;\n    if(iState.y>.5)local.y=max(local.y,.055);\n    gl_Position=uVP*vec4(local,1.);',
     '地面防穿透');
   src=patch(src,`  if(this.friendlyKnockGroups)for(const rig of this.friendlyKnockGroups.values())rig.evaluate(dt);
   const groups=[[actors.filter(a=>!a.hit),this.friendlyIdle]];
@@ -102,6 +102,14 @@ async function boot(){try{
     normal=vec3(normal.x*ct+normal.z*st,normal.y,-normal.x*st+normal.z*ct);
     float cs=cos(fall),sn=sin(fall);`,
     '倒地仰面面向修正');
+  // Rotate around the skinned character's hips; translating the entire body
+  // preserves the face, rather than flattening below-ground vertices.
+  src=patch(src,'float phase=clamp(iState.z,0.,1.);',
+    'float phase=clamp(iState.z,0.,1.);\n    if(iState.y>.5)local.y-=.89;',
+    '以髖部旋轉');
+  src=patch(src,'local*=iState.x;\n    local+=iPose.xyz;',
+    'local*=iState.x;\n    if(iState.y>.5)local.y+=mix(.89,.30,smoothstep(0.,1.,iState.z))*iState.x;\n    local+=iPose.xyz;',
+    '自然仰躺高度');
   src=patch(src,'precision highp float;in vec2 vUV;in vec3 vN;uniform sampler2D uTex;out vec4 frag;',
     'precision highp float;in vec2 vUV;in vec3 vN;uniform sampler2D uTex;uniform float uRed;out vec4 frag;',
     '紅軍實例化染色 uniform');
@@ -223,7 +231,7 @@ async function boot(){try{
     if(w.modelState==='ready'&&!state.ready){state.ready=true;w.actors=[];}
     if(state.ready&&view&&!state.paused){
       w.actors=actors.map(a=>({uid:'shooting-'+a.id,id:a.id,px:a.x,pz:a.z,x:a.x,z:a.z,angle:a.angle,scale:1,
-        renderLift:a.alive?0:(.18+(a.airY||0)),enemy:a.team==='red',hit:!a.alive,fall:a.fall||0,seed:a.seed??0,shootingAction:'run'}));
+        renderLift:a.alive?0:(a.airY||0),enemy:a.team==='red',hit:!a.alive,fall:a.fall||0,seed:a.seed??0,shootingAction:'run'}));
       if(!w.shootingKnockedIds)w.shootingKnockedIds=new Set();
       for(const a of w.actors){if(!a.hit||w.shootingKnockedIds.has(a.id))continue;w.shootingKnockedIds.add(a.id);
        a.knockBucket=0;if(!w.friendlyKnockGroups)w.friendlyKnockGroups=new Map();
