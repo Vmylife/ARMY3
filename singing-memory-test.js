@@ -1,5 +1,5 @@
-/* ARMY3 singing memory v0.2 — ORIGINAL VOICE STEM ONLY.
-   Original vocal MP3 chosen by the player; original music stem is NEVER played.
+/* ARMY3 singing memory v0.3 — ORIGINAL VOICE STEM ONLY.
+   Original isolated vocal MP3 is bundled with ARMY3; users never upload files. Music stem is NEVER played.
    Correct pitch is derived from the selected vocal waveform (no invented tune).
    Browser-only processing: Web Audio + short-time pitch detection + OLA pitch warp.
 */
@@ -14,42 +14,41 @@ const E={
  head:$('playhead'),dot:$('controlDot'),mouth:$('mouth'),speech:$('speech'),
  feedback:$('feedback'),rank:$('finalRank'),points:$('finalScore'),comment:$('comment'),
  replay:$('replayButton'),compare:$('compareButton'),hint:$('hint'),count:$('takeCount'),
- file:$('originalTracks'),clip:$('clipStart'),clipLabel:$('clipStartLabel'),
  preview:$('previewClip'),info:$('voiceInfo'),mode:$('voiceMode'),timeline:$('timeline')
 };
-let ctx=null,vocals=null,vocalBlob=null,musicBlob=null,clipStart=0;
+let ctx=null,vocals=null,clipStart=0;
 let pitch=[],refBase=62,validPitch=0,mode='empty',session=0,frame=0,playerHeld=false;
 let midiValue=refBase,pointerId=null,trace=[],lastScore=null,playSource=null,playPromise=null,comparison=false;
 let ownActionCount=0,analysisToken=0;
-const vocalsKey='vocals',musicKey='music';
+const AUDIO_URL='./singing-samples/junji-original-vocals-intro.mp3?v=3';
 const MIDI=f=>69+12*Math.log2(f/440);
 function getAudio(){if(!ctx){const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)throw Error('此裝置不支援 Web Audio');ctx=new Audio()}return ctx}
 function setText(s){E.info.textContent=s}
 function setMode(next){
  mode=next;
  const playing=['listen','imitate','playback'].includes(next);
- E.main.disabled=playing||!vocals;
+ E.main.disabled=playing||(!vocals&&next!=='error');
  E.repeat.disabled=playing||!vocals;
  E.preview.disabled=playing||!vocals;
- E.clip.disabled=playing||!vocals;
- E.file.disabled=playing;
  E.mouth.classList.toggle('singing',next==='listen'||next==='playback');
  E.board.style.cursor=next==='imitate'?'crosshair':'default';
  E.guide.style.display=(next==='listen'||(next==='done'&&comparison))?'':'none';
  E.trace.style.display=next==='done'&&comparison?'':'none';
  E.dot.setAttribute('visibility',next==='imitate'?'visible':'hidden');
  E.overlay.hidden=playing||next==='done';
- E.main.textContent=next==='empty'?'先載入原版人聲':
+ E.main.textContent=next==='empty'?'原版人聲載入中…':
+  next==='error'?'↻ 重新載入原版人聲':
   next==='ready'?'▶ 班長先唱':
   next==='listen'?'班長正在唱原版人聲…':
   next==='imitate'?'輪到你，憑記憶滑！':
   next==='playback'?'正在播放你的走音…':'↻ 再挑戰一次';
- E.stage.textContent=next==='empty'?'尚未載入音檔':
+ E.stage.textContent=next==='empty'?'正在自動載入原唱':
+  next==='error'?'原唱載入失敗':
   next==='ready'?'音檔就緒 · 原版人聲':
   next==='listen'?'① 班長示範 · 原唱音準線':
   next==='imitate'?'② 你唱 · 答案完全隱藏':
   next==='playback'?'③ 公開播放玩家走音':'④ 鑑測報告';
- E.overlay.textContent=next==='empty'?'請先載入原版人聲音檔':vocals?'按「班長先唱」開始':'請先載入原版人聲';
+ E.overlay.textContent=next==='empty'?'正在載入內建原版人聲…':next==='error'?'載入失敗，點擊重新載入':vocals?'按「班長先唱」開始':'正在載入內建原版人聲…';
  if(next==='listen')E.speech.textContent='「聽好！原唱只播人聲，不放伴奏！」';
  if(next==='imitate')E.speech.textContent='「換你！我把音準答案收起來了！」';
  if(next==='playback')E.speech.textContent='「讓我聽聽你剛才唱成怎樣！」';
@@ -202,68 +201,36 @@ function pitchAt(t){
 function expectedVoiced(t){
  return !!pitch[clamp(Math.round(t/STEP),0,pitch.length-1)]?.voiced;
 }
-function saveBlob(track,blob){
- try{
-  const open=indexedDB.open('army3-military-voice-v2',1);
-  open.onupgradeneeded=()=>open.result.createObjectStore('tracks');
-  open.onsuccess=()=>{const db=open.result;const tx=db.transaction('tracks','readwrite');tx.objectStore('tracks').put(blob,track);tx.oncomplete=()=>db.close();tx.onerror=()=>db.close()};
- }catch{}
-}
-function recover(){
- try{
-  const open=indexedDB.open('army3-military-voice-v2',1);
-  open.onupgradeneeded=()=>open.result.createObjectStore('tracks');
-  open.onsuccess=()=>{
-   const db=open.result,tx=db.transaction('tracks','readonly');
-   tx.objectStore('tracks').get(vocalsKey).onsuccess=event=>{
-    const blob=event.target.result;if(blob)loadVocals(blob,true);
-   };
-   tx.objectStore('tracks').get(musicKey).onsuccess=event=>{
-    const blob=event.target.result;if(blob){musicBlob=blob;updateModeText()}
-   };
-   tx.oncomplete=()=>db.close();
-  };
- }catch{}
-}
+
+/* The actual original vocal excerpt is tracked as a binary MP3 in this
+   repository, not synthesized. No instrumental track is decoded or played. */
 function updateModeText(){
- E.mode.textContent=vocals?(musicBlob?'原版人聲＋原版伴奏已載入（只播人聲）':'原版人聲 · 無伴奏'):'未載入原版人聲';
+ E.mode.textContent=vocals?'原版人聲已內建 · 無伴奏':'原版人聲載入中…';
 }
-async function loadVocals(blob,recovered=false){
+async function loadVocals(bytes){
+ const c=getAudio(),buffer=await c.decodeAudioData(bytes.slice(0));
+ if(buffer.duration<CLIP-.04)throw Error('內建人聲長度不足');
+ vocals=buffer;clipStart=0;
+ await extractPitch();
+ if(pitch.length<Math.floor(CLIP/STEP*.12))throw Error('無法分析原版人聲音準');
+ E.count.textContent='原版人聲 · '+CLIP+' 秒';
+ setMode('ready');updateModeText();
+}
+async function autoLoadVocal(){
+ if(['listen','imitate','playback'].includes(mode))return;
+ vocals=null;setMode('empty');updateModeText();
+ setText('正在載入內建原版人聲（無伴奏），並分析原唱音準…');
  try{
-  setMode('empty');setText('正在解碼與分析原版人聲…');
-  const c=getAudio();const buffer=await c.decodeAudioData((await blob.arrayBuffer()).slice(0));
-  if(buffer.duration<CLIP)throw Error('人聲長度不足 '+CLIP+' 秒');
-  vocals=buffer;vocalBlob=blob;
-  const upper=Math.max(0,buffer.duration-CLIP);
-  const remembered=Number(localStorage.getItem('army3_song_clip_start_v2'));
-  clipStart=clamp(recovered&&Number.isFinite(remembered)?remembered:onsetOf(buffer),0,upper);
-  E.clip.min='0';E.clip.max=upper.toFixed(1);E.clip.value=clipStart.toFixed(1);
-  E.clipLabel.textContent=clipStart.toFixed(1)+' 秒';
-  await extractPitch();
-  E.count.textContent='原版人聲 · '+CLIP+' 秒';
-  setMode('ready');updateModeText();
-  if(!recovered)saveBlob(vocalsKey,blob);
- }catch(err){setText('讀取人聲失敗：'+err.message);setMode('empty')}
+  const response=await fetch(AUDIO_URL,{cache:'force-cache'});
+  if(!response.ok)throw Error('HTTP '+response.status);
+  const bytes=await response.arrayBuffer();
+  if(bytes.byteLength<1000)throw Error('內建原版音檔不完整');
+  await loadVocals(bytes);
+ }catch(err){
+  console.error('[軍歌鑑測] 內建人聲載入失敗',err);
+  setMode('error');setText('內建原版人聲載入失敗（'+err.message+'）。請按重新載入；不需要上傳任何音檔。');
+ }
 }
-E.file.addEventListener('change',async e=>{
- const files=[...(e.target.files||[])];if(!files.length)return;
- let vocal=files.find(x=>/vocals|人聲|vocal/i.test(x.name));
- let music=files.find(x=>/music|伴奏|instrumental/i.test(x.name));
- if(!vocal&&files.length===1&&!music)vocal=files[0];
- if(!vocal&&files.length>1)vocal=files.find(x=>x!==music)||null;
- if(music){musicBlob=music;saveBlob(musicKey,music)}
- if(vocal)await loadVocals(vocal);
- else if(!vocals)setText('已辨識原版伴奏，但還需要 audio [vocals].mp3。這版不會播放伴奏。');
- updateModeText();
- e.target.value='';
-});
-E.clip.addEventListener('input',()=>{E.clipLabel.textContent=Number(E.clip.value).toFixed(1)+' 秒'});
-E.clip.addEventListener('change',async()=>{
- if(!vocals||['listen','imitate','playback'].includes(mode))return;
- clipStart=Number(E.clip.value)||0;
- try{localStorage.setItem('army3_song_clip_start_v2',String(clipStart))}catch{}
- setText('正在分析選定段落的原唱音準…');await extractPitch();
-});
 function sample(t){return trace[clamp(Math.floor(t/STEP),0,Math.max(0,trace.length-1))]||{m:refBase,on:false}}
 function createWarp(){
  const c=getAudio(),SR=22050;
@@ -394,7 +361,7 @@ function finishImitate(){
  playerHeld=false;pointerId=null;lastScore=calculate();tracePath();
  replay();
 }
-E.main.addEventListener('click',()=>{if(mode==='ready'||mode==='done')listen()});
+E.main.addEventListener('click',()=>{if(mode==='error')autoLoadVocal();else if(mode==='ready'||mode==='done')listen()});
 E.repeat.addEventListener('click',()=>{if(mode==='ready'||mode==='done')listen()});
 E.preview.addEventListener('click',async()=>{
  if(!vocals)return;
@@ -411,12 +378,12 @@ E.compare.addEventListener('click',()=>{
 });
 window.addEventListener('pagehide',()=>stopAudio());
 window.armySingingTest={
- get status(){return {mode,hasOriginalVocals:!!vocals,hasOriginalMusic:!!musicBlob,musicPlayback:false,
+ get status(){return {mode,hasOriginalVocals:!!vocals,hasOriginalMusic:false,musicPlayback:false,embeddedAudio:true,
    phraseSeconds:CLIP,referenceFrames:pitch.length,voicedPercent:Math.round(validPitch*100),samples:trace.length,score:lastScore}},
  get refPitch(){return pitch.map(p=>({...p}))},
  analyzePitch:pitchOf,calculate
 };
-E.main.disabled=true;E.repeat.disabled=true;E.preview.disabled=true;E.clip.disabled=true;
+E.main.disabled=true;E.repeat.disabled=true;E.preview.disabled=true;
 E.guide.style.display='none';E.trace.style.display='none';E.dot.setAttribute('visibility','hidden');
-setMode('empty');recover();
+setMode('empty');autoLoadVocal();
 })();
