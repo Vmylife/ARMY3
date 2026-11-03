@@ -1,4 +1,4 @@
-/* ARMY3 v1.46 fixed 3D paper-target practice / 20 animated runners — reuse original Army3 GLB world and rifle. */
+/* ARMY3 v1.47 fixed 3D paper-target practice / 20 animated runners — reuse original Army3 GLB world and rifle. */
 import {loadGlb} from './src/core/glb111.js';
 import {RifleRenderer} from './src/training/rifleRenderer.js';
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -73,7 +73,7 @@ async function boot(){try{
 
   // Patch the ACTUAL instanced cadet renderer; the earlier batchFunction is unused.
   src=patch(src,'float fall=0.; // The hit pass uses the actual Knock_Down joint matrices, not a rigid plank tilt.',
-    'float fall=iState.y>.5?clamp(iState.z,0.,1.)*1.50:0.; // Individual forward impact tumble.',
+    'float fall=iState.y>.5?-clamp(iState.z,0.,1.)*1.50:0.; // Backward tumble: chest faces up, head still downrange.',
     '中彈倒地角度');
   src=patch(src,'local+=iPose.xyz;\n    gl_Position=uVP*vec4(local,1.);',
     'local+=iPose.xyz;\n    if(iState.y>.5)local.y=max(local.y,.205);\n    gl_Position=uVP*vec4(local,1.);',
