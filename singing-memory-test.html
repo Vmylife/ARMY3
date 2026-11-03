@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-Hant"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#172a20">
+<title>軍歌鑑測｜聽班長唱一句</title>
+<link rel="stylesheet" href="./singing-memory-test.css?v=1">
+</head>
+<body>
+<main class="app">
+<header class="top"><div class="brand">國軍實驗靶場 <span>/ 軍歌鑑測 V0.1</span></div><a class="back" href="./index.html">← 返回軍營</a></header>
+<section class="hero">
+ <div class="scene" aria-hidden="true"><div class="badgeIcon">♪</div>
+  <div class="sergeant"><div class="beret"></div><div class="face"><i class="eye one"></i><i class="eye two"></i><i id="mouth" class="mouth"></i></div><div class="neck"></div><div class="body"><i class="badgeMark">班</i></div></div>
+  <div class="speech" id="speech">「跟著我唱，不准走音！」</div>
+ </div>
+ <div class="heading"><div class="eyebrow">軍歌記憶音準 · 第一版</div><h1>班長唱一句，你敢跟著唱嗎？</h1>
+ <p>聽示範時有正確音準線。輪到你時答案消失，只能用滑鼠或手指憑記憶唱。唱完公開播放你的走音版本。</p></div>
+</section>
+<section class="controls">
+ <div class="line"><span class="tag" id="stageTag">等待開始</span><span id="takeCount">兩句短句｜約 11 秒</span></div>
+ <div class="words" id="words">國家有綱常　／　軍隊有軍紀</div>
+ <div class="board" id="board" role="group" aria-label="音準練習控制區">
+  <div class="ylabels"><span>高</span><span>低</span></div>
+  <svg id="graph" viewBox="0 0 800 240" preserveAspectRatio="none" aria-label="音高示範與回顧圖">
+   <g id="gridLines"></g><path id="guideLine" d="" fill="none" stroke="#f2d39b" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+   <path id="yourLine" d="" fill="none" stroke="#e8828e" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+   <line id="playhead" x1="0" x2="0" y1="0" y2="240" stroke="#faf8e5" stroke-width="2" stroke-dasharray="5 5"/>
+   <circle id="controlDot" cx="0" cy="120" r="11" fill="#fa9294" stroke="#fff" stroke-width="2" visibility="hidden"/>
+  </svg>
+  <div class="boardOverlay" id="boardOverlay">按下「班長先唱」開始</div>
+  <div class="timeline" id="timeline"></div>
+ </div>
+ <div class="legend" id="legend"><span><b class="gold"></b>班長音高（只在示範時出現）</span><span><b class="red"></b>你的走音軌跡（回放後顯示）</span></div>
+ <div class="actionArea"><button id="mainButton" class="primary" type="button">▶ 班長先唱</button>
+ <button id="skipButton" class="secondary" type="button" disabled>重新聽示範</button></div>
+ <p class="hint" id="hint">電腦：按住滑鼠左鍵、上下移動｜手機：長按並上下滑動。放開就會斷氣。</p>
+ <div class="feedback" id="feedback" hidden>
+   <div class="feedbackTitle"><span id="finalRank">F 級</span><strong id="finalScore">0 分</strong></div>
+   <p id="comment"></p>
+   <div class="feedbackActions"><button type="button" id="replayButton">🔊 再聽一次我的走音</button><button type="button" id="compareButton">📈 查看音準差距</button></div>
+ </div>
+</section>
+<section class="voiceSection">
+ <div class="voiceHead"><strong>真人聲音實驗室</strong><span class="pill" id="voiceMode">預設：瀏覽器人聲</span></div>
+ <p>想聽真正的「人聲被你唱歪」？可錄下自己唱／唸這兩句，或載入你有權使用的乾淨人聲音檔。遊戲會在瀏覽器內把真人聲音依你的音準軌跡變調，不會上傳錄音。</p>
+ <div class="voiceActions"><button id="recordButton" type="button">● 錄一段真人聲音</button><label class="fileButton" for="voiceFile">↑ 載入人聲音檔</label><input type="file" accept="audio/*" id="voiceFile"></div>
+ <div id="voiceInfo" class="voiceInfo">不錄音也可以直接玩；預設用裝置中文語音做示範及走音回放。可使用真人錄音提升效果。</div>
+ <audio id="recordedPreview" controls hidden></audio>
+ <p class="legal">《軍紀歌》開頭短句僅作練習文字。這版為音準與人聲變調的技術測試，示範音型是暫定的原創旋律，並非《軍紀歌》的正式曲譜／原唱錄音。</p>
+</section>
+<footer>獨立試玩版本 · 尚未加入軍營正式小遊戲</footer>
+</main>
+<script src="./singing-memory-test.js?v=1" defer></script>
+</body></html>
