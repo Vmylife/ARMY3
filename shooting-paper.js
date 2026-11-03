@@ -1,4 +1,4 @@
-/* ARMY3 · 報告長官！我的子彈有上靶嗎？ — standalone target-paper shooting v1.51 */
+/* ARMY3 · 報告長官！我的子彈有上靶嗎？ — standalone target-paper shooting v1.52 */
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
 const canvas=$('shootingOverlay'),ctx=canvas.getContext('2d',{alpha:true}),min=Math.min,max=Math.max,clamp=(x,a,b)=>max(a,min(b,x));
@@ -85,6 +85,7 @@ let width=1,height=1,dpr=1,ready=false,state='loading',zoom=false,rounds=MAX_ROU
 let yaw=Math.atan2(PAPER.x-FIELD.x,PAPER.z-FIELD.z),pitch=Math.atan2(PAPER.y-FIELD.y,PAPER.z-FIELD.z);
 let bullets=[],reviewElapsed=0,reviewOrigin=null,dragging=null,shotTick=0,shotAt=-10,kickReturn=0;
 let shotHistory=[]; // Actual fired rounds, used only for collectible achievements and reports.
+let runStartStage=1,runStages=[],runFailures=[],pendingStage=1,transitionUntil=0;
 // Continuous, constant-speed wandering: the path may curve unpredictably,
 // but there are no random speed changes, scripted holds, or spring deceleration.
 // The setting controls travel range; the shot ray and sight post still agree.
@@ -262,48 +263,59 @@ function fire(){if(state!=='playing'||elapsed<nextShot)return;
  const distance=hit?Math.hypot(hit.x*600-300,hit.y*760-380):Infinity;
  const ring=distance<=248?clamp(10-Math.floor(distance/(248/10)),1,10):0;
  shotHistory.push({shot:shots,kind:friend?'friendly':hit?'target':'miss',ring,zoom,time:elapsed});
- bullets.push({t:0,life:.12,x:tip.x,y:tip.y,hit:!!hit});setHUD();if(rounds<=0){holdFire=false;setTimeout(()=>{if(state==='playing')finish()},530)}
+ bullets.push({t:0,life:.12,x:tip.x,y:tip.y,hit:!!hit});setHUD();if(rounds<=0){holdFire=false;setTimeout(()=>{if(state==='playing'&&rounds===0)finish()},530)}
 }
-function finish(){if(state!=='playing')return;state='reviewing';holdFire=false;reviewElapsed=0;reviewOrigin=getPaperRect();$('hud').hidden=true;$('shootBtn').classList.remove('pressed');}
-function presentResult(){if(state==='result')return;
+// Only one real result screen exists: after the last stage of this run.
+// Intermediate successes/failures display a brief, non-interactive overlay.
+function stageSnapshot(){
+ return {stage:currentStage,shots,hits:hits.map(h=>({...h})),friendlyHits,
+  shotHistory:shotHistory.map(h=>({...h})),elapsed};
+}
+function showTransition(message,nextStage){
+ pendingStage=nextStage;
+ transitionUntil=performance.now()+1150;
+ state='transition';holdFire=false;dragging=null;
+ $('shootBtn').classList.remove('pressed');
+ const banner=$('shootTransition');if(banner){banner.textContent=message;banner.hidden=false;}
+}
+function finish(){
+ if(state!=='playing')return;
+ const outcome=stageSnapshot(),passed=outcome.hits.length>=REQUIRED_HITS;
+ if(passed){
+  runStages.push(outcome);
+  try{window.armyPaperReport?.recordStage?.(outcome);}catch(e){console.warn('射擊進度保存失敗',e);}
+  if(currentStage<MAX_LEVEL){
+   showTransition('✓ 第 '+currentStage+' 關過關！準備第 '+(currentStage+1)+' 關',currentStage+1);
+   return;
+  }
+  // One-and-only end-of-run report after level five.
+  state='reviewing';holdFire=false;reviewElapsed=0;reviewOrigin=getPaperRect();
+  $('hud').hidden=true;$('shootBtn').classList.remove('pressed');
+  return;
+ }
+ runFailures.push(outcome);
+ showTransition('第 '+currentStage+' 關未達5發 · 原關重考',currentStage);
+}
+function presentResult(){
+ if(state!=='reviewing')return;
  state='result';$('resultScreen').hidden=false;
  const image=paperImage(),dest=$('resultPaper'),q=dest.getContext('2d');
  dest.width=600;dest.height=760;q.clearRect(0,0,600,760);q.drawImage(image,0,0);
- $('resultShots').textContent=shots;
- $('resultHits').textContent=hits.length;
- $('resultMisses').textContent=shots-hits.length;
- $('resultFriendly').textContent=friendlyHits;
- $('resultRate').textContent=shots?Math.round(100*hits.length/shots)+'%':'0%';
- let title,rank,stamp,officer;
- if(shots===0){
-  title='還沒開槍就下課';rank='出席紀錄：查無此人';stamp='缺考';officer='一發都沒打，班長連罵你都找不到理由。';
- }else if(friendlyHits>=3){
-  title='友軍正在找你';rank='射擊等第：軍紀調查';stamp='重大違規';officer='叫你打靶，不是叫你幫醫護所衝業績。';
- }else if(friendlyHits>0){
-  title='你射到自己人啦';rank='射擊等第：待查';stamp='軍紀注意';officer='靶紙沒跟你結仇，你怎麼先跟弟兄結仇？';
- }else if(hits.length===10&&shots===10){
-  title='班長難得笑了';rank='射擊等第：十發十中';stamp='特優';officer='十發全上靶！今天可以大聲喊報告了。';
- }else if(shots>0&&hits.length===shots){
-  title='靶紙全數收件';rank='射擊等第：全上靶';stamp='優等';officer='有幾發打幾發，全部都有洞。下次記得打滿十發。';
- }else if(hits.length>=8){
-  title='有在瞄，有前途';rank='射擊等第：優等';stamp='通過';officer='不錯。這張成績單先收好，免得全連都被要求跟進。';
- }else if(hits.length>=5){
-  title='至少靶紙有感覺';rank='射擊等第：及格';stamp='合格';officer='勉強可以。下次記得瞄靶，不是瞄人生方向。';
- }else if(hits.length>0){
-  title='靶紙擦邊球';rank='射擊等第：待加強';stamp='補強';officer='你不是沒有命中，只是靶紙不太想承認。';
- }else{
-  title='靶紙毫髮無傷';rank='射擊等第：重測';stamp='重測';officer='報告長官，十公尺外的空氣被我成功擊退！';
- }
- $('resultTitle').textContent=title;
- $('resultRank').textContent=rank;
- $('resultStamp').textContent=stamp;
- $('reportText').textContent=officer;
- // The independent field-report UI does not influence bullet physics or scoring.
- // The old static report above remains a usable fallback if the optional UI fails.
  try{
-  window.armyPaperReport?.show?.({stage:currentStage,shots,hits:hits.map(h=>({...h})),friendlyHits,
-   shotHistory:shotHistory.map(h=>({...h})),elapsed});
- }catch(error){console.error('[Army shooting report] 成就結算顯示失敗',error);}
+  window.armyPaperReport?.showRun?.({
+   startStage:runStartStage,stages:runStages.map(s=>({...s})),
+   failures:runFailures.map(s=>({...s}))
+  });
+ }catch(error){
+  console.error('[Army shooting] 五關總結算失敗',error);
+  const totalHits=runStages.reduce((n,s)=>n+s.hits.length,0);
+  const totalShots=runStages.reduce((n,s)=>n+s.shots,0);
+  $('resultTitle').textContent='實彈射擊總結算';
+  $('resultRank').textContent='完成 '+runStages.length+' 個關卡';
+  $('resultStamp').textContent='完成';
+  $('resultHits').textContent=totalHits;$('resultShots').textContent=totalShots;
+  $('reportText').textContent='本次共上靶 '+totalHits+' 發，累計重考 '+runFailures.length+' 次。';
+ }
 }
 function update(dt){elapsed+=dt;remain=max(0,MAX_TIME-elapsed);
  updateBreathing(dt);moveRunners(dt);
@@ -345,12 +357,23 @@ function render(dt){
  }else if(state==='reviewing')drawAnimation(dt);
  window.__armyShooting3D?.sync?.(runners,[],{yaw,pitch,fov:fovNow()*180/Math.PI,zoom,flinch,shotAge:Math.max(0,elapsed-shotAt),breathX,breathY,eye:[FIELD.x,FIELD.y,FIELD.z]});
 }
-function loop(now){const dt=clamp((now-lastFrame)/1000,0,.045);lastFrame=now;if(state==='playing')update(dt);if(state==='playing'||state==='reviewing')render(dt);if(state==='playing'||state==='reviewing')requestAnimationFrame(loop)}
-function reset(){
- currentStage=clamp(Math.floor(window.armyPaperReport?.selectedStage?.()||1),1,MAX_LEVEL);
+function loop(now){const dt=clamp((now-lastFrame)/1000,0,.045);lastFrame=now;if(state==='playing')update(dt);if(state==='transition'&&now>=transitionUntil){
+  currentStage=pendingStage;
+  resetStage();state='playing';
+  if($('shootTransition'))$('shootTransition').hidden=true;
+ }
+ if(state==='playing'||state==='reviewing'||state==='transition')render(dt);
+ if(state==='playing'||state==='reviewing'||state==='transition')requestAnimationFrame(loop)}
+function resetStage(){
  cachedPaper=null;cachedPaperKey='';rounds=MAX_ROUNDS;shots=0;hits=[];elapsed=0;remain=MAX_TIME;nextShot=0;holdFire=false;zoom=false;recoil=0;flinch=0;shotAt=-10;kickReturn=0;breathX=0;breathY=0;bullets=[];shotHistory=[];reviewElapsed=0;reviewOrigin=null;
  yaw=Math.atan2(PAPER.x-FIELD.x,PAPER.z-FIELD.z);pitch=Math.atan2(PAPER.y-FIELD.y,PAPER.z-FIELD.z);resetSway();makeRunners();window.__armyShooting3D?.restartNPCs?.();$('zoomBtn').classList.remove('active');$('zoomBtn').textContent='◎ 開鏡';document.body.classList.remove('scopeActive');setHUD();}
-function start(){if(!ready)return;reset();state='playing';$('hud').hidden=false;$('startScreen').hidden=true;$('resultScreen').hidden=true;lastFrame=performance.now();requestAnimationFrame(loop);}
+function start(){
+ if(!ready)return;
+ currentStage=clamp(Math.floor(window.armyPaperReport?.selectedStage?.()||1),1,MAX_LEVEL);
+ runStartStage=currentStage;runStages=[];runFailures=[];pendingStage=currentStage;
+ resetStage();
+ if($('shootTransition'))$('shootTransition').hidden=true;
+ state='playing';$('hud').hidden=false;$('startScreen').hidden=true;$('resultScreen').hidden=true;lastFrame=performance.now();requestAnimationFrame(loop);}
 function changeAim(dx,dy){if(state!=='playing')return;const k=zoom?.0021:.0055;yaw-=dx*k;while(yaw>Math.PI)yaw-=Math.PI*2;while(yaw< -Math.PI)yaw+=Math.PI*2;pitch=clamp(pitch-dy*k,-1.1,.58)}
 canvas.addEventListener('pointerdown',e=>{if(state!=='playing'||dragging!==null)return;e.preventDefault();dragging={id:e.pointerId,x:e.clientX,y:e.clientY};try{canvas.setPointerCapture(e.pointerId)}catch{}},{passive:false});
 addEventListener('pointermove',e=>{if(!dragging||e.pointerId!==dragging.id||state!=='playing')return;e.preventDefault();changeAim(e.clientX-dragging.x,e.clientY-dragging.y);dragging.x=e.clientX;dragging.y=e.clientY;},{passive:false});
@@ -365,7 +388,8 @@ function back(){state='result';holdFire=false;if(parent!==window){try{parent.pos
 document.querySelectorAll('.backBtn').forEach(b=>b.addEventListener('click',back));
  $('startBtn').addEventListener('click',start);
  $('againBtn').addEventListener('click',()=>{
-  window.armyPaperReport?.advanceAfterResult?.();start();
+  window.armyPaperReport?.selectStage?.(1);
+  start();
  });
  $('chooseStageBtn')?.addEventListener('click',()=>{
   state='intro';holdFire=false;$('resultScreen').hidden=true;$('startScreen').hidden=false;$('hud').hidden=true;
@@ -381,5 +405,5 @@ async function boot(){try{const r=await fetch('./shooting-paper-scene.json?v=140
   if(performance.now()-started>90000){clearInterval(timer);$('loadStatus').textContent='3D 載入逾時，請確認所有原版 GLB 檔案已上傳';}},250);
  }catch(e){console.error('[ARMY 紙靶打靶]',e);$('loadStatus').textContent='❌ '+e.message}}
 boot();
-window.__armyPaperTest={status:()=>({ready,state,shots,hits:hits.length,rounds,yaw,pitch,zoom,remain,paper:PAPER,breathLevel,breathX,breathY,npcCount:runners.length,aliveNPCs:runners.filter(a=>a.alive).length,friendlyHits,stage:currentStage,requiredHits:REQUIRED_HITS,qualified:hits.length>=REQUIRED_HITS}),start,fire,finish,aim:changeAim,getHoles:()=>hits.slice(),getPaperIntersection:hitFromSight,getSightTip:sightTip,getRunners:()=>runners.map(a=>({...a})),getShotHistory:()=>shotHistory.map(s=>({...s})),testFriendlyRay:firstFriendlyInLine};
+window.__armyPaperTest={status:()=>({ready,state,shots,hits:hits.length,rounds,yaw,pitch,zoom,remain,paper:PAPER,breathLevel,breathX,breathY,npcCount:runners.length,aliveNPCs:runners.filter(a=>a.alive).length,friendlyHits,stage:currentStage,requiredHits:REQUIRED_HITS,qualified:hits.length>=REQUIRED_HITS,completedStages:runStages.length,failedAttempts:runFailures.length}),start,fire,finish,aim:changeAim,getHoles:()=>hits.slice(),getPaperIntersection:hitFromSight,getSightTip:sightTip,getRunners:()=>runners.map(a=>({...a})),getShotHistory:()=>shotHistory.map(s=>({...s})),testFriendlyRay:firstFriendlyInLine};
 })();
