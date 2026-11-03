@@ -1,4 +1,4 @@
-/* ARMY3 singing memory v0.6 — ORIGINAL VOICE STEM ONLY.
+/* ARMY3 singing memory v0.7 — ORIGINAL VOICE STEM ONLY.
    Original isolated vocal MP3 is bundled with ARMY3; users never upload files. Music stem is NEVER played.
    Correct pitch is derived from the selected vocal waveform (no invented tune).
    Browser-only processing: Web Audio + short-time pitch detection + OLA pitch warp.
@@ -24,7 +24,7 @@ const E={
 let ctx=null,vocals=null,clipStart=0,activePhrase=0,audioBuffers=[],sourcePitch=[];
 let pitch=[],refBase=62,validPitch=0,mode='empty',session=0,frame=0,playerHeld=false;
 let midiValue=refBase,pointerId=null,trace=[],lastScore=null,playSource=null,playPromise=null,comparison=false;
-let ownActionCount=0,analysisToken=0,guideSegments=[],metronomeNodes=[],cancelCountIn=null,takes=[];
+let ownActionCount=0,analysisToken=0,guideSegments=[],metronomeNodes=[],cancelCountIn=null,takes=[],liveVoice=null;
 const AUDIO_URL='./singing-samples/junji-original-vocals-intro.mp3?v=3';
 // Extracted offline from the same original vocal MP3 with spectral tracking.
 // A sung chorus has harmonics/overlapping voices; the old browser autocorrelation
@@ -32,11 +32,17 @@ const AUDIO_URL='./singing-samples/junji-original-vocals-intro.mp3?v=3';
 // This derived contour stays synchronized to the shipped original, with
 // nulls only for genuine pauses. No melody was composed or substituted.
 const SOURCE_PITCH_50MS=[null,null,null,null,null,null,null,null,null,66.7,66.7,66.6,66.6,66.6,66.5,66.4,66.4,66.4,66.7,67,67,67,66.6,66.6,66.6,66.6,66.7,66.9,66.9,71.4,72,72.1,72.2,72.2,72.2,72.1,71.5,71.5,71.5,71.5,71.6,72,72,72,72.1,72.1,72.2,72.2,72.2,71.7,65.3,65.2,65.2,65,65,65,64.8,64.7,64.6,64.3,63.9,63.9,64.3,64.6,64.6,64.7,64.7,64.7,64.7,65,65,67.2,67.4,67.4,67.2,66.9,66.7,66.7,66.7,66.7,66.5,66.3,65.9,65.2,65.5,65.3,65.1,64.9,null,null,null,62.1,61.9,61.6,60,60,60,60,60,60.8,60.8,61.1,61.5,61.5,61.6,61.8,61.9,61.9,62.1,62.1,62.1,65.3,65.3,65.3,65,64.8,64.8,65,65,64.8,65.2,65.4,68.8,68.9,68.9,68.8,68,66.6,66.6,66.6,67.3,68.2,68.5,68.5,68.5,68.5,68.5,68.8,68.9,68.9,68.8,68.7,68.5,68.5,68.5,68.7,68.9,68.9,68.9,68.9,68.9,68.9,68.9,74.8,76,76,76.5,76.5,76.5,76.5,76.3];
-// Measured from the second sung phrase in the user's original vocal audio.
-const SOURCE_PITCH_2_50MS=[null,null,null,null,null,null,null,null,68.8,68.7,68.7,68.7,67.6,67.7,67.7,67.4,66.7,66.8,66.9,67,69.5,68.2,67,66.9,66.9,66.8,66.5,66.2,65.1,65,65,64.5,64.5,64.5,64.5,65.1,65.3,64.5,64.5,64.5,64.5,64.5,64.5,null,null,null,null,null,63.2,62.7,62.5,62.3,62.4,60,61.5,62.7,60.5,60.6,64.3,64.3,65.8,66,65.8,65.9,65.9,66.1,62.7,62.7,62.8,62.5,62.7,62.7,59.8,59.8,63.3,65.8,65.7,64.3,63,63.7,63.6,62.4,62.2,59.7,61.5,62.8,62.4,61.5,60,62.7];
+// The previous v0.6 cut started at 16s (the NEXT line: 以三民主義為根基).
+// Correct lyric boundaries in the user's 141s original vocal stem:
+//  國家有綱常／軍隊有軍紀: 8.35–12.37s (4.02s)
+//  軍紀是軍隊的命脈:     12.45–16.27s (3.82s)
+// Existing spectral pitch analysis of source 8.0–16.0s is sliced to match.
 const PHRASES=[
- {text:'國家有綱常　／　軍隊有軍紀',duration:8,audioUrl:AUDIO_URL,pitch:SOURCE_PITCH_50MS},
- {text:'軍紀是軍隊的命脈',duration:4.45,audioUrl:'./singing-samples/junji-original-vocals-phrase-2.mp3?v=6',pitch:SOURCE_PITCH_2_50MS}
+ {text:'國家有綱常　／　軍隊有軍紀',duration:4.02,
+  audioUrl:'./singing-samples/junji-vocals-line1-v7.mp3',pitch:SOURCE_PITCH_50MS.slice(7,88)},
+ {text:'軍紀是軍隊的命脈',duration:3.82,
+  audioUrl:'./singing-samples/junji-vocals-line2-v7.mp3',
+  pitch:SOURCE_PITCH_50MS.slice(89,161).concat([null,null,null,null,null])}
 ];
 const MIDI=f=>69+12*Math.log2(f/440);
 function getAudio(){if(!ctx){const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)throw Error('此裝置不支援 Web Audio');ctx=new Audio()}return ctx}
@@ -47,7 +53,7 @@ function setMode(next){
  E.main.disabled=playing||(!vocals&&next!=='error');
  E.repeat.disabled=playing||!vocals;
  E.preview.disabled=playing||!vocals;
- E.mouth.classList.toggle('singing',next==='listen'||next==='playback');
+ E.mouth.classList.toggle('singing',next==='listen'||next==='playback'||(next==='imitate'&&playerHeld));
  if(!next.startsWith('countin'))E.countdown.hidden=true;
  E.board.style.cursor='default';
  E.rail.style.cursor=next==='imitate'?'ns-resize':'default';
@@ -100,6 +106,7 @@ function drawGrid(){
 drawGrid();
 function stopAudio(){
  session++;
+ stopLiveVoice();
  if(cancelCountIn){const cancel=cancelCountIn;cancelCountIn=null;cancel()}
  for(const node of metronomeNodes){try{node.stop()}catch{}}
  metronomeNodes.length=0;
@@ -588,7 +595,9 @@ async function showComparedPhrase(index){
  E.compare.textContent='收起音準線';
 }
 async function startChallenge(){
+ const unlockAudio=getAudio().resume(); // Keep user gesture for mobile Web Audio.
  takes=[];lastScore=null;comparison=false;
+ await unlockAudio;
  await applyPhrase(0);
  if(mode==='ready'||mode==='done')await listen();
 }
@@ -619,7 +628,7 @@ E.compareFirst.addEventListener('click',()=>showComparedPhrase(0));
 E.compareSecond.addEventListener('click',()=>showComparedPhrase(1));
 window.addEventListener('pagehide',()=>stopAudio());
 window.armySingingTest={
- get status(){return {mode,hasOriginalVocals:audioBuffers.length===2,hasOriginalMusic:false,musicPlayback:false,embeddedAudio:true,
+ get status(){return {mode,hasOriginalVocals:audioBuffers.length===2,hasOriginalMusic:false,musicPlayback:false,embeddedAudio:true,liveVoiceEnabled:!!liveVoice&&mode==='imitate',
    phrase:activePhrase+1,phraseCount:2,completedTakes:takes.filter(Boolean).length,
    phraseSeconds:CLIP,referenceFrames:pitch.length,voicedPercent:Math.round(validPitch*100),
    referenceVisible:E.guide.style.display!=='none',guidePathPoints:sourcePitch.filter(Number.isFinite).length,
