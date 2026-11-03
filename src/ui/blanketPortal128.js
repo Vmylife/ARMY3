@@ -1,4 +1,4 @@
-// ARMY3 v1.91: camp training portals, near-range GPU warm-up with safe navigation fallback.
+// ARMY3 v1.92: camp training portals, near-range GPU warm-up with safe navigation fallback.
 export const BLANKET_PORTAL=Object.freeze({x:-36.37,z:1.49});
 export const GRENADE_PORTAL=Object.freeze({x:-22.79,z:-27.52});
 export const SHOOTING_PORTAL=Object.freeze({x:12.37,z:16.84});
@@ -51,9 +51,9 @@ export function createBlanketPortal(renderer,{onTrainingStart=()=>{},resuming=fa
  const blanketDraw=makeGroundRing(renderer,BLANKET_PORTAL),
   grenadeDraw=makeGroundRing(renderer,GRENADE_PORTAL),
   shootingDraw=makeGroundRing(renderer,SHOOTING_PORTAL);
- const blanket=createPortalMenu({position:BLANKET_PORTAL,kind:'blanket',panelId:'blanketPortalMenu',startId:'blanketPortalStart',cancelId:'blanketPortalCancel',destination:'./blanket-stack.html?v=159',onStart:()=>onTrainingStart('blanket'),initialDismissed:resuming});
- const grenade=createPortalMenu({position:GRENADE_PORTAL,kind:'grenade',panelId:'grenadePortalMenu',startId:'grenadePortalStart',cancelId:'grenadePortalCancel',destination:'./grenade-workshop-test.html?v=153',onStart:()=>onTrainingStart('grenade'),initialDismissed:resuming});
- const shooting=createPortalMenu({position:SHOOTING_PORTAL,kind:'shooting',panelId:'shootingPortalMenu',startId:'shootingPortalStart',cancelId:'shootingPortalCancel',destination:'./shooting-paper-range.html?v=154',onStart:()=>onTrainingStart('shooting'),initialDismissed:resuming});
+ const blanket=createPortalMenu({position:BLANKET_PORTAL,kind:'blanket',panelId:'blanketPortalMenu',startId:'blanketPortalStart',cancelId:'blanketPortalCancel',destination:'./blanket-stack.html?v=192',onStart:()=>onTrainingStart('blanket'),initialDismissed:resuming});
+ const grenade=createPortalMenu({position:GRENADE_PORTAL,kind:'grenade',panelId:'grenadePortalMenu',startId:'grenadePortalStart',cancelId:'grenadePortalCancel',destination:'./grenade-workshop-test.html?v=192',onStart:()=>onTrainingStart('grenade'),initialDismissed:resuming});
+ const shooting=createPortalMenu({position:SHOOTING_PORTAL,kind:'shooting',panelId:'shootingPortalMenu',startId:'shootingPortalStart',cancelId:'shootingPortalCancel',destination:'./shooting-paper-range.html?v=192',onStart:()=>onTrainingStart('shooting'),initialDismissed:resuming});
  return {
   draw(){blanketDraw();grenadeDraw();shootingDraw()},
   update(playerPos,blocked=false){blanket.update(playerPos,blocked);grenade.update(playerPos,blocked);shooting.update(playerPos,blocked)}
