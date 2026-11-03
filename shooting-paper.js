@@ -1,4 +1,4 @@
-/* ARMY3 · 報告長官！我的子彈有上靶嗎？ — standalone target-paper shooting v1.46 */
+/* ARMY3 · 報告長官！我的子彈有上靶嗎？ — standalone target-paper shooting v1.47 */
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
 const canvas=$('shootingOverlay'),ctx=canvas.getContext('2d',{alpha:true}),min=Math.min,max=Math.max,clamp=(x,a,b)=>max(a,min(b,x));
@@ -56,7 +56,9 @@ function knockRunner(a,tip){
  const d=shotRay(tip),len=Math.hypot(d[0],d[2])||1,dx=d[0]/len,dz=d[2]/len;
  a.alive=false;a.hitT=0;a.fall=0;a.airY=.035;a.landed=false;
  a.vx=dx*(4.25+runnerRandom()*.6);a.vz=dz*(4.25+runnerRandom()*.6);a.vy=2.9;
- a.angleStart=a.angle;a.targetAngle=Math.atan2(dx,dz);
+ // Face against the bullet direction so a backward tumble lands face-up,
+ // while translation still follows the bullet and the head lands downrange.
+ a.angleStart=a.angle;a.targetAngle=Math.atan2(-dx,-dz);
 }
 function shotRay(tip){
  const f=focal(),nx=(tip.x-width*.5)/f,ny=-(tip.y-height*.5)/f;
