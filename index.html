@@ -28,6 +28,8 @@ input[type="range"]{-webkit-user-select:none;user-select:none;-webkit-touch-call
 #blanketPortalCancel{background:#425f4b;color:#f4f5df;border-color:#a8bd98}
 #grenadePortalStart{background:linear-gradient(145deg,#f3df7d,#e5aa38);color:#433014}
 #grenadePortalCancel{background:#425f4b;color:#f4f5df;border-color:#a8bd98}
+#shootingPortalStart{background:linear-gradient(145deg,#f3df7d,#e5aa38);color:#433014}
+#shootingPortalCancel{background:#425f4b;color:#f4f5df;border-color:#a8bd98}
 </style>
 </head>
 <body>
@@ -54,6 +56,14 @@ input[type="range"]{-webkit-user-select:none;user-select:none;-webkit-touch-call
     <button id="grenadePortalCancel" type="button">稍後再說</button>
   </div>
 </section>
+<section id="shootingPortalMenu" class="training-portal-menu" aria-label="實彈射擊鑑測互動選單" hidden>
+  <div class="training-portal-title">🎯 實彈射擊鑑測</div>
+  <div class="training-portal-detail">五關連續鑑測，從第 1 關開始。每關上靶 5 發才能晉級，失敗就直接結算。</div>
+  <div class="training-portal-buttons">
+    <button id="shootingPortalStart" type="button">開始射擊鑑測</button>
+    <button id="shootingPortalCancel" type="button">稍後再說</button>
+  </div>
+</section>
 <div id="floatingStick" aria-hidden="true"><div class="stick-base"><div id="stickThumb" class="stick-thumb"></div></div></div>
 <div id="notice" role="status" hidden></div>
 <section class="army-home" id="armyHome" aria-label="國軍模擬器首頁">
@@ -74,10 +84,10 @@ input[type="range"]{-webkit-user-select:none;user-select:none;-webkit-touch-call
 <div id="debug" hidden></div>
 <!-- Army 3D Clean v0.11.1: refined collision, road-priority navigation, and NPC spacing. -->
 <script type="importmap">
-{"imports":{"./src/map/campGeometry.js?v=092":"./src/map/ground103.js?v=124","./src/map/mapDrawing.js?v=093":"./src/map/drawMap95.js?v=095","./src/map/roadMesh.js?v=071":"./src/map/roadMesh104.js?v=125","./src/ui/blanketPortal128.js?v=128":"./src/ui/blanketPortal128.js?v=196","./src/systems/campSession.js?v=144":"./src/systems/campSession.js?v=190","./src/ui/worldMap.js?v=093":"./src/ui/worldMap.js?v=180","./src/training/rangeTraining.js?v=111":"./src/training/rangeTraining.js?v=209"}}
+{"imports":{"./src/map/campGeometry.js?v=092":"./src/map/ground103.js?v=124","./src/map/mapDrawing.js?v=093":"./src/map/drawMap95.js?v=095","./src/map/roadMesh.js?v=071":"./src/map/roadMesh104.js?v=125","./src/ui/blanketPortal128.js?v=128":"./src/ui/blanketPortal128.js?v=197","./src/systems/campSession.js?v=144":"./src/systems/campSession.js?v=190","./src/ui/worldMap.js?v=093":"./src/ui/worldMap.js?v=180","./src/training/rangeTraining.js?v=111":"./src/training/rangeTraining.js?v=209"}}
 </script>
 <script type="module" src="./src/systems/campBgm.js?v=190"></script>
-<script type="module" src="./src/systems/campGameWarmup.js?v=196"></script>
+<script type="module" src="./src/systems/campGameWarmup.js?v=197"></script>
 <script type="module" src="./src/bootstrap111.js?v=190"></script>
 </body>
 </html>
