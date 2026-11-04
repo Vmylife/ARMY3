@@ -487,7 +487,7 @@ async function applyPhrase(index){
  vocals=audioBuffers[index];
  clipStart=0;
  E.words.textContent=part.text;
- E.count.textContent='原版人聲 · 第 '+(index+1)+'/'+PHRASES.length+' 句 · '+CLIP.toFixed(1)+' 秒';
+ E.count.textContent=(index+1)+' / '+PHRASES.length;
  for(let i=0;i<PHRASES.length;i++){
   const marker=$('phraseStep'+(i+1));
   if(!marker)continue;
