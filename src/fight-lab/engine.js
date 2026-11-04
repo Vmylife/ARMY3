@@ -10,7 +10,7 @@ const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const createFighter=(id,x,z)=>({id,x,z,angle:id==='player'?Math.PI/2:-Math.PI/2,hp:100,
  state:'idle',attack:null,stun:0,down:0,rise:0,cd:0,moveSpeed:0,
- pushX:0,pushZ:0,lean:0,chain:0,chainAt:-99,damageSinceFall:0,
+ pushX:0,pushZ:0,lean:0,airTime:0,airHeight:0,chain:0,chainAt:-99,damageSinceFall:0,
  impactAnim:'Hit_Reaction',fallen:false});
 export class FightEngine{
  constructor(){this.reset()}
@@ -50,8 +50,9 @@ export class FightEngine{
   const ko=b.hp<=0,down=ko||(b.damageSinceFall>LAUNCH_AFTER_DAMAGE);
   if(down){
    b.damageSinceFall=0;b.state='down';b.down=ko?5:2.0;b.stun=0;b.lean=0;b.fallen=true;
+   b.airTime=.63;b.airHeight=0;
   }
-  const push=down?4.6:def.push;
+  const push=down?12.0:def.push;
   b.pushX=fx*push;b.pushZ=fz*push;
   if(a.id==='player'){
    this.hits++;this.aggressive=true;
@@ -83,11 +84,15 @@ export class FightEngine{
  updateFighter(a,dt){
   a.cd=Math.max(0,a.cd-dt);
   if(a.state==='down'){
+   if(a.airTime>0){
+    a.airTime=Math.max(0,a.airTime-dt);
+    a.airHeight=.78*Math.sin(Math.PI*(1-a.airTime/.63));
+   }else a.airHeight=0;
    a.down=Math.max(0,a.down-dt);
    if(a.down===0&&a.hp>0){a.rise=1.70;a.state='rise';this.emit('rise',{who:a.id})}
   }else if(a.state==='rise'){
    a.rise=Math.max(0,a.rise-dt);
-   if(a.rise===0){a.state='idle';a.lean=0;a.fallen=false}
+   if(a.rise===0){a.state='idle';a.lean=0;a.fallen=false;a.airHeight=0}
   }else if(a.attack){
    a.attack.clock+=dt;const def=ATTACKS[a.attack.type];
    if(!a.attack.fired&&a.attack.clock>=def.hit){a.attack.fired=true;this.attackCollision(a)}
