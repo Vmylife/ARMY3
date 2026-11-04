@@ -127,6 +127,7 @@ async function boot(){
   }
   const combat=createCampCombat({player,npcs,renderer,rifleGlb:combatRifleGlb,npcGlb});
   window.armyCampCombat=combat;
+  window.armyProgression?.mountCampStatus(combat,options);
   combat.animationStatus={
    heroSupplement:heroCombatClips,
    npcSupplement:!!npcs[0]?.anim?.combatAnimationPack,

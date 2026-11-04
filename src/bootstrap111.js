@@ -18,7 +18,7 @@ window.armyLoadFailure=err=>{
  $('armyMessage').style.color='#a52c27';button.hidden=false;button.disabled=false;button.textContent='重新載入';button.onclick=()=>location.reload();
 };
 async function loadCampWithPause(){
- const sourceURL=new URL('./src/main111.js?v=158',location.href);
+ const sourceURL=new URL('./src/main111.js?v=159',location.href);
  const response=await fetch(sourceURL,{cache:'default'});
  if(!response.ok)throw Error('軍營程式 HTTP '+response.status);
  let source=await response.text();
@@ -27,7 +27,7 @@ async function loadCampWithPause(){
  source=source.replace(needle,`  function tick(now){
    // Do not update/render the hidden 3D camp while a loaded minigame is open.
    // Clock still advances so returning to the camp never causes a large dt jump.
-   if(window.armyMinigameActive){last=now;requestAnimationFrame(tick);return;}
+   if(window.armyMinigameActive||window.armyCharacterStatusOpen){last=now;requestAnimationFrame(tick);return;}
    try{`);
  // Blob modules need full import URLs; preserve the current app's exact module versions.
  source=source.replace(/(\bfrom\s+)(['"])(\.\/[^'"]+)\2/g,(_m,p,q,path)=>p+q+new URL(path,sourceURL).href+q);
@@ -46,7 +46,7 @@ button.addEventListener('click',async()=>{
 },{once:true});
 if(!getReturningCampSession()){
  const prefetch=async()=>{
-  for(const path of ['./src/main111.js?v=158','./assets/characters/cadet/cadet-life-lite.glb?v=119']){
+  for(const path of ['./src/main111.js?v=159','./assets/characters/cadet/cadet-life-lite.glb?v=119']){
    if(document.body.classList.contains('army-ready'))break;
    try{
     if(navigator.connection?.saveData)break;

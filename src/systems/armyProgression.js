@@ -8,18 +8,18 @@ const $=id=>document.getElementById(id);
 const RANKS=['新兵','二等兵','一等兵','上等兵','下士','中士','上士','少尉','中尉','上尉','少校','中校','上校','少將','中將','上將'];
 const NAMES={blanket:'棉被疊疊樂',shooting:'實彈射擊',grenade:'手榴彈投擲',weed:'拔草鑑測',swipe:'中山室滑手機',singing:'唱軍歌'};
 const TRAINING=[
- {id:'blanket-stack',kind:'blanket',name:'疊被大師',effect:['一次疊 2 層棉被','一次疊 3 層棉被','一次疊 4 層棉被'],note:'一個操作直接完成多層，不拖慢移動速度'},
- {id:'blanket-align',kind:'blanket',name:'豆腐干職人',effect:['對齊容錯 +25%','對齊容錯 +50%','對齊容錯 +75%'],note:'降低堆疊失誤率'},
- {id:'shoot-breathe',kind:'shooting',name:'呼吸控制',effect:['準星晃動 -20%','準星晃動 -50%','準星晃動 -80%'],note:'降低靶場準星自然晃動幅度'},
- {id:'shoot-paper',kind:'shooting',name:'靶場老鳥',effect:['靶紙左右寬度 +20%','靶紙左右寬度 +50%','靶紙左右寬度 +80%'],note:'只加寬靶紙，絕不改上下高度'},
- {id:'grenade-pitch',kind:'grenade',name:'棒球投手',effect:['計量條速度 -20%','計量條速度 -40%','計量條速度 -60%'],note:'方向、距離計量條變慢'},
- {id:'grenade-retry',kind:'grenade',name:'再給我一次機會',effect:['每場可重投 1 次','每場可重投 2 次','每場可重投 3 次'],note:'用來挽救投歪的手榴彈'},
- {id:'weed-tolerance',kind:'weed',name:'鏟土容錯',effect:['額外允許鏟錯 1 次','額外允許鏟錯 2 次','額外允許鏟錯 3 次'],note:'例如原本錯兩次會壞，Lv.1 改成第三次才壞'},
- {id:'weed-boss',kind:'weed',name:'王草剋星',effect:['每點王草多鏟 1 下','每點王草多鏟 2 下','每點王草多鏟 3 下'],note:'只針對王草，每次點擊合計鏟 2／3／4 下'},
- {id:'swipe-score',kind:'swipe',name:'班長媽媽雷達',effect:['滑卡總分 ×1.2','滑卡總分 ×1.5','滑卡總分 ×2'],note:'結算分數最多 100 分'},
- {id:'swipe-undo',kind:'swipe',name:'後悔藥',effect:['每場撤銷錯誤滑卡 1 次','每場撤銷錯誤滑卡 2 次','每場撤銷錯誤滑卡 3 次'],note:'給誤觸的玩家一次補救機會'},
- {id:'singing-memory',kind:'singing',name:'軍歌速記',effect:['記憶顯示 +1 秒','記憶顯示 +2 秒','記憶顯示 +3 秒'],note:'讓記憶階段有更多觀察時間'},
- {id:'singing-pitch',kind:'singing',name:'絕對音感',effect:['音準容錯 +20%','音準容錯 +40%','音準容錯 +60%'],note:'擴大軍歌音準合格範圍'}
+ {id:'blanket-stack',kind:'blanket',name:'疊被大師',effect:['一次疊 2 層棉被','一次疊 3 層棉被','一次疊 4 層棉被'],note:'一次完成多層棉被'},
+ {id:'blanket-align',kind:'blanket',name:'豆腐干職人',effect:['對齊容錯 +25%','對齊容錯 +50%','對齊容錯 +75%'],note:'更容易把棉被疊整齊'},
+ {id:'shoot-breathe',kind:'shooting',name:'呼吸控制',effect:['準星晃動 -20%','準星晃動 -50%','準星晃動 -80%'],note:'降低準星晃動'},
+ {id:'shoot-paper',kind:'shooting',name:'靶場老鳥',effect:['靶紙左右寬度 +20%','靶紙左右寬度 +50%','靶紙左右寬度 +80%'],note:'只增加靶紙左右寬度'},
+ {id:'grenade-pitch',kind:'grenade',name:'棒球投手',effect:['計量條速度 -20%','計量條速度 -40%','計量條速度 -60%'],note:'方向、距離計量條放慢'},
+ {id:'grenade-retry',kind:'grenade',name:'再給我一次機會',effect:['每場可重投 1 次','每場可重投 2 次','每場可重投 3 次'],note:'投歪時可以重新投擲'},
+ {id:'weed-tolerance',kind:'weed',name:'鏟土容錯',effect:['額外允許鏟錯 1 次','額外允許鏟錯 2 次','額外允許鏟錯 3 次'],note:'原本鏟錯兩次會壞，Lv.1 改成三次'},
+ {id:'weed-boss',kind:'weed',name:'王草剋星',effect:['每點王草多鏟 1 下','每點王草多鏟 2 下','每點王草多鏟 3 下'],note:'王草一次點擊可鏟更多下'},
+ {id:'swipe-score',kind:'swipe',name:'班長媽媽雷達',effect:['滑卡總分 ×1.2','滑卡總分 ×1.5','滑卡總分 ×2'],note:'分數上限 100 分'},
+ {id:'swipe-undo',kind:'swipe',name:'後悔藥',effect:['每場撤銷錯誤滑卡 1 次','每場撤銷錯誤滑卡 2 次','每場撤銷錯誤滑卡 3 次'],note:'滑錯可以撤銷'},
+ {id:'singing-memory',kind:'singing',name:'軍歌速記',effect:['記憶顯示 +1 秒','記憶顯示 +2 秒','記憶顯示 +3 秒'],note:'軍歌記憶時間延長'},
+ {id:'singing-pitch',kind:'singing',name:'絕對音感',effect:['音準容錯 +20%','音準容錯 +40%','音準容錯 +60%'],note:'音準判定更寬鬆'}
 ];
 const TRAITS={
  blanket:{
@@ -155,67 +155,277 @@ function rewardPanel(kind,score,anchor){
  const summary=make('summary','army-reward__summary',(record.first?'🎖 +'+record.medals:'🎖 已領取')+'　'+(record.positive?'正面':'負面')+'：'+record.name+' Lv.'+record.level);
  box.append(summary);
  const detail=make('div','army-reward__desc',record.description);
- const foot=make('div','army-reward__foot','本輪特質 · 暫不生效 · 本輪每項訓練僅發獎一次');
+ const foot=make('div','army-reward__foot','本輪限定');
  box.append(detail,foot);
  anchor.insertAdjacentElement('afterend',box);
  return record;
 }
+// Military rank progress is a saved blueprint in this release, not live combat buffs.
+const RANK_GAIN={hp:15,defense:2,damage:3,speed:1};
+const rankBonus=level=>({hp:level*RANK_GAIN.hp,defense:level*RANK_GAIN.defense,
+ damage:level*RANK_GAIN.damage,speed:level*RANK_GAIN.speed});
+// Explicit per-level weapon specifications; none are applied to the current combat engine yet.
+const WEAPON_LEVELS={
+ pistol:[
+  {mag:1,damage:20,reload:2.5,interval:0.50,mode:'單發'},
+  {mag:3,damage:22,reload:2.2,interval:0.42,mode:'單發'},
+  {mag:6,damage:24,reload:1.9,interval:0.35,mode:'單發'},
+  {mag:9,damage:27,reload:1.6,interval:0.30,mode:'單發'},
+  {mag:12,damage:30,reload:1.3,interval:0.25,mode:'單發'}],
+ rifle:[
+  {mag:3,damage:30,reload:3.0,interval:0.42,mode:'半自動'},
+  {mag:6,damage:32,reload:2.7,interval:0.35,mode:'半自動'},
+  {mag:12,damage:35,reload:2.4,interval:0.25,mode:'慢速連發'},
+  {mag:20,damage:38,reload:2.0,interval:0.17,mode:'連發'},
+  {mag:30,damage:40,reload:1.6,interval:0.125,mode:'高速連發'}]
+};
+const WEAPON_NAMES={fists:'拳頭',pistol:'手槍',rifle:'步槍'};
+const weaponStats=x=>['彈匣 '+x.mag+' 發','傷害 '+x.damage,'換彈 '+x.reload+' 秒','射擊間隔 '+x.interval+' 秒',x.mode];
+function updateHomeWallet(){
+ const target=$('armyHomeMedals');if(!target)return;
+ const s=state();
+ target.textContent='🎖 '+s.medals+' · '+RANKS[clamp(s.rank,0,RANKS.length-1)];
+}
 function upgradeUI(){
  const host=$('armyUpgradeDialog'),open=$('armyUpgradeOpen');
  if(!host||!open)return;
- const view=$('armyUpgradeView'),head=$('armyUpgradeMedals'),tabs=host.querySelectorAll('[data-tab]');
+ const view=$('armyUpgradeView'),head=$('armyUpgradeMedals'),tabs=host.querySelectorAll('[data-tab]'),toast=$('armyUpgradeToast');
  let tab='rank';
- function render(){
-  const s=state();head.textContent='🎖 '+s.medals+' 枚';$('armyHomeMedals').textContent='🎖 '+s.medals+' · '+RANKS[clamp(s.rank,0,RANKS.length-1)];
-  for(const t of tabs)t.classList.toggle('selected',t.dataset.tab===tab);
+ const detailLine=(el,label,value)=>{
+  const row=make('div','army-upgrade-metric');
+  row.append(make('span','',label),make('strong','',value));
+  el.append(row);
+ };
+ const addCard=({id,name,caption,tip,lines=[],cost=null,action=null,levels=[]})=>{
+  const card=make('details','army-upgrade-card');card.dataset.key=id;
+  const summary=make('summary','army-upgrade-card__summary');
+  const meta=make('span','');
+  meta.append(make('strong','',name),make('small','',caption));
+  summary.append(meta,make('span','army-upgrade-card__chevron','›'));
+  card.append(summary);
+  const body=make('div','army-upgrade-card__body');
+  if(tip)body.append(make('p','army-upgrade-explain',tip));
+  if(lines.length){
+   const metrics=make('div','army-upgrade-metrics');
+   for(const [label,val]of lines)detailLine(metrics,label,val);
+   body.append(metrics);
+  }
+  if(levels.length){
+   const list=make('div','army-upgrade-levels');
+   for(const item of levels){
+    const row=make('div','army-upgrade-level'+(item.active?' active':'')+(item.next?' next':''));
+    row.append(make('strong','',item.label),make('span','',item.text));list.append(row);
+   }
+   body.append(list);
+  }
+  if(cost!==null&&action){
+   const btn=make('button','army-upgrade-buy','🎖 '+cost+' · 升級');
+   btn.type='button';btn.disabled=cost>state().medals;
+   btn.addEventListener('click',event=>{
+    event.preventDefault();
+    const outcome=action();
+    if(!outcome.success)return;
+    render(id);
+    if(toast){toast.hidden=false;toast.textContent='升級成功'}
+   });
+   body.append(btn);
+  }
+  card.append(body);view.append(card);
+  return card;
+ };
+ function render(focusId=null){
+  const y=view.scrollTop,s=state();
+  head.textContent='🎖 '+s.medals+' 枚';updateHomeWallet();
+  for(const t of tabs){
+   t.classList.toggle('selected',t.dataset.tab===tab);
+   t.setAttribute('aria-selected',String(t.dataset.tab===tab));
+  }
   view.replaceChildren();
-  const addCard=(name,caption,description,level,cost,action)=>{
-   const card=make('details','army-upgrade-card');
-   const sum=make('summary','army-upgrade-card__summary');
-   const meta=make('span','','');
-   const title=make('strong','',name);const sub=make('small','',caption);
-   meta.append(title,sub);sum.append(meta,make('span','army-upgrade-card__chevron','›'));
-   card.append(sum);
-   const info=make('div','army-upgrade-card__body');
-   info.append(make('p','',description));
-   if(level!==null&&cost!==null){
-    const btn=make('button','army-upgrade-buy', '🎖 '+cost+' · 升級');
-    btn.type='button';btn.disabled=cost>s.medals;
-    btn.addEventListener('click',ev=>{ev.preventDefault();const result=action();if(result.success){render();const toast=$('armyUpgradeToast');toast.textContent='升級已記錄（能力尚未生效）'}});
-    info.append(btn);
-   }else info.append(make('small','','已達目前最高等級'));
-   card.append(info);view.append(card);
-  };
   if(tab==='rank'){
    const k=clamp(s.rank,0,RANKS.length-1),next=k<RANKS.length-1?rankCost(k):null;
-   addCard('軍階：'+RANKS[k],next!==null?'下一階：'+RANKS[k+1]:'最高軍階',
-    '預計提升血量、防禦、基礎傷害及移動速度，並解鎖軍階專屬趣味事件。現在僅記錄軍階。',k,next,()=>buy('rank'));
+   const now=rankBonus(k),after=rankBonus(k+1);
+   addCard({id:'rank',name:RANKS[k],caption:next===null?'最高軍階':'下一階：'+RANKS[k+1],
+    tip:next===null?'已達最高軍階':'升階增加的能力',
+    lines:next===null?
+     [['生命加成','+'+now.hp+' HP'],['防禦加成','+'+now.defense+'%'],['攻擊加成','+'+now.damage+'%'],['移速加成','+'+now.speed+'%']]:
+     [['生命上限','+'+RANK_GAIN.hp+' HP'],['防禦減傷','+'+RANK_GAIN.defense+'%'],['攻擊傷害','+'+RANK_GAIN.damage+'%'],['移動速度','+'+RANK_GAIN.speed+'%']],
+    levels:next===null?[]:[{label:'升階後累計',text:'HP +'+after.hp+' · 防禦 +'+after.defense+'% · 攻擊 +'+after.damage+'% · 移速 +'+after.speed+'%'}],
+    cost:next,action:()=>buy('rank')});
   }else if(tab==='weapon'){
-   for(const [id,name,note] of [['pistol','手槍','彈匣、換彈、射速、武器傷害'],['rifle','步槍','彈匣、射擊模式、換彈、武器傷害']]){
-    const lvl=clamp(s.weapons[id],0,5);
-    addCard(name,lvl?'已解鎖 · Lv.'+lvl:'尚未解鎖',
-     '永久解鎖後預計從進營區就能使用；逐級強化'+note+'。目前不改動任何槍械使用權或數值。',
-     lvl,lvl<5?gunCost(id,lvl):null,()=>buy('weapon',id));
+   for(const id of ['pistol','rifle']){
+    const level=clamp(s.weapons[id],0,5),spec=WEAPON_LEVELS[id];
+    const next=level<5?spec[level]:null;
+    addCard({id,name:WEAPON_NAMES[id],caption:level?'Lv.'+level+'/5':'未解鎖',
+     tip:level===0?'解鎖後可升級五個階段':null,
+     lines:next?[['下級彈匣',next.mag+' 發'],['下級傷害',String(next.damage)],['下級換彈',next.reload+' 秒'],['下級射擊間隔',next.interval+' 秒']]:[],
+     levels:spec.map((x,i)=>({label:'Lv.'+(i+1),text:weaponStats(x).join(' · '),active:level===i+1,next:level===i})),
+     cost:level<5?gunCost(id,level):null,action:()=>buy('weapon',id)});
    }
   }else{
    for(const kind of Object.keys(NAMES)){
     view.append(make('h3','army-upgrade-group',NAMES[kind]));
-    for(const t of TRAINING.filter(t=>t.kind===kind)){
-     const lvl=clamp(s.training[t.id]||0,0,3);
-     const levelDesc=lvl?'目前：'+t.effect[lvl-1]:'尚未學習';
-     addCard(t.name,'Lv.'+lvl+'/3 · '+levelDesc,
-      t.note+'。升級後：'+(lvl<3?t.effect[lvl]:'已達最高等級')+'（目前僅記錄，尚未套用）。',
-      lvl,lvl<3?trainingCost(lvl):null,()=>buy('training',t.id));
+    for(const t of TRAINING.filter(x=>x.kind===kind)){
+     const level=clamp(s.training[t.id]||0,0,3);
+     addCard({id:t.id,name:t.name,caption:'Lv.'+level+'/3'+(level?' · '+t.effect[level-1]:''),
+      tip:t.note,
+      levels:t.effect.map((x,i)=>({label:'Lv.'+(i+1),text:x,active:level===i+1,next:level===i})),
+      cost:level<3?trainingCost(level):null,action:()=>buy('training',t.id)});
     }
    }
   }
+  if(focusId){
+   const selected=Array.from(view.querySelectorAll('details')).find(x=>x.dataset.key===focusId);
+   if(selected)selected.open=true;
+   view.scrollTop=y;
+  }else view.scrollTop=0;
  }
- open.addEventListener('click',()=>{host.hidden=false;tab='rank';$('armyUpgradeToast').textContent='所有能力目前僅供展示，不影響遊戲';render()});
+ open.addEventListener('click',()=>{
+  host.hidden=false;tab='rank';if(toast)toast.hidden=true;render();
+ });
  $('armyUpgradeClose').addEventListener('click',()=>{host.hidden=true});
  host.addEventListener('click',e=>{if(e.target===host)host.hidden=true});
- for(const t of tabs)t.addEventListener('click',()=>{tab=t.dataset.tab;render()});
- window.addEventListener('storage',()=>{if(!host.hidden)render()});
- const s=state();$('armyHomeMedals').textContent='🎖 '+s.medals+' · '+RANKS[clamp(s.rank,0,RANKS.length-1)];
+ for(const t of tabs)t.addEventListener('click',()=>{tab=t.dataset.tab;if(toast)toast.hidden=true;render()});
+ window.addEventListener('storage',()=>{updateHomeWallet();if(!host.hidden)render()});
+ updateHomeWallet();
+}
+function mountCampStatus(combat,options={}){
+ if(!combat?.root||$('campCharacterButton'))return false;
+ const root=combat.root;
+ const button=make('button','army-character-trigger');
+ button.id='campCharacterButton';button.type='button';
+ button.setAttribute('aria-label','角色狀態');
+ button.innerHTML='<span aria-hidden="true">🪖</span><small>狀態</small>';
+ const dialog=make('div','army-character-dialog');
+ dialog.id='campCharacterDialog';dialog.hidden=true;
+ dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');
+ dialog.setAttribute('aria-label','角色狀態');
+ dialog.innerHTML=
+ '<section class="army-character-panel">'+
+ '<header class="army-character-header"><div><h2>角色狀態</h2><small id="campCharacterRank"></small></div>'+
+ '<button id="campCharacterClose" type="button" aria-label="關閉">×</button></header>'+
+ '<nav class="army-character-tabs" aria-label="角色狀態分頁">'+
+ '<button type="button" data-status-tab="base">素質</button>'+
+ '<button type="button" data-status-tab="weapon">武器</button>'+
+ '<button type="button" data-status-tab="training">訓練</button>'+
+ '<button type="button" data-status-tab="traits">特質</button>'+
+ '<button type="button" data-status-tab="record">紀錄</button>'+
+ '</nav><div class="army-character-body" id="campCharacterBody"></div></section>';
+ root.append(button,dialog);
+ const view=$('campCharacterBody'),tabs=dialog.querySelectorAll('[data-status-tab]'),close=$('campCharacterClose');
+ let tab='base';
+ const section=title=>view.append(make('h3','army-character-section',title));
+ const row=(label,value)=>{
+  const item=make('div','army-character-row');
+  item.append(make('span','',label),make('strong','',value));
+  view.append(item);
+ };
+ const chip=(label,value)=>{
+  const el=make('div','army-character-chip');
+  el.append(make('small','',label),make('strong','',value));
+  return el;
+ };
+ const cards=(data)=>{
+  const grid=make('div','army-character-grid');
+  for(const [label,value]of data)grid.append(chip(label,value));
+  view.append(grid);
+ };
+ const card=(title,subtitle,description,tone='')=>{
+  const el=make('details','army-character-card'+(tone?' '+tone:''));
+  const summary=make('summary','');
+  const name=make('span','');
+  name.append(make('strong','',title),make('small','',subtitle));
+  summary.append(name,make('span','army-character-chevron','›'));
+  el.append(summary);
+  if(description)el.append(make('p','',description));
+  view.append(el);
+ };
+ const fmt=n=>Number(n).toFixed(1).replace(/\.0$/,'');
+ function render(){
+  const s=state(),r=run(),rank=clamp(s.rank,0,RANKS.length-1);
+  $('campCharacterRank').textContent=RANKS[rank]+' · 🎖 '+s.medals;
+  for(const t of tabs){
+   t.classList.toggle('selected',t.dataset.statusTab===tab);
+   t.setAttribute('aria-selected',String(t.dataset.statusTab===tab));
+  }
+  view.replaceChildren();
+  if(tab==='base'){
+   section('目前作戰數值');
+   cards([['生命',Math.ceil(combat.hp)+' / 100'],['防禦減傷','0%'],
+    ['目前武器',WEAPON_NAMES[combat.weapon]||'拳頭'],['軍階',RANKS[rank]]]);
+   section('攻擊力');
+   row('拳頭','10');row('手槍','25');row('步槍','40');
+   section('移動速度');
+   row('走路',fmt(options.moveSpeed??4.2)+' m/s');
+   row('跑步',fmt(options.runSpeed??6.6)+' m/s');
+   row('衝刺',fmt(options.sprintSpeed??8.3)+' m/s');
+   section('軍階增益');
+   const bonus=rankBonus(rank);
+   cards([['生命','+'+bonus.hp+' HP'],['防禦','+'+bonus.defense+'%'],['攻擊','+'+bonus.damage+'%'],['移速','+'+bonus.speed+'%']]);
+   view.append(make('p','army-character-footnote','軍階增益目前尚未生效'));
+   section('當前狀態');
+   row('警戒',combat.provoked?'警戒中':'正常');
+   row('角色',combat.gameOver?'陣亡':combat.playerDown>0?'倒地':combat.playerRise>0?'起身中':'正常');
+  }else if(tab==='weapon'){
+   section('目前裝備');
+   row('手持武器',WEAPON_NAMES[combat.weapon]||'拳頭');
+   row('拳頭傷害','10');row('手槍傷害','25');row('步槍傷害','40');
+   section('武器升級');
+   for(const id of ['pistol','rifle']){
+    const level=clamp(s.weapons[id],0,5),spec=level?WEAPON_LEVELS[id][level-1]:null;
+    card(WEAPON_NAMES[id],level?'Lv.'+level+'/5':'尚未解鎖',
+      spec?weaponStats(spec).join(' · '):'前往首頁升級以解鎖');
+   }
+   view.append(make('p','army-character-footnote','武器升級數值目前尚未生效'));
+  }else if(tab==='training'){
+   const owned=TRAINING.filter(t=>clamp(s.training[t.id]||0,0,3)>0);
+   section('已學習 · '+owned.length+'/12');
+   if(!owned.length)view.append(make('p','army-character-empty','尚未學習訓練天賦'));
+   for(const kind of Object.keys(NAMES)){
+    const selected=owned.filter(t=>t.kind===kind);
+    if(!selected.length)continue;
+    section(NAMES[kind]);
+    for(const t of selected){
+     const lvl=clamp(s.training[t.id]||0,1,3);
+     card(t.name,'Lv.'+lvl,t.effect[lvl-1]);
+    }
+   }
+  }else if(tab==='traits'){
+   const earned=Object.values(r.trainings||{}).filter(t=>t?.name);
+   section('本輪戰鬥特質 · '+earned.length+'/6');
+   if(!earned.length)view.append(make('p','army-character-empty','尚未取得戰鬥特質'));
+   for(const t of earned)card(t.name+' · Lv.'+t.level,(NAMES[t.kind]||'訓練')+' · '+(t.positive?'正面':'負面'),
+    t.description,t.positive?'good':'bad');
+  }else{
+   const b=r.battle||{},earned=Object.values(r.trainings||{});
+   section('本輪戰績');
+   cards([['訓練完成',earned.length+' / 6'],['軍營擊殺',String(combat.kills)],
+    ['敵軍擊殺',String(b.kills||0)],['榮譽勳章',String(s.medals)]]);
+   section('本輪榮譽勳章');
+   row('訓練獎勵','+'+earned.reduce((n,x)=>n+(x.medals||0),0));
+   row('敵軍擊殺','+'+(b.medals||0));
+   section('訓練成績');
+   for(const kind of Object.keys(NAMES)){
+    const result=r.trainings?.[kind];
+    row(NAMES[kind],result?result.score+' 分 · 🎖 +'+result.medals:'未完成');
+   }
+  }
+  view.scrollTop=0;
+ }
+ function shut(){dialog.hidden=true;window.armyCharacterStatusOpen=false;}
+ function show(){
+  if(combat.gameOver||window.armyMinigameActive)return;
+  if(combat.wheelOpen)combat.closeWheel(false);
+  combat.attackPointer=null;combat.attackKeyboard=false;
+  tab='base';render();dialog.hidden=false;window.armyCharacterStatusOpen=true;
+ }
+ button.addEventListener('click',show);
+ close.addEventListener('click',shut);
+ dialog.addEventListener('click',e=>{if(e.target===dialog)shut()});
+ for(const t of tabs)t.addEventListener('click',()=>{tab=t.dataset.statusTab;render()});
+ window.addEventListener('keydown',e=>{if(e.key==='Escape'&&!dialog.hidden){e.preventDefault();shut()}});
+ window.addEventListener('army-map-open',shut);
+ window.addEventListener('pagehide',shut);
+ return true;
 }
 function battleSummary(){
  const r=run(),b=r.battle||{},trainings=Object.values(r.trainings||{});
@@ -228,7 +438,7 @@ function renderBattleSummary(){
  let el=$('armyBattleMedalSummary');if(!el){el=make('div','army-battle-summary');el.id='armyBattleMedalSummary';const btn=$('campCombatRestart');btn?.insertAdjacentElement('beforebegin',el)}
  if(el)el.textContent='🎖 本輪訓練 +'+s.trainingMedals+'　·　敵軍擊殺 +'+s.battleMedals+'　·　合計 '+(s.trainingMedals+s.battleMedals);
 }
-window.armyProgression={NAMES,TRAINING,TRAITS,RANKS,scoreTier,medalsForScore,beginRun,awardTraining,enemyKill,buy,state,run,battleSummary,rewardPanel,renderBattleSummary};
+window.armyProgression={NAMES,TRAINING,TRAITS,RANKS,scoreTier,medalsForScore,beginRun,awardTraining,enemyKill,buy,state,run,battleSummary,rewardPanel,renderBattleSummary,mountCampStatus,RANK_GAIN,rankBonus,WEAPON_LEVELS};
 window.addEventListener('army:blanket:finished',e=>{
  const anchor=document.getElementById('modal')?.querySelector('.big');
  if(anchor)rewardPanel('blanket',e.detail?.score,anchor);

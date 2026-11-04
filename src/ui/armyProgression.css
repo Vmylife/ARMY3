@@ -39,3 +39,81 @@
 .army-reward__foot{padding:0 13px 12px;font-size:10px;opacity:.69}
 .army-battle-summary{font-size:12px;line-height:1.6;margin:7px auto 14px;max-width:95%;text-align:center;color:#f0da9a}
 @media(max-width:390px){.army-upgrade-header{padding:13px 14px 9px}.army-upgrade-tabs{margin:0 12px 7px}.army-upgrade-view{padding:4px 12px 10px}}
+
+/* Upgrade details: compact data instead of long paragraphs. */
+.army-upgrade-header small{display:none}
+.army-upgrade-card__body{padding:10px 12px 12px}
+.army-upgrade-explain{font-size:12px;line-height:1.55;color:#5a705d;margin:0 0 9px}
+.army-upgrade-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-bottom:10px}
+.army-upgrade-metric{background:#ecf0e7;padding:9px;border-radius:8px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.army-upgrade-metric span{font-size:11px;color:#687a6a}
+.army-upgrade-metric strong{font-size:14px;color:#345943;font-variant-numeric:tabular-nums}
+.army-upgrade-levels{display:grid;gap:6px;margin:0 0 12px}
+.army-upgrade-level{display:flex;gap:9px;align-items:start;justify-content:space-between;border:1px solid #e0e6d9;border-radius:8px;padding:8px 9px;line-height:1.45}
+.army-upgrade-level strong{font-size:11px;white-space:nowrap;color:#4a7051}
+.army-upgrade-level span{font-size:11px;text-align:right;color:#657b66}
+.army-upgrade-level.active{background:#e8f0e4;border-color:#aac9ad}
+.army-upgrade-level.next{border-color:#bda574}
+.army-upgrade-footer[hidden]{display:none!important}
+.army-upgrade-footer{padding:8px 16px;font-size:12px;font-weight:750;color:#2f5e44;background:#e6eee3}
+.army-home__foot{display:none}
+
+/* Camp lower-left shortcut, matching the weapon-wheel control footprint. */
+#campCharacterButton.army-character-trigger{
+ position:absolute;left:max(14px,env(safe-area-inset-left));bottom:calc(24px + env(safe-area-inset-bottom));
+ width:61px;height:61px;z-index:11;pointer-events:auto;
+ border:2px solid #e3d4b0;border-radius:16px;background:#244a3bd1;color:#fff4d4;
+ box-shadow:0 4px 16px #0b2b1c78;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+ font-weight:900;touch-action:manipulation;
+}
+#campCharacterButton>span{font-size:25px;line-height:1}
+#campCharacterButton>small{font-size:11px}
+#campCharacterDialog[hidden]{display:none!important}
+#campCharacterDialog.army-character-dialog{position:fixed;inset:0;z-index:33;pointer-events:auto;
+ display:flex;align-items:center;justify-content:center;
+ box-sizing:border-box;padding:calc(env(safe-area-inset-top) + 12px) 12px calc(env(safe-area-inset-bottom) + 12px);
+ background:#0c241ac8;touch-action:manipulation;font-family:system-ui,-apple-system,'PingFang TC',sans-serif}
+.army-character-panel{width:min(470px,100%);height:min(76dvh,680px);max-height:100%;
+ border-radius:18px;background:#f6f5e9;color:#284532;box-shadow:0 20px 60px #051b1399;
+ display:flex;flex-direction:column;overflow:hidden;pointer-events:auto;min-height:0}
+.army-character-header{flex:none;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:17px 17px 10px}
+.army-character-header h2{font-size:20px;line-height:1.15;font-weight:900;margin:0}
+.army-character-header small{display:block;color:#6b7d6a;font-size:12px;margin-top:5px}
+#campCharacterClose{width:38px;height:38px;border:0;border-radius:10px;background:#e4e8de;color:#365743;font-size:24px;touch-action:manipulation}
+.army-character-tabs{flex:none;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin:0 13px 9px}
+.army-character-tabs button{border:0;border-radius:9px;padding:11px 3px;background:#e3e7dc;color:#607763;font-size:12px;font-weight:850;touch-action:manipulation;white-space:nowrap}
+.army-character-tabs button.selected{background:#315d45;color:white}
+#campCharacterBody.army-character-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+ touch-action:pan-y;overscroll-behavior:contain;padding:2px 15px 18px}
+.army-character-body *{touch-action:pan-y}
+.army-character-section{font-size:12px;color:#657b68;font-weight:850;margin:15px 2px 8px;letter-spacing:.03em}
+.army-character-section:first-child{margin-top:4px}
+.army-character-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.army-character-chip{border:1px solid #dce4d7;background:#fffef7;border-radius:10px;padding:12px;min-width:0}
+.army-character-chip small{display:block;color:#778776;font-size:11px}
+.army-character-chip strong{display:block;font-size:18px;font-weight:900;color:#2f5540;margin-top:6px;font-variant-numeric:tabular-nums}
+.army-character-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 9px;
+ border-bottom:1px solid #e2e7d9;font-size:13px}
+.army-character-row span{color:#59715c}
+.army-character-row strong{color:#315541;font-size:13px;font-variant-numeric:tabular-nums;text-align:right}
+.army-character-card{border:1px solid #dae2d4;background:#fffef8;border-radius:11px;margin-bottom:8px;overflow:hidden}
+.army-character-card summary{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 12px;list-style:none;cursor:pointer;touch-action:manipulation}
+.army-character-card summary::-webkit-details-marker{display:none}
+.army-character-card summary strong{display:block;color:#294936;font-size:13px}
+.army-character-card summary small{display:block;color:#6b806e;font-size:11px;margin-top:4px}
+.army-character-chevron{color:#7b967e;font-size:20px}
+.army-character-card[open] .army-character-chevron{transform:rotate(90deg)}
+.army-character-card p{border-top:1px solid #e2e8de;padding:10px 12px;font-size:12px;line-height:1.6;margin:0;color:#486950}
+.army-character-card.good{border-left:3px solid #4e8f69}
+.army-character-card.bad{border-left:3px solid #b26b59}
+.army-character-footnote,.army-character-empty{font-size:12px;color:#70816d;line-height:1.55;margin:9px 2px}
+@media(max-width:500px){
+ #campCharacterButton.army-character-trigger{left:11px;bottom:calc(23px + env(safe-area-inset-bottom));width:56px;height:56px}
+ .army-character-panel{height:min(73dvh,660px)}
+}
+@media(max-height:610px){
+ #campCharacterButton.army-character-trigger{bottom:calc(12px + env(safe-area-inset-bottom))}
+ .army-character-panel{height:min(90dvh,520px)}
+ .army-character-header{padding:9px 12px 6px}
+ .army-character-tabs{margin-bottom:5px}
+}
