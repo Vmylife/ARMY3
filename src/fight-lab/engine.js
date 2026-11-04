@@ -8,8 +8,8 @@ const minmax=(n,lo,hi)=>Math.max(lo,Math.min(hi,n));
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 function fighter(id,x){
  return{id,x,z:0,angle:id==='player'?Math.PI/2:-Math.PI/2,hp:100,
- state:'idle',attack:null,stun:0,down:0,rise:0,invulnerable:0,cd:0,
- dodgeCD:0,pushX:0,pushZ:0,lean:0,chain:0,chainAt:-99};
+ state:'idle',attack:null,stun:0,down:0,rise:0,cd:0,
+ pushX:0,pushZ:0,lean:0,chain:0,chainAt:-99};
 }
 export class FightEngine{
  constructor(){this.reset()}
@@ -24,23 +24,16 @@ export class FightEngine{
  enableAI(on){this.aiEnabled=!!on;if(!on){this.enemy.attack=null;this.enemy.state='idle'}}
  attack(type='jab'){
   const p=this.player;
-  if(this.winner||!['jab','heavy'].includes(type)||p.attack||p.stun>0||p.cd>0||['down','rise','dodge'].includes(p.state))return false;
-  this.face(p,this.enemy);p.attack={type,clock:0,fired:false};p.state='attack';
+  if(this.winner||!['jab','heavy'].includes(type)||p.attack||p.stun>0||p.cd>0||['down','rise'].includes(p.state))return false;
+  // A free-roaming player punches in their actual facing direction; never snap to a target.
+  p.attack={type,clock:0,fired:false};p.state='attack';
   p.cd=ATTACKS[type].length+.12;this.emit('swing',{who:'player',type});return true;
- }
- dodge(){
-  const p=this.player;
-  if(this.winner||p.attack||p.stun>0||p.dodgeCD>0||['down','rise'].includes(p.state))return false;
-  p.state='dodge';p.invulnerable=.47;p.dodgeCD=1.6;p.cd=Math.max(p.cd,.45);
-  p.pushX=-Math.sin(p.angle)*4.3;p.pushZ=-Math.cos(p.angle)*4.3;
-  this.emit('dodge',{who:'player'});return true;
  }
  impact(a,b,type){
   const atk=ATTACKS[type],d=distance(a,b);
   const fwdX=Math.sin(a.angle),fwdZ=Math.cos(a.angle);
   const forward=((b.x-a.x)*fwdX+(b.z-a.z)*fwdZ)/Math.max(d,.01);
   if(d>atk.reach||forward<.22){this.emit('miss',{who:a.id});return}
-  if(b.invulnerable>0){this.emit('evade',{who:b.id});return}
   b.hp=Math.max(0,b.hp-atk.damage);
   b.chain=this.time-b.chainAt<2.5?b.chain+1:1;b.chainAt=this.time;
   b.attack=null;b.stun=type==='heavy'?.64:.36;
@@ -56,8 +49,7 @@ export class FightEngine{
   if(ko){this.winner=a.id;this.emit('finished',{winner:a.id})}
  }
  updateFighter(a,b,dt){
-  a.cd=Math.max(0,a.cd-dt);a.dodgeCD=Math.max(0,a.dodgeCD-dt);
-  a.invulnerable=Math.max(0,a.invulnerable-dt);
+  a.cd=Math.max(0,a.cd-dt);
   if(a.state==='down'){
    a.down=Math.max(0,a.down-dt);
    if(a.down<=0&&!this.winner){a.rise=.8;a.state='rise';this.emit('rise',{who:a.id})}
@@ -72,7 +64,7 @@ export class FightEngine{
   }else if(a.stun>0){
    a.stun=Math.max(0,a.stun-dt);a.lean+=(0-a.lean)*Math.min(1,dt*6);
    if(a.stun===0&&a.state==='hit')a.state='idle';
-  }else if(a.state==='dodge'&&a.invulnerable<=.08){a.state='idle'}
+  }
   if(Math.abs(a.pushX)+Math.abs(a.pushZ)>.002){
    a.x+=a.pushX*dt;a.z+=a.pushZ*dt;
    a.pushX*=Math.exp(-8.1*dt);a.pushZ*=Math.exp(-8.1*dt);
@@ -81,7 +73,7 @@ export class FightEngine{
  }
  think(dt){
   const e=this.enemy,p=this.player;
-  if(!this.aiEnabled||!this.aggressive||this.winner||e.attack||e.stun>0||['down','rise','hit','dodge'].includes(e.state))return;
+  if(!this.aiEnabled||!this.aggressive||this.winner||e.attack||e.stun>0||['down','rise','hit'].includes(e.state))return;
   this.face(e,p);
   const d=distance(e,p);
   if(d>1.43){
@@ -102,11 +94,16 @@ export class FightEngine{
   const p=this.player,e=this.enemy;
   this.updateFighter(p,e,dt);this.updateFighter(e,p,dt);
   if(this.winner)return;
-  if(!p.attack&&p.stun<=0&&!['down','rise','dodge','hit'].includes(p.state)){
+  if(!p.attack&&p.stun<=0&&!['down','rise','hit'].includes(p.state)){
    const x=Number(input.x)||0,z=Number(input.z)||0,d=Math.hypot(x,z);
    if(d>.06){
-    p.x+=x/d*Math.min(1,d)*2.55*dt;p.z+=z/d*Math.min(1,d)*2.55*dt;
-    p.state='walk';this.face(p,e);
+    // Same camera-relative walking/running input as the main camp, supplied in world coordinates.
+    const speed=minmax(Number(input.speed)||2.55,0,8.3),mx=x/d,mz=z/d;
+    p.x+=mx*Math.min(1,d)*speed*dt;p.z+=mz*Math.min(1,d)*speed*dt;
+    const desired=Math.atan2(mx,mz);
+    const delta=Math.atan2(Math.sin(desired-p.angle),Math.cos(desired-p.angle));
+    p.angle+=delta*Math.min(1,dt*13.2);
+    p.state='walk';
    }else if(p.state==='walk')p.state='idle';
   }
   this.think(dt);
