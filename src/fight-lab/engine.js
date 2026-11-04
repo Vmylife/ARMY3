@@ -14,7 +14,7 @@ const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const createFighter=(id,x,z)=>({id,x,z,angle:id==='player'?Math.PI/2:-Math.PI/2,hp:100,
  state:'idle',attack:null,stun:0,down:0,rise:0,cd:0,moveSpeed:0,gunKick:0,
  pushX:0,pushZ:0,lean:0,airTime:0,airHeight:0,chain:0,chainAt:-99,damageSinceFall:0,
- impactAnim:'Hit_Reaction',fallen:false});
+ impactAnim:'Hit_Reaction',fallen:false,deathAt:Infinity});
 export class FightEngine{
  constructor(){this.reset()}
  reset(){
@@ -42,14 +42,16 @@ export class FightEngine{
  enableAI(on){this.aiEnabled=Boolean(on);
   if(!on)for(const f of this.opponents){f.attack=null;if(f.state==='attack')f.state='idle'}
  }
-  switchWeapon(){
-   if(this.winner||this.player.attack||['down','rise'].includes(this.player.state))return false;
-   this.weapon=this.weapon==='fists'?'rifle':'fists';
-   this.player.gunKick=0;this.emit('weapon',{weapon:this.weapon});return true;
+  selectWeapon(weapon){
+   if(!['fists','pistol','rifle'].includes(weapon)||this.winner||this.player.hp<=0||
+     this.player.attack||['down','rise','hit'].includes(this.player.state))return false;
+   if(this.weapon===weapon)return true;
+   this.weapon=weapon;this.player.gunKick=0;this.emit('weapon',{weapon});return true;
   }
+  switchWeapon(){return this.selectWeapon(this.weapon==='fists'?'pistol':this.weapon==='pistol'?'rifle':'fists')}
   shoot(){
    const p=this.player;
-   if(this.weapon!=='rifle'||this.winner||p.hp<=0||p.attack||p.stun>0||
+   if(!['pistol','rifle'].includes(this.weapon)||this.winner||p.hp<=0||p.attack||p.stun>0||
      ['down','rise','hit'].includes(p.state)||this.shotCooldown>0)return false;
    const forwardX=Math.sin(p.angle),forwardZ=Math.cos(p.angle);
    // No full-screen targeting: only enemies within +/-7.5 degrees of player facing.
@@ -65,12 +67,16 @@ export class FightEngine{
    const angle=target?Math.atan2(target.x-p.x,target.z-p.z):p.angle;
    const dx=Math.sin(angle),dz=Math.cos(angle);
    // Spawn at the rifle muzzle and keep visible projectiles, not instant-hit rays.
-   const x=p.x+forwardX*.85-Math.cos(p.angle)*.085;
-   const z=p.z+forwardZ*.85+Math.sin(p.angle)*.085;
+   const muzzle=this.weapon==='rifle'?1.00:.73;
+   const x=p.x+forwardX*muzzle-Math.cos(p.angle)*.085;
+   const z=p.z+forwardZ*muzzle+Math.sin(p.angle)*.085;
    const bullet={id:this.nextBulletId++,x,z,prevX:x,prevZ:z,
     startX:x,startZ:z,dx,dz,angle,targetId:target?.id||null,remaining:28,speed:49,age:0};
-   this.projectiles.push(bullet);this.shotsFired++;this.shotCooldown=.25;p.gunKick=.12;
-   this.emit('shot',{who:p.id,id:bullet.id,angle,lockedTarget:target?.id||null,at:{x,z,y:1.08}});
+   this.projectiles.push(bullet);this.shotsFired++;
+   this.shotCooldown=this.weapon==='rifle'?.125:.25;
+   p.gunKick=this.weapon==='rifle'?.075:.12;
+   this.emit('shot',{who:p.id,weapon:this.weapon,id:bullet.id,angle,
+    lockedTarget:target?.id||null,at:{x,z,y:1.08}});
    return true;
   }
   updateProjectiles(dt){
@@ -129,7 +135,7 @@ export class FightEngine{
   const ko=b.hp<=0,down=ko||(b.damageSinceFall>LAUNCH_AFTER_DAMAGE);
   if(down){
    b.damageSinceFall=0;b.state='down';b.down=ko?5:2.0;b.stun=0;b.lean=0;b.fallen=true;
-   b.airTime=.63;b.airHeight=0;
+   b.airTime=.63;b.airHeight=0;if(ko)b.deathAt=this.time;
   }
   const push=down?12.0:def.push;
   b.pushX=fx*push;b.pushZ=fz*push;
@@ -137,7 +143,7 @@ export class FightEngine{
    this.hits++;this.aggressive=true;
    if(this.alertAt===Infinity){this.alertAt=this.time+.70;this.emit('alarm',{who:b.id})}
   }else this.enemyHits++;
-  this.freeze=Math.max(this.freeze,def.freeze);
+  this.freeze=Math.max(this.freeze,type==='bullet'&&a.id==='player'&&this.weapon==='rifle'?.012:def.freeze);
   this.emit('hit',{who:a.id,target:b.id,type,damage:def.damage,down,ko,chain:b.chain,
    health:b.hp,damageSinceFall:b.damageSinceFall,at:{x:b.x,z:b.z}});
   if(down)this.emit('down',{who:b.id,ko});
@@ -212,8 +218,9 @@ export class FightEngine{
  step(dt,input={x:0,z:0}){
   dt=clamp(Number(dt)||0,0,.06);if(!dt)return;
   this.time+=dt;
-  if(this.freeze>0){this.freeze=Math.max(0,this.freeze-dt);return}
+  // Automatic fire shouldn't stall its cooldown during projectile hit-stop.
   this.shotCooldown=Math.max(0,this.shotCooldown-dt);
+  if(this.freeze>0){this.freeze=Math.max(0,this.freeze-dt);return}
   const p=this.player;this.updateFighter(p,dt);
   for(const foe of this.opponents)this.updateFighter(foe,dt);
   if(this.winner)return;
