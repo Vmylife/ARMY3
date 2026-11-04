@@ -4,7 +4,8 @@ import {ArmyRenderer} from '../core/renderer.js?v=116';
 import {RigAnimator} from '../characters/rigAnimator.js?v=121';
 import {loadGlb} from '../core/glb111.js?v=111';
 import {mul,translation,rotateY} from '../core/math.js?v=060';
-import {FightEngine,ATTACKS} from './engine.js?v=2';
+import {FightEngine,ATTACKS,LAUNCH_AFTER_DAMAGE} from './engine.js?v=4';
+import {installUserCombatClips} from './uploadedHitAnimations.js?v=1';
 import {setupInput} from '../ui/input.js?v=062';
 
 const $=id=>document.getElementById(id);
@@ -13,7 +14,7 @@ let renderer=null,ground=null,actors=null,ready=false,last=0,shake=0,noticeUntil
 let input=()=>({x:0,y:0,magnitude:0});
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const lerp=(a,b,t)=>a+(b-a)*clamp(t,0,1);
-let cameraYaw=.66,cameraPitch=.72,cameraZoom=8.8,targetZoom=8.8;
+let cameraYaw=.66,cameraPitch=.72,cameraZoom=12,targetZoom=12;
 const rotateX=rad=>{const c=Math.cos(rad),s=Math.sin(rad);return new Float32Array([1,0,0,0,0,c,s,0,0,-s,c,0,0,0,0,1])};
 function tell(text,ms=1700){
  $('callout').textContent=text;
@@ -31,8 +32,8 @@ function makeGround(gl){
   push([x1,y,z2],[x2,y,z1],[x2,y,z2],color);
  };
  // Boxing test mat, drawn above the original camp's static terrain.
- for(let x=-7;x<7;x++)for(let z=-5;z<5;z++){
-  const edge=x===-7||x===6||z===-5||z===4;
+ for(let x=-18;x<18;x++)for(let z=-14;z<14;z++){
+  const edge=x===-18||x===17||z===-14||z===13;
   quad(x,z,x+1,z+1,.075,edge?[.22,.40,.31]:(x+z)%2?[.66,.76,.61]:[.70,.78,.65]);
  }
  for(let k=0;k<86;k++){
@@ -42,15 +43,15 @@ function makeGround(gl){
    push(p(r,a),p(r+th,a),p(r,b),c);
    push(p(r,b),p(r+th,a),p(r+th,b),c);
   };
-  ring(3.65,.10,[.91,.73,.33]);
-  ring(3.47,.028,[.93,.88,.64]);
+  ring(10.85,.13,[.91,.73,.33]);
+  ring(10.65,.038,[.93,.88,.64]);
  }
- quad(-.023,-3.4,.023,3.4,.093,[.87,.86,.62]);
+ quad(-.028,-11,.028,11,.093,[.87,.86,.62]);
  for(const side of [-1,1]){
   const color=side<0?[.26,.57,.47]:[.75,.36,.27];
   for(let k=0;k<58;k++){
    const a=2*Math.PI*k/58,b=2*Math.PI*(k+1)/58;
-   const px=side*1.0,r=.40,y=.105;
+   const px=side*3.0,r=.58,y=.105;
    const pos=(ang,rad)=>[px+Math.cos(ang)*rad,y,Math.sin(ang)*rad];
    push(pos(a,r),pos(a,r+.065),pos(b,r),color);
    push(pos(b,r),pos(a,r+.065),pos(b,r+.065),color);
@@ -73,7 +74,7 @@ function renderFloor(){
  gl.bindVertexArray(ground.vao);gl.drawArrays(gl.TRIANGLES,0,ground.count);gl.bindVertexArray(null);
 }
 function lowFootLift(asset,anim){
- if(!['Knock_Down','Arise','BeHit_FlyUp'].includes(anim.clip)||!asset?.sample?.length)return 0;
+ if(!['Knock_Down','Arise','BeHit_FlyUp','falling_down'].includes(anim.clip)||!asset?.sample?.length)return 0;
  let low=Infinity;
  for(const s of asset.sample){
   let y=0;for(let k=0;k<4;k++){const weight=s.w[k];if(weight<=0)continue;
@@ -100,10 +101,11 @@ function drawFighter(f,actor){
  gl.bindVertexArray(a.vao);gl.drawElements(gl.TRIANGLES,a.count,a.indexType,0);
  gl.bindVertexArray(null);
 }
-const CLIP={idle:'Idle',walk:'Walking',attack:'Punch_Combo_1',hit:'Idle',down:'Knock_Down',rise:'Arise'};
+const CLIP={idle:'Idle',walk:'Walking',attack:'Punch_Combo_1',hit:'Hit_Reaction',down:'falling_down',rise:'Arise'};
 function syncActor(f,actor,dt){
  const anim=actor.anim;
  let clip=CLIP[f.state]||'Idle';
+ if(f.state==='hit')clip=f.impactAnim||'Hit_Reaction';
  if(f.state==='walk'&&f.id==='player'){
   clip=f.moveSpeed>=7?'RunFast':f.moveSpeed>=4.2?'Running':'Walking';
  }
@@ -116,8 +118,12 @@ function syncActor(f,actor,dt){
  if(f.state==='attack'&&f.attack){
   const duration=anim.clips[clip]?.duration||1.5;
   anim.speed=clamp(duration/(ATTACKS[f.attack.type].length*1.45),.85,2.5);
+ }else if(f.state==='hit'){
+  anim.speed=clamp((anim.clips[clip]?.duration||1.6)/.64,1,3.1);
  }else if(f.state==='down'){
-  anim.speed=clamp((anim.clips[clip]?.duration||1.2)/.8,.75,1.75);
+  anim.speed=clamp((anim.clips[clip]?.duration||2.2)/1.95,.85,1.7);
+ }else if(f.state==='rise'){
+  anim.speed=clamp((anim.clips[clip]?.duration||1.8)/1.70,.85,1.4);
  }else if(f.state==='walk'&&f.id==='player')anim.speed=clamp((f.moveSpeed||3)/4,.86,1.55);
  else anim.speed=1;
  anim.evaluate(dt);
@@ -280,13 +286,17 @@ function frame(now){
  cameraZoom+=(targetZoom-cameraZoom)*Math.min(1,dt*12);
  react();
  const frozen=e.freeze>0;
- if(!frozen){syncActor(e.player,actors.player,dt);syncActor(e.enemy,actors.enemy,dt)}
+ if(!frozen){syncActor(e.player,actors.player,dt);
+  for(const foe of e.opponents)syncActor(foe,actors[foe.id],dt);
+ }
  shake=Math.max(0,shake-dt*.73);
  const cameraJitter=shake*Math.sin(now*.091)*.075;
  renderer.setCamera({yaw:cameraYaw+cameraJitter,pitch:cameraPitch+shake*Math.cos(now*.11)*.035,zoom:cameraZoom});
  renderer.startFrame(e.player);
- renderFloor();drawFighter(e.player,actors.player);drawFighter(e.enemy,actors.enemy);
+ renderFloor();drawFighter(e.player,actors.player);
+ for(const foe of e.opponents)drawFighter(foe,actors[foe.id]);
  followLabel('playerLabel',e.player);followLabel('enemyLabel',e.enemy);
+ for(const ally of e.allies)followLabel(ally.id+'Label',ally);
  if(now>noticeUntil&&e.aggressive&&!e.winner){
   $('callout').textContent=e.aiEnabled?'NPC 會還手，靠移動走位！':'練習模式：NPC 暫不還手';
  }
@@ -302,12 +312,16 @@ async function boot(){
   const glb=await loadGlb('./assets/characters/cadet/cadet-animation-lab.glb?v=1181',
    {timeoutMs:90000,onProgress:loadProgress});
   const base=new RigAnimator(glb);
-  if(!base.hasClip('Punch_Combo_1')||!base.hasClip('Knock_Down')){
-   throw new Error('目前士兵 GLB 沒有拳擊或倒地動畫，請確認動畫模型版本');
-  }
-  $('loadText').textContent='建立士兵骨架與貼圖…';$('loadBar').style.width='92%';
+  if(!base.hasClip('Punch_Combo_1'))throw new Error('士兵 GLB 沒有拳擊動畫');
+  const loaded=installUserCombatClips(base);
+  if(!loaded)throw new Error('上傳受擊動畫與現有士兵骨架不相容，請重新校正模型');
+  $('loadText').textContent='建立 5 名士兵骨架與貼圖…';$('loadBar').style.width='92%';
   await renderer.addModel('duelist',glb);
-  actors={player:{anim:base,clip:''},enemy:{anim:new RigAnimator(glb),clip:''}};
+  actors={player:{anim:base,clip:''}};
+  for(const foe of e.opponents){
+   const anim=new RigAnimator(glb);installUserCombatClips(anim);
+   actors[foe.id]={anim,clip:''};
+  }
   for(const actor of Object.values(actors)){actor.anim.setClip('Idle');actor.anim.evaluate(0)}
   $('loadBar').style.width='100%';
   ready=true;$('loading').hidden=true;
@@ -323,7 +337,10 @@ controls();boot();
 window.armyFightLab={
  get status(){return{...e.status,ready,modelLoaded:!!actors,
   hasPunch:!!actors?.player.anim.hasClip('Punch_Combo_1'),
-  hasKnockdown:!!actors?.player.anim.hasClip('Knock_Down')}},
+  hasKnockdown:!!actors?.player.anim.hasClip('falling_down'),
+  hasHitReaction:!!actors?.player.anim.hasClip('Hit_Reaction'),
+  hasArise:!!actors?.player.anim.hasClip('Arise'),
+  hasBlock2:!!actors?.player.anim.hasClip('Block2')}},
  attack:type=>{const ok=e.attack(type||'jab');react();return ok},
  reset,engine:e,
  get camera(){return {yaw:cameraYaw,pitch:cameraPitch,zoom:cameraZoom,targetZoom}},
