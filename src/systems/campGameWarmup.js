@@ -1,7 +1,6 @@
 import './shootingRangeLauncher.js?v=100';
-/* ARMY3 v1.94 - staged network prefetch + six reusable near-portal game frames.
- * Never executes heavyweight GLB parsing for all four mini-games during camp travel.
- * Only one near-portal scene is GPU-warmed at a time. Standalone page links remain fallback.
+/* ARMY3 v1.95 - near-portal-only network prefetch and single GPU-warmed mini-game.
+ * Do not download dozens of unrelated audio files during ordinary camp travel.
  */
 import {clearCampSession} from './campSession.js?v=144';
 const ROOT = new URL('../../', import.meta.url);
@@ -13,45 +12,32 @@ const urls = {
  weed:'weed-pulling.html?v=194',
  singing:'singing-memory-test.html?v=13'
 };
-const stage1 = [
- 'blanket-stack.html?v=192','grenade-workshop-test.html?v=192','weed-pulling.html?v=194',
- 'singing-memory-test.html?v=13','singing-memory-test.css?v=13','singing-memory-test.js?v=13','singing-settlement.js?v=12','src/systems/singingCampExit.js?v=13',
- 'shooting-paper-range.html?v=192','shooting-paper.css?v=153','shooting-paper.js?v=154','shooting-paper-report.js?v=153',
- 'shooting-paper-world.js?v=149','shooting-paper-scene.json?v=140',
- 'src/systems/minigameQuickExit.js?v=192',
- '/Don-t-like-your-mom/army-test/index.html?v=4',
- '/Don-t-like-your-mom/army-test/game.js?v=3',
- '/Don-t-like-your-mom/army-test/army-report.js?v=3',
- '/Don-t-like-your-mom/army-test/army-camp-exit.js?v=4',
- '/Don-t-like-your-mom/army-test/army.css?v=4',
- '/Don-t-like-your-mom/style.css?v=0.9.0',
- '/Don-t-like-your-mom/art-data.js?v=0.8.7',
- 'assets/audio/minigames/blanket-parade-loop.mp3','assets/audio/minigames/grenade-ordnance-loop.mp3',
- 'src/systems/minigameBgm.js?v=190','src/systems/grenadeEarlyAudio.js?v=190','src/systems/blanketSfx.js?v=170',
- 'src/systems/blanketAchievements.js?v=180','src/systems/grenadeWorkshopSfx.js?v=316',
- 'src/systems/grenadeArenaSfx.js?v=316',
- 'assets/audio/blanket/blanket_drop_fabric.mp3','assets/audio/blanket/blanket_land_1.mp3',
- 'assets/audio/blanket/blanket_land_2.mp3','assets/audio/blanket/blanket_land_3.mp3',
- 'assets/audio/blanket/blanket_land_4.mp3','assets/audio/blanket/blanket_perfect_ding.mp3',
- 'assets/audio/blanket/coin_payout_finish.mp3',
- 'assets/audio/grenade/01_fill_loop.mp3',
- 'assets/audio/grenade/02_fill_stop.mp3','assets/audio/grenade/03_press_start.mp3',
- 'assets/audio/grenade/04_press_good.mp3','assets/audio/grenade/05_press_perfect.mp3',
- 'assets/audio/grenade/06_press_bad.mp3','assets/audio/grenade/10_overflow.mp3',
- 'assets/audio/grenade/ratchet_1.mp3','assets/audio/grenade/ratchet_2.mp3',
- 'assets/audio/grenade/ratchet_3.mp3','assets/audio/grenade/ratchet_4.mp3',
- 'assets/audio/grenade/aim_lock.mp3',
- 'assets/audio/grenade/flight_cartoon_B_long.mp3',
- 'assets/audio/grenade/explosion_crack_rumble.mp3',
- 'assets/audio/grenade/ground_land.mp3','assets/audio/grenade/collapse_2.mp3',
- 'assets/audio/grenade/collapse_3.mp3','assets/audio/grenade/debris_scatter.mp3',
- 'assets/audio/grenade/collapse_1.mp3',
- 'blanket-stack-scene.json?v=153','grenade-user-scene.json?v=130',
- 'blanket-stack.js?v=153','grenade-user-play.html?embedded=1&v=192',
- 'grenade-user-play-3d.js?v=138'
-];
+const nearbyAssets={
+ blanket:[
+  urls.blanket,'blanket-stack.js?v=153','blanket-stack-scene.json?v=153',
+  'assets/audio/minigames/blanket-parade-loop.mp3','src/systems/blanketSfx.js?v=170'
+ ],
+ grenade:[
+  urls.grenade,'grenade-user-play.html?embedded=1&v=192',
+  'grenade-user-scene.json?v=130','grenade-user-play-3d.js?v=138',
+  'src/systems/grenadeEarlyAudio.js?v=190'
+ ],
+ shooting:[
+  urls.shooting,'shooting-paper.css?v=153','shooting-paper.js?v=154',
+  'shooting-paper-report.js?v=153','shooting-paper-world.js?v=149'
+ ],
+ swipe:[
+  urls.swipe,'/Don-t-like-your-mom/army-test/game.js?v=3',
+  '/Don-t-like-your-mom/army-test/army.css?v=4'
+ ],
+ weed:[urls.weed],
+ singing:[
+  urls.singing,'singing-memory-test.css?v=13','singing-memory-test.js?v=13',
+  'singing-settlement.js?v=12','singing-samples/junji-backing-from-start-v10.mp3'
+ ]
+};
 const status = {blanket:{},grenade:{},shooting:{},swipe:{},weed:{},singing:{}};
-let enabled=false, active=null, warming=null, prefetching=false, pendingPrefetch=false;
+let enabled=false, active=null, warming=null, prefetching=false;
 const seen = new Set();
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const isIdle=()=>document.body.classList.contains('army-ready')&&!document.hidden&&!active;
@@ -67,62 +53,37 @@ async function fetchCached(path){
   await res.arrayBuffer();
  }catch(err){seen.delete(url.href);console.debug('[營區預載]略過',path,err?.message||err)}
 }
-async function sceneryModels(sceneFile,kind){
- try{
-  const r=await fetch(new URL(sceneFile,ROOT),{cache:'force-cache'});
-  if(!r.ok)return [];
-  const json=await r.json(),items=Array.isArray(json.items)?json.items:[];
-  const priority=[];
-  if(kind==='blanket'){
-   const base=items.find(x=>x.uid===json.foundationId&&x.category==='blanket');
-   if(base)priority.push(base);
-   const mine=items.find(x=>x.category==='mine');if(mine)priority.push(mine);
-   const cadet=items.find(x=>x.category==='soldier');if(cadet)priority.push(cadet);
-   priority.push({model:'./assets/grenade-low/grenade-soldier-low.glb'});
-  }else{
-   const thrower=items.find(x=>x.uid===(json.throwerUid||'g10001'));
-   if(thrower)priority.push(thrower);
-   const enemy=items.find(x=>x.team==='enemy');if(enemy)priority.push(enemy);
-   const friend=items.find(x=>x.team==='friendly');if(friend)priority.push(friend);
-  }
-  const unique=new Set(),out=[];
-  for(const obj of [...priority,...items]){
-   const model=obj?.model;
-   if(typeof model!=='string'||!/^\.\/assets\/[\w/-]+\.glb(?:\?.*)?$/i.test(model))continue;
-   if(unique.has(model))continue;unique.add(model);out.push(model);
-   if(out.length>= (kind==='blanket'?10:12))break;
-  }
-  return out;
- }catch(e){console.debug('場景清單預載略過',kind,e);return []}
+// Only prefetch the CLOSEST relevant game, once the player approaches its portal.
+const NEAR_PREFETCH_DISTANCE=24;
+let suggestion=null,prefetchTimer=null;
+function scheduleNearby(kind,distance){
+ if(distance>NEAR_PREFETCH_DISTANCE||!isIdle())return;
+ const now=performance.now();
+ if(!suggestion||now-suggestion.at>900||distance<suggestion.distance-1.5){
+  suggestion={kind,distance,at:now};
+ }
+ if(prefetchTimer||prefetching)return;
+ prefetchTimer=setTimeout(()=>{
+  prefetchTimer=null;
+  if(!suggestion||!isIdle()||window.armyAssetNetBusy||window.armyAssetUploadBusy)return;
+  prefetch(suggestion.kind);
+ },450);
 }
-async function prefetch(){
- if(prefetching||pendingPrefetch)return;
- pendingPrefetch=true;
- await idle();
- pendingPrefetch=false;
- if(!isIdle())return;
+async function prefetch(kind){
+ if(prefetching||!isIdle()||window.armyAssetNetBusy||window.armyAssetUploadBusy)return;
  if(navigator.connection?.saveData||/2g/.test(navigator.connection?.effectiveType||''))return;
  prefetching=true;
  try{
-  // Audio, pages and scene definitions first: fixes the silent opening seconds.
-  for(const f of stage1){
-   if(!isIdle())break;
-   await fetchCached(f);
+  await idle();
+  for(const path of nearbyAssets[kind]||[]){
+   if(!isIdle()||window.armyAssetNetBusy||window.armyAssetUploadBusy)break;
+   if(suggestion&&suggestion.kind!==kind&&suggestion.distance<NEAR_PREFETCH_DISTANCE)break;
+   await fetchCached(path);
    await idle();
   }
-  if(isIdle()){
-   const a=await sceneryModels('blanket-stack-scene.json?v=153','blanket');
-   const b=await sceneryModels('grenade-user-scene.json?v=130','grenade');
-   // Avoid several simultaneous large GLB downloads while 3D camp is running.
-   const interleaved=[];
-   for(let i=0;i<Math.max(a.length,b.length);i++){if(a[i])interleaved.push(a[i]);if(b[i])interleaved.push(b[i]);}
-   for(const f of interleaved){
-    if(!isIdle())break;
-    await fetchCached(f);
-    await idle();
-   }
-  }
- }finally{prefetching=false;}
+ }finally{
+  prefetching=false;
+ }
 }
 function discard(kind){
  const s=status[kind];if(!s?.frame)return;
@@ -143,8 +104,8 @@ function readyFrame(kind){
   return !!nested?.contentWindow?.__grenadeTest?.world&&nested.contentWindow.__grenadeTest.world.modelState==='ready';
  }catch{return false}
 }
-function warm(kind){
- if(!isIdle()||!urls[kind])return;
+function warm(kind,{force=false}={}){
+ if(!isIdle()||!urls[kind]||(!force&&window.armyAssetUploadBusy))return;
  if(warming&&warming!==kind)discard(warming);
  if(status[kind].frame)return;
  const frame=document.createElement('iframe');
@@ -194,6 +155,7 @@ function approach(kind,distance){
  const now=performance.now();
  if(now<rewarmAfter)return;
  if(now-(lastApproach[kind]||0)<380)return;lastApproach[kind]=now;
+ scheduleNearby(kind,distance);
  if(distance<=11){
    if(!status[kind]?.frame)warm(kind);
    else status[kind].ready=readyFrame(kind);
@@ -202,7 +164,7 @@ function approach(kind,distance){
 function enter(kind){
  const s=status[kind];if(!s||active)return false;
  // Even when the frame is still warming, display its real loading UI. No duplicate page navigation.
- if(!s.frame)warm(kind);
+ if(!s.frame)warm(kind,{force:true});
  if(!s.frame)return false;
  active=kind;
  document.body.classList.add('army-in-minigame');
@@ -219,8 +181,7 @@ function exit(){
  window.armyMinigameActive=false;
  clearCampSession();
  discard(kind);
- // Let the camp breathe before any new WebGL warm-up.
- setTimeout(()=>{if(isIdle())prefetch()},900);
+ // No global prefetch after exit: next approach decides which game needs files.
 }
 window.addEventListener('message',event=>{
  if(!active||event.origin!==location.origin)return;
@@ -228,9 +189,9 @@ window.addEventListener('message',event=>{
  if(event.data?.type==='ARMY3_RETURN_TO_CAMP')exit();
 });
 const observer=new MutationObserver(()=>{
- if(document.body.classList.contains('army-ready')){enabled=true;observer.disconnect();setTimeout(prefetch,1200);}
+ if(document.body.classList.contains('army-ready')){enabled=true;observer.disconnect();}
 });
 observer.observe(document.body,{attributes:true,attributeFilter:['class']});
-if(document.body.classList.contains('army-ready')){enabled=true;setTimeout(prefetch,1200)}
-window.addEventListener('pageshow',()=>{if(isIdle())setTimeout(prefetch,500)});
-window.armyGameWarmup={approach,enter,exit,getState:(kind)=>({loaded:!!status[kind]?.loaded,ready:!!status[kind]?.ready,prefetching})};
+if(document.body.classList.contains('army-ready'))enabled=true;
+window.addEventListener('pageshow',()=>{if(isIdle()&&suggestion)scheduleNearby(suggestion.kind,suggestion.distance)});
+window.armyGameWarmup={approach,enter,exit,getState:(kind)=>({loaded:!!status[kind]?.loaded,ready:!!status[kind]?.ready,prefetching,suggestion:suggestion?.kind||null})};
