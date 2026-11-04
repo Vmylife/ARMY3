@@ -3,86 +3,78 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#172a20">
-<title>軍歌鑑測｜前兩句分開唱</title>
-<link rel="stylesheet" href="./singing-memory-test.css?v=8">
-</head>
-<body>
-<main class="app">
-<header class="top"><div class="brand">國軍實驗靶場 <span>/ 軍歌鑑測 V0.8 · 七句接唱</span></div><a class="back" href="./index.html">← 返回軍營</a></header>
-<section class="hero">
- <div class="scene" aria-hidden="true"><div class="badgeIcon">♪</div>
-  <div class="sergeant"><div class="beret"></div><div class="face"><i class="eye one"></i><i class="eye two"></i><i id="mouth" class="mouth"></i></div><div class="neck"></div><div class="body"><i class="badgeMark">班</i></div></div>
-  <div class="speech" id="speech">「跟著我唱，不准走音！」</div>
- </div>
- <div class="heading"><div class="eyebrow">軍歌記憶音準 · 原版音訊測試</div><h1>班長唱一句，你敢跟著唱嗎？</h1>
- <p>七句原版《軍紀歌》，班長唱一句你就模仿一句。倒數 3、2、1、唱時，白色游標先從左邊往中間跑；第 5 拍接上金色音高線，右側滑桿可即時唱出走音人聲。</p></div>
-</section>
-<section class="controls">
- <div class="line"><span class="tag" id="stageTag">等待開始</span><span id="takeCount">第 1 / 7 句 · 4 秒</span></div>
- <div class="words" id="words">國家有綱常　／　軍隊有軍紀</div>
- <div class="phraseProgress" aria-label="七句軍歌進度">
- <span id="phraseStep1" class="active">① 國家有綱常，軍隊有軍紀</span>
- <span id="phraseStep2">② 軍紀是軍隊的命脈</span>
- <span id="phraseStep3">③ 以三民主義為根基</span>
- <span id="phraseStep4">④ 三信心，堅如鐵</span>
- <span id="phraseStep5">⑤ 上下團結成一體</span>
- <span id="phraseStep6">⑥ 號令嚴明，服從第一</span>
- <span id="phraseStep7">⑦ 革命軍人要牢記</span>
- </div>
- <div class="boardShell">
- <div class="board" id="board" role="group" aria-label="自動前進的音準時間軸">
-  <div class="ylabels"><span>高</span><span>低</span></div>
-  <svg id="graph" viewBox="0 0 800 240" preserveAspectRatio="none" aria-label="音高示範與回顧圖">
-   <g id="gridLines"></g><path id="guideLine" d="" fill="none" stroke="#f2d39b" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-   <path id="yourLine" d="" fill="none" stroke="#e8828e" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-   <line id="playhead" x1="0" x2="0" y1="0" y2="240" stroke="#faf8e5" stroke-width="2" stroke-dasharray="5 5"/>
-   <circle id="controlDot" cx="0" cy="120" r="11" fill="#fa9294" stroke="#fff" stroke-width="2" visibility="hidden"/>
-  </svg>
-  <div id="countdown" class="countdown" hidden aria-live="off" aria-label="預備四拍，下一拍開唱">
-    <div class="countdownCore"><strong id="countdownWord">3</strong><small id="countdownLabel">班長準備開唱</small></div>
-   </div>
-   <div class="boardOverlay" id="boardOverlay">原版人聲載入中…</div>
-  <div class="timeline" id="timeline"></div>
- </div>
- <div class="pitchControl" id="pitchControl">
-  <span class="pitchTitle">音高控制</span>
-  <span class="pitchHigh">高 ↑</span>
-  <div class="pitchRail" id="pitchRail" role="slider" tabindex="0" aria-label="演唱音高，上下拖動控制，時間會自動前進" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" aria-orientation="vertical">
-   <div class="pitchTrack"></div>
-   <div class="pitchThumb" id="pitchThumb"><span>↕</span></div>
+<title>軍歌鑑測｜七句接唱</title>
+<link rel="stylesheet" href="./singing-memory-test.css?v=9">
+</head><body>
+<main class="app gameCompact">
+ <header class="top">
+  <div class="brand">軍歌鑑測 <span>v0.9</span></div>
+  <a class="back" href="./index.html" aria-label="返回軍營">退出</a>
+ </header>
+ <section class="controls" aria-label="軍歌鑑測遊戲">
+  <div class="line"><span class="tag" id="stageTag">載入中</span><span id="takeCount">1 / 7</span></div>
+  <div class="words" id="words">國家有綱常，軍隊有軍紀</div>
+  <div class="phraseProgress" aria-label="七句進度">
+   <span id="phraseStep1" class="active" aria-label="第一句">1</span>
+   <span id="phraseStep2" aria-label="第二句">2</span>
+   <span id="phraseStep3" aria-label="第三句">3</span>
+   <span id="phraseStep4" aria-label="第四句">4</span>
+   <span id="phraseStep5" aria-label="第五句">5</span>
+   <span id="phraseStep6" aria-label="第六句">6</span>
+   <span id="phraseStep7" aria-label="第七句">7</span>
   </div>
-  <span class="pitchLow">低 ↓</span>
-  <span class="pitchHint">按住<br>上下拉</span>
- </div>
- </div>
- <div class="legend" id="legend"><span><b class="gold"></b>班長音高：從中間開始</span><span><b class="red"></b>玩家走音：完成後顯示</span></div>
- <div class="actionArea"><button id="mainButton" class="primary" type="button">▶ 班長先唱</button>
- <button id="skipButton" class="secondary" type="button" disabled>重新聽示範</button></div>
- <p class="hint" id="hint">倒數 3、2、1、唱時白色游標就開始前進，前半段預備，第五拍在中間開始唱。右側滑桿上下拉可即時聽到走音，放開停聲。</p>
- <div class="feedback" id="feedback" hidden>
+  <div class="boardShell">
+   <div class="board" id="board" aria-label="音準與時間軸">
+    <div class="ylabels"><span>高</span><span>低</span></div>
+    <svg id="graph" viewBox="0 0 800 240" preserveAspectRatio="none" aria-label="旋律示範與演唱軌跡">
+     <g id="gridLines"></g>
+     <path id="guideLine" d="" fill="none" stroke="#f2d39b" stroke-width="10" stroke-linecap="butt" stroke-linejoin="miter"/>
+     <path id="yourLine" d="" fill="none" stroke="#e8828e" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+     <line id="playhead" x1="0" x2="0" y1="0" y2="240" stroke="#faf8e5" stroke-width="2" stroke-dasharray="5 5"/>
+     <circle id="controlDot" cx="0" cy="120" r="11" fill="#fa9294" stroke="#fff" stroke-width="2" visibility="hidden"/>
+    </svg>
+    <div id="countdown" class="countdown" hidden aria-live="off">
+     <div class="countdownCore"><strong id="countdownWord">3</strong><small id="countdownLabel">換你唱</small></div>
+    </div>
+    <div class="boardOverlay" id="boardOverlay">原版人聲載入中…</div>
+    <div class="timeline" id="timeline"></div>
+   </div>
+   <div class="pitchControl" id="pitchControl">
+    <span class="pitchHigh">高 ↑</span>
+    <div class="pitchRail" id="pitchRail" role="slider" tabindex="0" aria-label="上下拖動調整音高，玩家倒數期間即可預先調整" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" aria-orientation="vertical">
+     <div class="pitchTrack"></div>
+     <div class="pitchThumb" id="pitchThumb"><span>↕</span></div>
+    </div>
+    <span class="pitchLow">低 ↓</span>
+   </div>
+  </div>
+  <div class="actionArea">
+   <button id="mainButton" class="primary" type="button">開始</button>
+   <button id="skipButton" type="button" hidden disabled>重新聽示範</button>
+  </div>
+  <div class="feedback" id="feedback" hidden>
    <div class="feedbackTitle"><span id="finalRank">F 級</span><strong id="finalScore">0 分</strong></div>
    <p id="comment"></p>
-   <div id="phraseScores" class="phraseScores">第一句 — · 第二句 —</div>
-   <div class="feedbackActions"><button type="button" id="replayButton">🔊 重播七句走音</button><button type="button" id="compareButton">📈 查看音準差距</button></div>
+   <div id="phraseScores" class="phraseScores">總回顧</div>
+   <div class="feedbackActions">
+    <button id="replayButton" type="button">重播總回顧</button>
+    <button id="compareButton" type="button">查看音準</button>
+   </div>
    <div class="phraseCompare">
- <button type="button" id="comparePhrase1">第1句</button>
- <button type="button" id="comparePhrase2">第2句</button>
- <button type="button" id="comparePhrase3">第3句</button>
- <button type="button" id="comparePhrase4">第4句</button>
- <button type="button" id="comparePhrase5">第5句</button>
- <button type="button" id="comparePhrase6">第6句</button>
- <button type="button" id="comparePhrase7">第7句</button>
+    <button id="comparePhrase1" type="button">1</button>
+    <button id="comparePhrase2" type="button">2</button>
+    <button id="comparePhrase3" type="button">3</button>
+    <button id="comparePhrase4" type="button">4</button>
+    <button id="comparePhrase5" type="button">5</button>
+    <button id="comparePhrase6" type="button">6</button>
+    <button id="comparePhrase7" type="button">7</button>
+   </div>
+  </div>
+ </section>
+ <div hidden aria-hidden="true" class="internalOnly">
+  <span id="speech"></span><i id="mouth"></i><span id="hint"></span>
+  <span id="voiceMode"></span><span id="voiceInfo"></span><button id="previewClip" type="button" disabled>試聽</button>
  </div>
- </div>
-</section>
-<section class="voiceSection">
- <div class="voiceHead"><strong>原版《軍紀歌》人聲</strong><span class="pill" id="voiceMode">載入中…</span></div>
- <p><strong>原版人聲已內建在遊戲。</strong>直接按「班長先唱」就能玩，電腦或手機都不必選擇音檔。示範、模仿後的走音回放都只使用人聲，完全沒有背景伴奏。</p>
- <div class="voiceActions"><button id="previewClip" type="button" disabled>▶ 試聽原版人聲</button></div>
- <div id="voiceInfo" class="voiceInfo" role="status">正在從遊戲載入原版人聲並分析音準…</div>
- <p class="legal">直接使用你提供的原版 vocals 人聲分軌，依原唱停頓分成七句；不使用 music 伴奏、不合成新旋律。</p>
-</section>
-<footer>獨立試玩版本 · 尚未加入軍營正式小遊戲</footer>
 </main>
-<script src="./singing-memory-test.js?v=8" defer></script>
+<script src="./singing-memory-test.js?v=9" defer></script>
 </body></html>
