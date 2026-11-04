@@ -30,21 +30,24 @@ button:focus-visible,a:focus-visible{outline:3px solid #fae39c;outline-offset:2p
 .targetLabel.you{background:#3a7e65}
 .targetLabel.them{background:#b85848}
 .callout{position:absolute;z-index:5;bottom:calc(180px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);min-width:180px;max-width:min(490px,calc(100% - 24px));padding:9px 14px;border-radius:11px;color:#f9e9b7;background:#173a2fdb;border:1px solid #e4ca9280;font-size:12px;line-height:1.5;font-weight:900;text-align:center;text-wrap:balance;pointer-events:none;box-shadow:0 7px 19px #081f1759}
-.controls{position:absolute;left:0;right:0;bottom:calc(87px + env(safe-area-inset-bottom));z-index:7;display:flex;align-items:end;justify-content:space-between;padding:0 max(18px,env(safe-area-inset-left)) 0 max(18px,env(safe-area-inset-right));pointer-events:none}
-.stickArea{display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:auto}
-.stick{width:116px;height:116px;border-radius:50%;border:2px solid #e3e8d6a8;background:#32584880;box-shadow:inset 0 0 0 16px #c9e0c020,0 9px 24px #1e372650;display:grid;place-items:center;touch-action:none;position:relative}
-.stick::after{content:"";position:absolute;inset:25px;border:1px dashed #d1deb399;border-radius:50%;pointer-events:none}
-.stickThumb{width:55px;height:55px;border-radius:50%;background:linear-gradient(130deg,#f9eac5,#bdd4bc);box-shadow:0 3px 12px #0d291c99;border:2px solid #fff9;z-index:1;transition:transform 70ms linear;pointer-events:none}
-.controlName{font-size:10px;font-weight:900;color:#254637;text-shadow:0 1px 2px #eef6e1}
+.controls{position:absolute;left:0;right:0;bottom:calc(87px + env(safe-area-inset-bottom));z-index:7;display:flex;align-items:end;justify-content:flex-end;padding:0 max(18px,env(safe-area-inset-left)) 0 max(18px,env(safe-area-inset-right));pointer-events:none}
+/* ARMY3 main-camp touch stick, shown under the player's finger. */
+#floatingStick{position:fixed;z-index:8;left:50%;top:70%;width:132px;height:132px;transform:translate(-50%,-50%) scale(.9);opacity:0;visibility:hidden;pointer-events:none;transition:opacity 80ms ease,transform 80ms ease,visibility 80ms}
+#floatingStick.active{visibility:visible;opacity:1;transform:translate(-50%,-50%) scale(1)}
+.stick-base{width:100%;height:100%;border:2px solid #f6ffecb0;border-radius:50%;display:grid;place-items:center;background:#31564557;box-shadow:0 3px 22px #213c2c4d,inset 0 0 14px #d5e7b638}
+.stick-thumb{width:54px;height:54px;border-radius:50%;border:3px solid #fffff5d8;background:#f1f8e7e8;box-shadow:0 4px 12px #14291e42;will-change:transform}
+#floatingStick.run .stick-thumb{background:#ddeaafe8}
+#floatingStick.sprint .stick-thumb{background:#ffd9a5ea}
+@media(orientation:landscape){#floatingStick{width:115px;height:115px}.stick-thumb{width:47px;height:47px}}
 .actionArea{display:flex;align-items:end;gap:10px;pointer-events:auto}
 .action{border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;box-shadow:0 6px 19px #203c2e5a;border:2px solid #f5e7baa8;line-height:1;color:white;font-weight:950;text-shadow:0 1px 1px #162d1f66}
 .action span{font-size:27px}
 .action small{font-size:11px}
 .action.light{width:79px;height:79px;background:linear-gradient(145deg,#50775a,#234b3a)}
 .action.heavy{width:92px;height:92px;background:linear-gradient(145deg,#e6a14c,#bb4d32);border:3px solid #ffe0a6}
-.action.dodge{width:60px;height:60px;background:linear-gradient(145deg,#6b91a0,#39586c)}
-.action.dodge span{font-size:21px}
-.action.dodge small{font-size:10px}
+
+
+
 .action:disabled{opacity:.55;filter:grayscale(.6);cursor:default}
 .footer{position:absolute;z-index:5;left:0;right:0;bottom:0;min-height:calc(80px + env(safe-area-inset-bottom));padding:8px 15px calc(5px + env(safe-area-inset-bottom));background:linear-gradient(0deg,#153a2ee8,#234b3aab);color:#d7e2d2;text-align:center}
 .settings{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:12px;font-size:11px;font-weight:850}
@@ -84,8 +87,8 @@ button:focus-visible,a:focus-visible{outline:3px solid #fae39c;outline-offset:2p
  .hudTop{top:calc(128px + env(safe-area-inset-top))}
  .fighterName strong{font-size:10px}.fighterName span{font-size:8px}
  .controls{bottom:calc(94px + env(safe-area-inset-bottom));padding-inline:12px}
- .stick{width:104px;height:104px}.stickThumb{width:51px;height:51px}
- .actionArea{gap:6px}.action.heavy{width:82px;height:82px}.action.light{width:69px;height:69px}.action.dodge{width:54px;height:54px}
+ 
+ .actionArea{gap:10px}.action.heavy{width:82px;height:82px}.action.light{width:69px;height:69px}
  .action span{font-size:22px}.action small{font-size:10px}
  .callout{bottom:calc(193px + env(safe-area-inset-bottom));font-size:11px}
  .footer{padding:6px 7px calc(4px + env(safe-area-inset-bottom));min-height:90px}
@@ -98,8 +101,8 @@ button:focus-visible,a:focus-visible{outline:3px solid #fae39c;outline-offset:2p
  .hudTop{top:calc(112px + env(safe-area-inset-top))}
  .callout{bottom:calc(153px + env(safe-area-inset-bottom))}
  .controls{bottom:calc(68px + env(safe-area-inset-bottom))}
- .stick{width:84px;height:84px}.stickThumb{width:43px;height:43px}
- .action.heavy{width:73px;height:73px}.action.light{width:65px;height:65px}.action.dodge{width:50px;height:50px}
+ 
+ .action.heavy{width:73px;height:73px}.action.light{width:65px;height:65px}
  .footer p:last-child{display:none}
 }
-@media(prefers-reduced-motion:reduce){.hitBurst,.floatDamage{animation-duration:1ms}#flash,.healthFill,.stickThumb{transition:none}}
+@media(prefers-reduced-motion:reduce){.hitBurst,.floatDamage{animation-duration:1ms}#flash,.healthFill,}
