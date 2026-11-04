@@ -107,9 +107,13 @@ export class CampCombat{
   this.playerAttack=0;this.playerAttackApplied=false;this.playerCooldown=0;this.attackKeyboard=false;this.attackPointer=null;
   this.wheelOpen=false;this.wheelSelection='up';this.wheelPointer=null;this.wheelTouch=null;
   this.bullets=[];this.seq=1;this.playerShotAt=-100;this.npcFireAt=-100;
-  this.canvas=renderer.canvas;this.lastState='';
+  this.canvas=renderer.canvas;this.lastState='';this.lastRangeShotMs=-1000;
   this.hitStop=0;this.shake=0;this.cameraRecoil=0;this.playerHurt=0;
   this.mountUI();
+  // Safari requires a user gesture to unlock audio. Walking or tapping the
+  // 3D camp should unlock range rifle sounds, even before combat begins.
+  this.canvas.addEventListener('pointerdown',()=>startAudio(),{passive:true});
+  window.addEventListener('keydown',()=>startAudio(),{passive:true});
   this.playerPistol=new PistolRenderer(renderer.gl);
   this.npcPistol=new PistolRenderer(renderer.gl);
   this.playerRifle=new RifleRenderer(renderer.gl);
@@ -286,6 +290,16 @@ export class CampCombat{
   $('campAttackText').textContent=this.weapon==='rifle'?'連發':this.weapon==='pistol'?'開火':'攻擊';
   $('campAttack').disabled=this.gameOver;
   $('campWeaponSwitch').disabled=this.gameOver;
+ }
+ // Rifle-range NPCs use the identical sample/pitch as their combat counterparts.
+ // Avoid clipping when 5 squads fire at nearly the same instant.
+ playRangeShot(distance,now=performance.now()){
+  if(!Number.isFinite(distance)||distance<0||distance>28)return false;
+  if(now-this.lastRangeShotMs<50)return false;
+  this.lastRangeShotMs=now;
+  const loudness=Math.pow(Math.max(0,1-distance/32),1.2);
+  shotSound(true,Math.max(.09,.90*loudness));
+  return true;
  }
  scaledDt(realDt){
   const d=clamp(realDt,0,.05);

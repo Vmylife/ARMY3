@@ -18,7 +18,7 @@ window.armyLoadFailure=err=>{
  $('armyMessage').style.color='#a52c27';button.hidden=false;button.disabled=false;button.textContent='重新載入';button.onclick=()=>location.reload();
 };
 async function loadCampWithPause(){
- const sourceURL=new URL('./src/main111.js?v=149',location.href);
+ const sourceURL=new URL('./src/main111.js?v=150',location.href);
  const response=await fetch(sourceURL,{cache:'default'});
  if(!response.ok)throw Error('軍營程式 HTTP '+response.status);
  let source=await response.text();

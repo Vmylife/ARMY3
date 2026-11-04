@@ -5,8 +5,6 @@ import {loadGlb} from './core/glb111.js?v=111';
 import {ArmyRenderer} from './core/renderer.js?v=118';
 import {RigAnimator} from './characters/rigAnimator.js?v=121';
 import {TwoHandBroomRenderer} from './characters/twoHandBroomRenderer119.js?v=119';
-import {RifleRenderer} from './training/rifleRenderer.js?v=117';
-import {createRangeAudio} from './training/rangeTraining.js?v=111';
 import {CAMP} from './map/camp.js?v=093';
 import {movePlayer} from './map/navCollision109.js?v=124';
 import {createNavDebugger} from './ui/navDebug109.js?v=109';
@@ -17,7 +15,7 @@ import {initWorldMap} from './ui/worldMap.js?v=093';
 import {setupInput} from './ui/input.js?v=062';
 import {options} from './systems/settings.js?v=060';
 import {createCampNPCs,updateCampNPCs,squadDebug} from './systems/npcSquads113.js?v=127';
-import {createCampCombat} from './systems/campCombat.js?v=3';
+import {createCampCombat} from './systems/campCombat.js?v=4';
 
 const $=id=>document.getElementById(id);
 const debug=new URLSearchParams(location.search).has('debug');
@@ -70,11 +68,9 @@ async function boot(){
   const npcGlb=await npcPromise;
   step='建立 NPC 貼圖';await stage(renderer.addModel('lifeRecruit',npcGlb),'NPC 貼圖',45000);
   npcPart=1;progress('NPC 動畫就位');
-  const rifleRenderer=new RifleRenderer(renderer.gl);
   const sweepBroom=new TwoHandBroomRenderer(renderer.gl);
   const buildings=new CampBuildings(renderer.gl);
   const props=new CampProps(renderer.gl);
-  const playRangeShot=createRangeAudio();
   // Avoid firing 23 simultaneous model downloads / image decodes into iOS Safari.
   // Keep 3 workers busy and show actual completed-model progress.
   let combatRifleGlb=null;
@@ -90,7 +86,7 @@ async function boot(){
     {label:'步槍',fn:async()=>{
       const glb=await loadGlb('./assets/weapons/rifle.glb?v=111',{timeoutMs:90000});
       combatRifleGlb=glb;
-      await stage(rifleRenderer.addModel(glb),'建立步槍',45000);
+      // Share this GLB with the combat rifle; no duplicate training mesh.
     }}
   ];
   let jobIndex=0;
@@ -237,11 +233,25 @@ async function boot(){
     renderer.drawActor('recruit',player);
     for(const npc of npcs){
       const distance=Math.hypot(npc.pos.x-player.pos.x,npc.pos.z-player.pos.z);
-      if(npc.shotPending){npc.shotPending=false;playRangeShot(distance)}
+      const onRange=npc.home.job==='shoot'&&!npc.combatActive&&!npc.combatDead;
+      if(npc.shotPending){
+       npc.shotPending=false;
+       if(onRange){
+        npc.shotUntil=now+110;
+        combat.playRangeShot(distance,now);
+       }
+      }
       if(renderer.isActorVisible(npc.pos)){
-       npc.anim.evaluate(simDt);floorCorrectCrossSit(npc.anim);renderer.drawActor('lifeRecruit',npc);
+       // Rifle trainers and combat soldiers share the calibrated 0.65x GLB.
+       // Recoil only nudges the aiming arms, without disrupting lane timing.
+       if(onRange&&npc.shotUntil>now){
+        const kick=Math.sin(Math.PI*Math.max(0,Math.min(1,1-(npc.shotUntil-now)/110)));
+        npc.anim.rifleAim=Math.max(.01,npc.anim.rifleAim*(1-.13*kick));
+       }
+       npc.anim.evaluate(simDt);floorCorrectCrossSit(npc.anim);
+       renderer.drawActor('lifeRecruit',npc);
        if(npc.anim.clip==='Sweeping_Both_Hands')sweepBroom.draw(renderer,npc);
-       if(npc.home.job==='shoot'&&!npc.combatActive&&!npc.combatDead)rifleRenderer.draw(renderer.vp,npc,now);
+       if(onRange)combat.npcRifle.draw(renderer.vp,npc,now);
       }
     }
     combat.drawWeapons(now);
