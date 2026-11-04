@@ -74,7 +74,7 @@ function renderFloor(){
  gl.bindVertexArray(ground.vao);gl.drawArrays(gl.TRIANGLES,0,ground.count);gl.bindVertexArray(null);
 }
 function lowFootLift(asset,anim){
- if(!['Knock_Down','Arise','BeHit_FlyUp','falling_down'].includes(anim.clip)||!asset?.sample?.length)return 0;
+ if(!['Knock_Down','Arise','BeHit_FlyUp','falling_down','Hit_Reaction','Block2'].includes(anim.clip)||!asset?.sample?.length)return 0;
  let low=Infinity;
  for(const s of asset.sample){
   let y=0;for(let k=0;k<4;k++){const weight=s.w[k];if(weight<=0)continue;
