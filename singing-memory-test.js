@@ -249,26 +249,37 @@ function stopAudio(){
  E.mouth.classList.remove('singing');
 }
 
+// Final montage uses ONE uninterrupted instrumental from the original song's 0:00.
+// All seven out-of-tune vocal tracks are placed at their original absolute times.
 function stopBacking(){
- if(backingSource){
-  try{backingSource.stop()}catch{}
-  backingSource=null;
+ for(const node of reviewNodes){
+  try{node.stop()}catch{}
  }
+ reviewNodes=[];
+ backingSource=null;
 }
-function playReviewBacking(index,when){
- if(!backingBuffer)return null;
+function scheduleContinuousReview(c,startAt){
  stopBacking();
- const c=getAudio(),node=c.createBufferSource(),gain=c.createGain();
- const offset=BACKING_PHRASE_STARTS[index]-BACKING_FIRST_ORIGINAL_SECOND;
- const duration=Math.min(PHRASES[index].duration,backingBuffer.duration-offset-.004);
- if(duration<=0)return null;
- node.buffer=backingBuffer;
- gain.gain.value=.53; // lower than voice, so the out-of-tune singing stays audible
- node.connect(gain);gain.connect(c.destination);
- backingSource=node;
- node.onended=()=>{if(backingSource===node)backingSource=null;try{gain.disconnect()}catch{}};
- node.start(when,offset,duration);
- return node;
+ if(backingBuffer){
+  const music=c.createBufferSource(),mix=c.createGain();
+  music.buffer=backingBuffer;
+  mix.gain.value=.58;
+  music.connect(mix);mix.connect(c.destination);
+  music.start(startAt,0); // no duration: the original backing plays start to finish
+  backingSource=music;reviewNodes.push(music);
+  music.onended=()=>{if(backingSource===music)backingSource=null;try{mix.disconnect()}catch{}};
+ }
+ for(let i=0;i<PHRASES.length;i++){
+  const voice=c.createBufferSource(),gain=c.createGain();
+  voice.buffer=takes[i].buffer;
+  gain.gain.value=.94;
+  voice.connect(gain);gain.connect(c.destination);
+  // No slices or tempo stretching of the accompaniment.
+  voice.start(startAt+BACKING_PHRASE_STARTS[i],0);
+  reviewNodes.push(voice);
+  voice.onended=()=>{try{gain.disconnect()}catch{}};
+ }
+ return backingBuffer?.duration||BACKING_PHRASE_STARTS.at(-1)+PHRASES.at(-1).duration+.5;
 }
 
 function playBuffer(buffer,offset=0,duration=CLIP,when=null){
