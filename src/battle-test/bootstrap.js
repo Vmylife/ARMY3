@@ -19,6 +19,6 @@ $('battleStart').addEventListener('click',async()=>{
   $('battleIntro').hidden=true;$('errorText').textContent=String(err?.message||err);
   $('fatal').hidden=false;
  };
- try{await import('./main.js?v=3')}
+ try{await import('./main.js?v=4')}
  catch(err){console.error('敵軍來襲測試版載入失敗',err);window.armyLoadFailure(err)}
 });

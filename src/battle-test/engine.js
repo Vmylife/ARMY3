@@ -356,6 +356,9 @@ export class ArmyBattleCombat extends CampCombat{
    }
    const ranged=!fist&&d<20&&visible&&shooterSet.has(n);
    const chase=n.combatAttack<=0&&(!ranged||d>9)&&d>(fist?1.4:5);
+   // Orient running soldiers toward their REAL displacement, never the moving
+   // target behind them. This prevents side-sliding while routing around props.
+   let actualMove=null;
    if(chase){
     if(n.assaultGoalTarget!==target||!n.combatGoal||
        dist(n.combatGoal,target.pos)>1.8||this.time-n.combatLastMove>1.5){
@@ -364,8 +367,23 @@ export class ArmyBattleCombat extends CampCombat{
     }
     const before={...n.pos};
     moveSquadMember(n,n.combatGoal,dt,true,false);
-    if(dist(before,n.pos)>.008)n.combatStall=0;
-    else n.combatStall=(n.combatStall||0)+dt;
+    const moved=dist(before,n.pos);
+    if(moved>.008){
+     actualMove={x:n.pos.x-before.x,z:n.pos.z-before.z};
+     n.combatStall=0;
+     // Squad pathfinding sometimes selects a walking escape. Preserve it,
+     // and scale the gait to distance actually travelled this frame.
+     if(!['Running','Walking','RunFast'].includes(n.anim.clip))n.anim.setClip('Running');
+     const walk=n.anim.clip==='Walking';
+     n.anim.speed=clamp(moved/Math.max(dt,.001)/(walk?1.36:2.18),.65,1.35);
+    }else{
+     n.combatStall=(n.combatStall||0)+dt;
+     // A* can request Running even when collision blocks every step.
+     // Don't let stationary soldiers keep running on the spot.
+     if(['Running','Walking','RunFast'].includes(n.anim.clip)){
+      n.anim.setClip('Idle');n.anim.speed=1;
+     }
+    }
     if(n.combatStall>1.4){
      n.route=null;n.routeGoal=null;n.routeIndex=0;n.replanAt=0;
      n.combatStall=0;n.combatGoal={...target.pos};
@@ -375,9 +393,9 @@ export class ArmyBattleCombat extends CampCombat{
     n.anim.speed=(n.anim.clips.Punch_Combo_1.duration||1.4)/.70;
    }else{n.anim.setClip('Idle');n.anim.speed=1}
    const dx=target.pos.x-n.pos.x,dz=target.pos.z-n.pos.z;
-   if(Math.hypot(dx,dz)>.08){
-    const desired=Math.atan2(dx,dz),delta=Math.atan2(Math.sin(desired-n.angle),Math.cos(desired-n.angle));
-    n.angle+=delta*Math.min(1,dt*8);
+   if(actualMove||Math.hypot(dx,dz)>.08){
+    const desired=actualMove?Math.atan2(actualMove.x,actualMove.z):Math.atan2(dx,dz);
+    this.turnAlly(n,desired,dt);
    }
   }
   // Parent AI is suppressed; finish the usual death/fall cleanup here.
