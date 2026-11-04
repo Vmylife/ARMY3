@@ -42,7 +42,7 @@ async function boot(){
  try{
   // Real progress per streamed model; visible increments even before GLB parsing.
   const TOTAL=1000;let heroPart=0,npcPart=0,otherDone=0;
-  const otherTotal=BUILDING_MODELS.length+PROP_MODELS.length+1;
+  let otherTotal=BUILDING_MODELS.length+PROP_MODELS.length+1;
   const staticProgress=new Map();
   const progress=(message)=>window.armySetLoading?.(
     345*heroPart+145*npcPart+485*(Math.min(otherTotal,otherDone+[...staticProgress.values()].reduce((s,p)=>s+p,0))/otherTotal),TOTAL,message);
@@ -87,6 +87,7 @@ async function boot(){
   ];
   const initialJobs=jobs.filter(j=>j.essential);
   const deferredJobs=jobs.filter(j=>!j.essential);
+  otherTotal=initialJobs.length; // Loading bar measures time-to-first-playable-frame, not background uploads.
   const loadJob=async(job,foreground=false)=>{
    const key=job.kind+job.id;
    const glb=await loadGlb(job.url,{timeoutMs:90000,onProgress:(got,total)=>{
@@ -99,7 +100,7 @@ async function boot(){
     await new Promise(resolve=>{
      const check=()=>{
       if(document.hidden||window.armyMinigameActive){setTimeout(check,250);return}
-      if(performance.now()-lastPlayerMove>220||performance.now()-deferredStartedAt>2000){resolve();return}
+      if(performance.now()-lastPlayerMove>270||performance.now()-deferredStartedAt>2700){resolve();return}
       setTimeout(check,160);
      };
      check();
