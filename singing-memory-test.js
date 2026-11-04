@@ -700,9 +700,14 @@ async function replay(){
    E.speech.textContent='「聽聽看你第 '+(i+1)+' 句唱得怎樣！」';
    E.guide.style.display='none';E.trace.style.display='none';
    const warped=takes[i].buffer;
-   const p=playBuffer(warped,0,PHRASES[i].duration);
-   await animateAudio(p);
+   // The original instrumental plays only here, matched to the same
+   // source-song timestamp as each recorded vocal phrase.
+   const c=getAudio(),when=c.currentTime+.04;
+   playReviewBacking(i,when);
+   const p=playBuffer(warped,0,PHRASES[i].duration,when);
+   await animateAudio(p,when);
    await p;
+   stopBacking();
   }
   if(id!==session)return;
   await applyPhrase(PHRASES.length-1);
@@ -711,7 +716,7 @@ async function replay(){
   E.points.textContent=lastScore.points+' / 100';
   E.comment.textContent=lastScore.comment+'（七句平均跟唱率 '+lastScore.coverage+'%；平均走音 '+lastScore.error+' 個半音）';
   E.phraseScores.textContent=takes.map((take,index)=>'第'+(index+1)+'句 '+take.score.points+' 分').join(' · ');
-  E.hint.textContent='七句走音人聲已依序播放完畢，沒有伴奏。可以重播整段，或切換任一句查看音準比較。';
+  E.hint.textContent='七句走音人聲＋原版伴奏已回放完畢。可重播或選擇任一句比較音準。';
   tracePathFor(takes[PHRASES.length-1]);
  }catch(err){console.error('[軍歌鑑測] 回放失敗',err);setText('播放走音人聲失敗：'+err.message);setMode('done')}
 }
@@ -788,7 +793,7 @@ for(let i=0;i<PHRASES.length;i++){
 }
 window.addEventListener('pagehide',()=>stopAudio());
 window.armySingingTest={
- get status(){return {mode,hasOriginalVocals:audioBuffers.length===PHRASES.length,hasOriginalMusic:false,musicPlayback:false,embeddedAudio:true,liveVoiceEnabled:!!liveVoice&&mode==='imitate',
+ get status(){return {mode,hasOriginalVocals:audioBuffers.length===PHRASES.length,hasOriginalMusic:!!backingBuffer,musicPlayback:mode==='playback'&&!!backingSource,embeddedAudio:true,liveVoiceEnabled:!!liveVoice&&mode==='imitate',
    phrase:activePhrase+1,phraseCount:PHRASES.length,completedTakes:takes.filter(Boolean).length,
    phraseSeconds:CLIP,referenceFrames:pitch.length,voicedPercent:Math.round(validPitch*100),
    referenceVisible:E.guide.style.display!=='none',guidePathPoints:sourcePitch.filter(Number.isFinite).length,
