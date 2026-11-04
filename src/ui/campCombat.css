@@ -91,3 +91,9 @@
 @media(prefers-reduced-motion:reduce){
  .campHitBurst,.campFloatDamage,.campMuzzle{animation-duration:140ms}
 }
+
+/* Distinct rifle silhouette, not the platform handgun emoji. */
+.campRifleGlyph{display:block;width:50px;height:33px;max-width:100%;fill:currentColor;filter:drop-shadow(0 1px 2px #0004)}
+.campWheelSlot .campRifleGlyph{width:53px;height:35px}
+#campAttackIcon:has(.campRifleGlyph){display:flex;align-items:center;justify-content:center}
+#campAttackIcon .campRifleGlyph{width:56px;height:35px}

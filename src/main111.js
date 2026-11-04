@@ -15,7 +15,7 @@ import {initWorldMap} from './ui/worldMap.js?v=093';
 import {setupInput} from './ui/input.js?v=062';
 import {options} from './systems/settings.js?v=060';
 import {createCampNPCs,updateCampNPCs,squadDebug} from './systems/npcSquads113.js?v=127';
-import {createCampCombat} from './systems/campCombat.js?v=4';
+import {createCampCombat} from './systems/campCombat.js?v=5';
 
 const $=id=>document.getElementById(id);
 const debug=new URLSearchParams(location.search).has('debug');
@@ -233,7 +233,11 @@ async function boot(){
     renderer.drawActor('recruit',player);
     for(const npc of npcs){
       const distance=Math.hypot(npc.pos.x-player.pos.x,npc.pos.z-player.pos.z);
-      const onRange=npc.home.job==='shoot'&&!npc.combatActive&&!npc.combatDead;
+      // Free recruits should carry a rifle while approaching the range;
+      // squads also get their gun when marching to their assigned lanes.
+      const rangeTask=npc.task?.type==='shoot'||npc.activity?.includes('靶場打靶');
+      const onRange=!npc.combatActive&&!npc.combatDead&&
+       (npc.home.job==='shoot'||rangeTask);
       if(npc.shotPending){
        npc.shotPending=false;
        if(onRange){
@@ -242,6 +246,9 @@ async function boot(){
        }
       }
       if(renderer.isActorVisible(npc.pos)){
+       // Draw the already loaded rifle on the very first range approach.
+       // Never defer rendering until a subsequent shot cycle.
+       if(onRange)npc.anim.rifleAim=Math.max(.68,npc.anim.rifleAim||0);
        // Rifle trainers and combat soldiers share the calibrated 0.65x GLB.
        // Recoil only nudges the aiming arms, without disrupting lane timing.
        if(onRange&&npc.shotUntil>now){
@@ -251,7 +258,7 @@ async function boot(){
        npc.anim.evaluate(simDt);floorCorrectCrossSit(npc.anim);
        renderer.drawActor('lifeRecruit',npc);
        if(npc.anim.clip==='Sweeping_Both_Hands')sweepBroom.draw(renderer,npc);
-       if(onRange)combat.npcRifle.draw(renderer.vp,npc,now);
+       if(onRange)combat.npcRifle.draw(renderer.vp,npc,now,{force:true});
       }
     }
     combat.drawWeapons(now);

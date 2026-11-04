@@ -17,7 +17,8 @@ export const COMBAT_KNOCKDOWN_DAMAGE=50;
 export const NPC_MAX_HP=100;
 export const COMBAT_DOWN_SECONDS=2.3;
 export const COMBAT_RISE_SECONDS=.85;
-const SENSE_RADIUS=k=>k>=10?Infinity:k===0?4:k<5?5.5+k*.9:10+(k-5)*1.2;
+// Larger local aggro zones, but ten kills still uniquely triggers GLOBAL pursuit.
+const SENSE_RADIUS=k=>k>=10?Infinity:k===0?7:k<5?8.5+k*1.5:17+(k-5)*2;
 
 // Obstacles are exactly those used to keep players/NPCs out of structures.
 export function lineClear(a,b,padding=.11){
@@ -36,6 +37,8 @@ export function weaponForKills(kills){return kills>=5?'rifle':kills>=1?'pistol':
 
 
 const CAMP_GUN_SAMPLE='./assets/audio/rifle/npc_rifle_B.mp3?v=1';
+// A distinguishable side-on rifle silhouette, shared by the weapon wheel and HUD.
+const RIFLE_ICON='<svg class="campRifleGlyph" viewBox="0 0 100 56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="currentColor" d="M4 21h14l10 6h24v-7h28v-5h5v5h11v8H71l-9 6-3 17H47l1-17H36l-10 9-10-11H4z"/><path fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" d="M38 19l5-7h19l5 7M9 17v-7M57 34l-3 12"/></svg>';
 function startAudio(){
  try{
   const Ctor=window.AudioContext||window.webkitAudioContext;
@@ -47,8 +50,8 @@ function startAudio(){
    for(let i=0;i<samples.length;i++)samples[i]=Math.random()*2-1;
    startAudio.pcm=b;
   }
-  // Download only after a direct touch/key gesture; use a synthesized fallback
-  // for the very first shot while Safari is decoding the original MP3.
+  // Preload and decode at camp initialization, before the first range volley.
+  // Playback still needs a user gesture to resume AudioContext on mobile.
   if(!startAudio.gunBuffer&&!startAudio.gunPromise&&
      (!startAudio.retryAt||performance.now()>startAudio.retryAt)){
    startAudio.gunPromise=fetch(CAMP_GUN_SAMPLE)
@@ -110,10 +113,11 @@ export class CampCombat{
   this.canvas=renderer.canvas;this.lastState='';this.lastRangeShotMs=-1000;
   this.hitStop=0;this.shake=0;this.cameraRecoil=0;this.playerHurt=0;
   this.mountUI();
-  // Safari requires a user gesture to unlock audio. Walking or tapping the
-  // 3D camp should unlock range rifle sounds, even before combat begins.
-  this.canvas.addEventListener('pointerdown',()=>startAudio(),{passive:true});
-  window.addEventListener('keydown',()=>startAudio(),{passive:true});
+  // Start the MP3 preload during camp boot instead of waiting for the first volley.
+  // Listen in capture phase so the home/start button and virtual joystick count too.
+  startAudio();
+  window.addEventListener('pointerdown',()=>startAudio(),{capture:true,passive:true});
+  window.addEventListener('keydown',()=>startAudio(),{capture:true,passive:true});
   this.playerPistol=new PistolRenderer(renderer.gl);
   this.npcPistol=new PistolRenderer(renderer.gl);
   this.playerRifle=new RifleRenderer(renderer.gl);
@@ -154,7 +158,7 @@ export class CampCombat{
     <div id="campWheelDisc">
      <button data-choice="up" class="campWheelSlot up" type="button"><span>✊</span><small>拳頭</small></button>
      <button data-choice="right" class="campWheelSlot right" type="button"><span>🔫</span><small>手槍</small></button>
-     <button data-choice="bottom" class="campWheelSlot bottom" type="button"><span>🔫</span><small>步槍</small></button>
+     <button data-choice="bottom" class="campWheelSlot bottom" type="button"><span>${RIFLE_ICON}</span><small>步槍</small></button>
      <button data-choice="left" class="campWheelSlot left inactive" type="button"><span>🔒</span><small>預留</small></button>
      <button id="campWheelCancel" type="button"><strong id="campWheelName">拳頭</strong><small>取消</small></button>
     </div>
@@ -286,7 +290,8 @@ export class CampCombat{
   $('campHealth').textContent='HP '+Math.ceil(this.hp);
   $('campKills').textContent='擊殺 '+this.kills;
   $('campAlert').textContent=this.kills>=10?'全營追擊':this.kills>=5?'步槍警戒':this.kills>=1?'手槍警戒':this.provoked?'徒手警戒':'正常操課';
-  $('campAttackIcon').textContent=this.weapon==='fists'?'✊':'🔫';
+  if(this.weapon==='rifle')$('campAttackIcon').innerHTML=RIFLE_ICON;
+  else $('campAttackIcon').textContent=this.weapon==='fists'?'✊':'🔫';
   $('campAttackText').textContent=this.weapon==='rifle'?'連發':this.weapon==='pistol'?'開火':'攻擊';
   $('campAttack').disabled=this.gameOver;
   $('campWeaponSwitch').disabled=this.gameOver;
