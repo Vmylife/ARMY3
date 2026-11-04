@@ -577,11 +577,11 @@ async function listen(){
  try{
   const c=getAudio();await c.resume();
   if(id!==session)return;
-  const firstBeat=c.currentTime+.12,songStart=firstBeat+4*BEAT_SECONDS;
-  const playing=playBuffer(vocals,clipStart,CLIP,songStart);
-  if(!await countIn('countinTeacher',c,firstBeat)||id!==session)return;
-  setMode('listen');
-  await animateAudio(playing,songStart);
+  // Teacher sings instantly; white playhead is already at midpoint.
+ const songStart=c.currentTime+.025;
+ setMode('listen');headAt(0);
+ const playing=playBuffer(vocals,clipStart,CLIP,songStart);
+ await animateAudio(playing,songStart);
   await playing;
   if(id!==session)return;
   await startImitate();
@@ -595,9 +595,10 @@ async function startImitate(){
  setMode('imitate');
  E.guide.style.display='none';
  E.guide.setAttribute('visibility','hidden');
- pointerId=null;playerHeld=false;midiValue=refBase;trace=[];ownActionCount=0;
- E.thumb.style.top='50%';
+ // Preserve slider pitch and pointer selected in beats 3-2-1-唱.
+ trace=[];ownActionCount=0;
  beginLiveVoice(c,playerStart);
+ if(playerHeld){liveGain(true);pumpLiveVoice()}
  E.hint.textContent='第五拍開始！右側滑桿上下移動時會即時聽見走音人聲；放開就停唱。';
  const step=()=>{
   if(id!==session||mode!=='imitate')return;
@@ -620,34 +621,34 @@ function updateFromRail(e){
  E.dot.setAttribute('cy',String(toY(midiValue)));
 }
 E.rail.addEventListener('pointerdown',e=>{
- if(mode!=='imitate'||pointerId!==null)return;
+ if((mode!=='imitate'&&mode!=='countinPlayer')||pointerId!==null)return;
  e.preventDefault();pointerId=e.pointerId;playerHeld=true;ownActionCount++;
  E.rail.classList.add('active');updateFromRail(e);
- liveGain(true);pumpLiveVoice();
+ if(mode==='imitate'){liveGain(true);pumpLiveVoice()}
  try{E.rail.setPointerCapture(e.pointerId)}catch{}
 });
 E.rail.addEventListener('pointermove',e=>{
- if(mode!=='imitate'||pointerId!==e.pointerId)return;
+ if((mode!=='imitate'&&mode!=='countinPlayer')||pointerId!==e.pointerId)return;
  e.preventDefault();updateFromRail(e);
- pumpLiveVoice();
+ if(mode==='imitate')pumpLiveVoice();
 });
 for(const event of ['pointerup','pointercancel','lostpointercapture']){
  E.rail.addEventListener(event,e=>{
-  if(mode!=='imitate')return;
+  if(mode!=='imitate'&&mode!=='countinPlayer')return;
   if(pointerId!==null&&e.pointerId!==pointerId)return;
   pointerId=null;playerHeld=false;E.rail.classList.remove('active');liveGain(false);
  });
 }
 E.rail.addEventListener('keydown',e=>{
- if(mode!=='imitate')return;
+ if(mode!=='imitate'&&mode!=='countinPlayer')return;
  if(e.key==='ArrowUp'||e.key==='ArrowDown'){
   e.preventDefault();
   midiValue=clamp(midiValue+(e.key==='ArrowUp'?.7:-.7),refBase-9.5,refBase+9.5);
   const position=clamp((refBase+9.5-midiValue)/19,0,1);
   E.thumb.style.top=(position*100).toFixed(1)+'%';
   E.rail.setAttribute('aria-valuenow',String(Math.round((1-position)*100)));
-  E.dot.setAttribute('cy',String(toY(midiValue)));pumpLiveVoice();
- }else if(e.code==='Space'){e.preventDefault();playerHeld=true;E.rail.classList.add('active');liveGain(true);pumpLiveVoice()}
+  E.dot.setAttribute('cy',String(toY(midiValue)));if(mode==='imitate')pumpLiveVoice();
+ }else if(e.code==='Space'){e.preventDefault();playerHeld=true;E.rail.classList.add('active');if(mode==='imitate'){liveGain(true);pumpLiveVoice()}}
 });
 E.rail.addEventListener('keyup',e=>{
  if(e.code==='Space'){playerHeld=false;E.rail.classList.remove('active');liveGain(false)}
@@ -766,10 +767,10 @@ E.preview.addEventListener('click',async()=>{
  stopAudio();const id=session;setMode('listen');
  try{
   const c=getAudio();await c.resume();if(id!==session)return;
-  const firstBeat=c.currentTime+.12,start=firstBeat+4*BEAT_SECONDS;
+  const start=c.currentTime+.025;
+  setMode('listen');headAt(0);
   const p=playBuffer(vocals,clipStart,CLIP,start);
-  if(!await countIn('countinTeacher',c,firstBeat)||id!==session)return;
-  setMode('listen');await animateAudio(p,start);await p;
+  await animateAudio(p,start);await p;
   if(id===session)setMode('ready');
  }
  catch(e){setMode('ready');setText('原唱試聽失敗：'+e.message)}
