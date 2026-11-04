@@ -26,7 +26,15 @@ export class FightEngine{
  }
  emit(kind,payload={}){this.events.push({kind,...payload})}
  drain(){return this.events.splice(0)}
- face(a,b){a.angle=Math.atan2(b.x-a.x,b.z-b.z)}
+ face(a,b,dt=0){
+  const dx=b.x-a.x,dz=b.z-a.z;
+  if(dx*dx+dz*dz<1e-8)return;
+  // Match the main camp's yaw convention: atan2(world X, world Z).
+  // Z must be target minus actor (the old b.z-b.z was always zero).
+  const desired=Math.atan2(dx,dz);
+  const delta=Math.atan2(Math.sin(desired-a.angle),Math.cos(desired-a.angle));
+  a.angle+=delta*Math.min(1,dt>0?dt*12:1);
+ }
  enableAI(on){this.aiEnabled=Boolean(on);
   if(!on)for(const f of this.opponents){f.attack=null;if(f.state==='attack')f.state='idle'}
  }
@@ -112,7 +120,7 @@ export class FightEngine{
   for(const foe of this.opponents){
    if(foe.hp<=0||foe.stun>0||foe.attack||['down','rise','hit'].includes(foe.state))continue;
    if(foe!==this.enemy&&!this.reinforcements)continue;
-   const p=this.player;this.face(foe,p);const d=distance(foe,p);
+   const p=this.player;this.face(foe,p,dt);const d=distance(foe,p);
    const desired=1.28+foe.aiIndex*.10;
    if(d>desired+.16){
     foe.state='walk';
