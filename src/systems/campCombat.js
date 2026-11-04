@@ -153,8 +153,8 @@ export class CampCombat{
   const root=document.createElement('div');root.id='campCombatUI';root.innerHTML=`
    <div id="campCombatStatus" aria-live="polite"><span id="campHealth">HP 100</span><span id="campKills">擊殺 0</span><span id="campAlert">正常操課</span></div>
    <div class="campCombatButtons">
-    <button id="campWeaponSwitch" type="button" aria-label="選擇武器"><span>◉</span><small>武器</small></button>
     <button id="campAttack" type="button" aria-label="攻擊"><span id="campAttackIcon">✊</span><small id="campAttackText">攻擊</small></button>
+    <button id="campWeaponSwitch" type="button" aria-label="選擇武器"><span>◉</span><small>武器</small></button>
    </div>
    <div id="campCombatTip" hidden></div>
    <div id="campCombatCombo" hidden></div>
@@ -450,7 +450,9 @@ export class CampCombat{
  damageNPC(n,damage,kind='bullet'){
   if(n.combatDead||damage<=0)return;
   this.provoked=true;
-  if(!n.combatActive)this.engage(n);
+  // Provoking ANY soldier of a five-person training squad alerts all surviving
+  // squadmates immediately, even on the other side of the camp.
+  this.engageWithSquad(n);
   const grounded=n.combatDown>0||n.combatRise>0;
   n.combatHP=Math.max(0,n.combatHP-damage);
   const dead=n.combatHP<=0;
@@ -509,6 +511,18 @@ export class CampCombat{
     n.anim.setClip('Hit_Reaction',{restart:true});
     n.anim.transition=0;n.anim.prevClip=null;
    }
+  }
+ }
+ engageWithSquad(n){
+  const group=n.squadId;
+  // Independent recruits have no integer squad ID. Never treat them as
+  // one giant group merely because all their squadId values are undefined.
+  if(!Number.isInteger(group)||group<0){
+   this.engage(n);
+   return;
+  }
+  for(const member of this.npcs){
+   if(member.squadId===group&&!member.combatDead)this.engage(member);
   }
  }
  engage(n){
@@ -674,7 +688,8 @@ export class CampCombat{
   const radius=chaseRadius(this.kills);
   for(const n of this.npcs){
    if(n.combatDead)continue;
-   if(!n.combatActive&&distance(n.pos,this.player.pos)<=radius)this.engage(n);
+   if(!n.combatActive&&distance(n.pos,this.player.pos)<=radius)
+    this.engageWithSquad(n);
   }
   const shooters=this.shootingNPCs(),shooterSet=new Set(shooters);
   for(const n of this.npcs){

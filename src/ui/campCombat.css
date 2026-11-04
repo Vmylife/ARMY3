@@ -5,14 +5,18 @@
 }
 #campCombatUI{position:fixed;inset:0;z-index:9;pointer-events:none;color:#f7f1d8;font-family:-apple-system,BlinkMacSystemFont,"PingFang TC",system-ui,sans-serif}
 #campCombatUI button{touch-action:none;appearance:none;outline-offset:3px}
-#campCombatStatus{position:absolute;top:calc(10px + env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));
- display:flex;flex-direction:column;align-items:flex-end;gap:5px;pointer-events:none}
+/* Music is at top right (16px / 42px). Put the HUD underneath, not behind it. */
+#campCombatStatus{position:absolute;top:calc(75px + env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));
+ display:flex;flex-direction:column;align-items:flex-end;gap:5px;pointer-events:none;
+ transition:top .18s ease,opacity .18s ease}
+ /* The music volume panel drops below its button; make room while expanded. */
+body:has(#campMusicPanel:not([hidden])) #campCombatStatus{top:calc(164px + env(safe-area-inset-top))}
 #campCombatStatus span{padding:5px 10px;border-radius:9px;background:#173a2de8;border:1px solid #ebd4a46e;
  box-shadow:0 2px 7px #0003;font-size:12px;font-weight:850;white-space:nowrap}
 #campCombatStatus #campKills{color:#ffd798}
 #campCombatStatus #campAlert{font-size:10px;color:#e8e8c9}
-.campCombatButtons{position:absolute;bottom:calc(88px + env(safe-area-inset-bottom));right:max(14px,env(safe-area-inset-right));
- display:flex;align-items:center;gap:10px;pointer-events:auto}
+.campCombatButtons{position:absolute;bottom:calc(24px + env(safe-area-inset-bottom));right:max(14px,env(safe-area-inset-right));
+ display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:auto}
 .campCombatButtons button{border:2px solid #f2d9a2;border-radius:16px;color:#fff5db;background:#254c3d;
  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;line-height:1;
  box-shadow:0 5px 20px #0b2b1c80;font-weight:900}
@@ -55,10 +59,10 @@
 .campShotHit{position:absolute;pointer-events:none;color:#ffe5ab;font-weight:900;animation:campFloat .4s ease-out forwards}
 @keyframes campFloat{from{opacity:1}to{opacity:0;transform:translateY(-32px)}}
 @media(max-width:500px){#campCombatStatus span{padding:4px 7px;font-size:10px}#campCombatStatus #campAlert{font-size:9px}
- .campCombatButtons{right:11px;bottom:calc(88px + env(safe-area-inset-bottom))}
+ .campCombatButtons{right:11px;bottom:calc(23px + env(safe-area-inset-bottom))}
  #campAttack{width:76px;height:76px}#campWeaponSwitch{width:56px;height:56px}
  #campCombatTip{bottom:calc(174px + env(safe-area-inset-bottom))}}
-@media(max-height:610px){.campCombatButtons{bottom:calc(56px + env(safe-area-inset-bottom))}
+@media(max-height:610px){.campCombatButtons{bottom:calc(12px + env(safe-area-inset-bottom))}
  #campCombatTip{bottom:calc(143px + env(safe-area-inset-bottom))}
  #campWheelDisc{width:min(60vw,63dvh);height:min(60vw,63dvh)}}
 
@@ -107,3 +111,8 @@
  -webkit-user-select:none!important;user-select:none!important}
 #campCombatCombo[hidden]{display:none!important}
 @media(max-width:520px){#campCombatCombo{top:calc(78px + env(safe-area-inset-top));font-size:12px}}
+ 
+/* Short landscape screens: collapse music overlay conflicts during volume editing. */
+@media(max-height:480px){
+ body:has(#campMusicPanel:not([hidden])) #campCombatStatus{opacity:0}
+}
