@@ -5,14 +5,14 @@
  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
  <meta name="theme-color" content="#182c20">
  <title>國軍模擬器｜格鬥打擊實驗室</title>
- <link rel="stylesheet" href="./src/fight-lab/lab.css?v=1">
+ <link rel="stylesheet" href="./src/fight-lab/lab.css?v=2">
 </head>
 <body>
  <canvas id="arena" aria-label="3D軍營格鬥實驗場"></canvas>
  <div id="flash" aria-hidden="true"></div>
  <div id="burstLayer" aria-hidden="true"></div>
  <header class="header">
-  <div class="headerLeft"><div class="eyebrow">ARMY3 · COMBAT TEST</div><h1>格鬥打擊實驗室 <small>V1</small></h1></div>
+  <div class="headerLeft"><div class="eyebrow">ARMY3 · COMBAT TEST</div><h1>格鬥打擊實驗室 <small>V1.1</small></h1></div>
   <a class="exit" href="./index.html?v=205">← 返回軍營</a>
  </header>
  <section class="scores" aria-label="雙方狀態">
@@ -33,13 +33,9 @@
  <div class="targetLabel you" id="playerLabel">你</div>
  <div class="targetLabel them" id="enemyLabel">對手</div>
  <div id="callout" class="callout" aria-live="polite">靠近 NPC，打一拳試試看！</div>
+ <div id="floatingStick" aria-hidden="true"><div class="stick-base"><div id="stickThumb" class="stick-thumb"></div></div></div>
  <section class="controls" aria-label="戰鬥控制">
-  <div class="stickArea">
-   <div id="stick" class="stick" aria-label="移動搖桿" role="group"><span id="stickThumb" class="stickThumb"></span></div>
-   <span class="controlName">移動</span>
-  </div>
   <div class="actionArea">
-   <button id="dodge" class="action dodge" type="button"><span>↘</span><small>閃避</small></button>
    <button id="light" class="action light" type="button"><span>✊</span><small>出拳</small></button>
    <button id="heavy" class="action heavy" type="button"><span>💥</span><small>重拳</small></button>
   </div>
@@ -50,7 +46,7 @@
    <label class="difficultyLabel" for="difficulty">反擊強度 <select id="difficulty"><option value="normal">一般</option><option value="hard">兇猛</option></select></label>
    <button id="reset" class="reset" type="button">↻ 重開測試</button>
   </div>
-  <p>電腦：WASD 移動 · J 出拳 · K 重拳 · 空白鍵閃避。手機：左側搖桿、右側攻擊。</p>
+  <p>電腦：WASD 移動 · J 出拳 · K 重拳。手機：螢幕下半部觸碰移動、上半部滑動鏡頭、雙指縮放。</p>
   <p>獨立實驗頁面，不影響主軍營 NPC 的訓練、生命值或行為。</p>
  </footer>
  <div id="loading" class="loading" role="status">
@@ -72,6 +68,6 @@
    <a href="./index.html?v=205">返回軍營</a>
   </div>
  </div>
- <script type="module" src="./src/fight-lab/lab.js?v=1"></script>
+ <script type="module" src="./src/fight-lab/lab.js?v=2"></script>
 </body>
 </html>
