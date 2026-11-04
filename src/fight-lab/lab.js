@@ -156,8 +156,8 @@ function followLabel(id,f){
 function hitBurst(event){
  if(!renderer)return;
  const at=project(event.at.x,1.18,event.at.z);
- const node=document.createElement('div');node.className='hitBurst '+(event.down?'heavy ':'')+(event.who==='player'?'':'enemy');
- node.dataset.text=event.down?'擊飛！':'啪！';
+ const node=document.createElement('div');node.className='hitBurst '+(event.down?'heavy ':'')+(event.type==='bullet'?'bulletHit ':'')+(event.who==='player'?'':'enemy');
+ node.dataset.text=event.down?'擊飛！':event.type==='bullet'?'命中！':'啪！';
  node.style.left=at.x+'px';node.style.top=at.y+'px';
  $('burstLayer').appendChild(node);setTimeout(()=>node.remove(),410);
  const damage=document.createElement('div');damage.className='floatDamage';
@@ -269,16 +269,22 @@ function toggleWeapon(){
 
 function react(){
  for(const event of e.drain()){
-  if(event.kind==='swing'){
+  if(event.kind==='shot'){
+   if(rifleActor)rifleActor.shotUntil=performance.now()+110;
+   rifleSound();shake=Math.max(shake,.13);
+   cameraPitch=clamp(cameraPitch-.014,.32,1.12);
+   showMuzzle(event.at);
+  }else if(event.kind==='swing'){
    whoosh(false);
    if(event.who!=='player')tell('有人要揍你了！快走位！',900);
   }else if(event.kind==='hit'){
-   shake=Math.max(shake,event.down?.25:.095);
-   hitBurst(event);thump(Boolean(event.down));
+   shake=Math.max(shake,event.down?.25:event.type==='bullet'?.085:.095);
+   hitBurst(event);
+   if(event.type!=='bullet')thump(Boolean(event.down));
    if(event.who==='player'){
-    tell(event.down?'擊飛！這拳直接讓他躺平！':
-     event.damageSinceFall>=LAUNCH_AFTER_DAMAGE?'累積受傷 30%！下一拳直接擊飛！':
-     '命中！對方累積受傷 '+event.damageSinceFall+' / '+LAUNCH_AFTER_DAMAGE,1300);
+    tell(event.down?(event.type==='bullet'?'子彈擊飛！':'擊飛！這拳直接讓他躺平！'):
+     event.damageSinceFall>=LAUNCH_AFTER_DAMAGE?'累積受傷 30%！下一擊會被擊飛！':
+     (event.type==='bullet'?'射擊命中！':'拳擊命中！')+'累積受傷 '+event.damageSinceFall+' / '+LAUNCH_AFTER_DAMAGE,1300);
    }else{
     tell(event.down?'你被打趴了！其他人還在追！':'靠北！你被反擊了！',1150);
    }
@@ -306,6 +312,7 @@ function updateHUD(){
   if(fill.dataset.hp!==String(shown)){fill.style.width=hp+'%';fill.dataset.hp=String(shown);txt.textContent=shown+' / 100'}
  }
  $('attack').disabled=!ready||Boolean(e.winner);
+ $('weaponSwitch').disabled=!ready||Boolean(e.winner);
  const active=e.opponents.filter(f=>f.hp>0).length;
  $('sceneStatus').textContent=e.winner?'格鬥結束':e.reinforcements?'1 對 4！所有友軍都來了':
   e.aggressive?'對手已還手 · 支援即將抵達':'先打其中一名阿兵哥看看';
@@ -327,11 +334,14 @@ function showEnd(winner){
 }
 function reset(){
  roundSerial++;
- const settings={ai:$('counter').checked,difficulty:$('difficulty').value};
+ const settings={ai:$('counter').checked,difficulty:$('difficulty').value,weapon:e.weapon};
  e.reset();e.enableAI(settings.ai);e.difficulty=settings.difficulty;
+ if(settings.weapon==='rifle')e.switchWeapon();
+ clearTracers();if(rifleActor)rifleActor.shotUntil=0;
+ syncWeaponControls();
  $('endScreen').hidden=true;$('burstLayer').replaceChildren();$('combo').hidden=true;
  shake=0;last=0;if(renderer)renderer.cameraReady=false;
- tell('像在軍營一樣自由移動，面向對手再揮拳！',1700);updateHUD();
+ tell(e.weapon==='rifle'?'步槍已就位，面向哪裡就往哪裡射擊！':'像在軍營一樣自由移動，面向對手再揮拳！',1700);updateHUD();
  if(actors){for(const a of Object.values(actors)){a.clip='';a.anim.setClip('Idle',{restart:true});a.anim.evaluate(0)}}
 }
 function controls(){
@@ -343,9 +353,12 @@ function controls(){
  );
  function playAction(){
   if(!ready)return;
-  unlockAudio();e.attack();react();updateHUD();
+  unlockAudio();
+  if(e.weapon==='rifle')e.shoot();else e.attack();
+  react();updateHUD();
  }
  $('attack').addEventListener('click',playAction);
+ $('weaponSwitch').addEventListener('click',toggleWeapon);
  $('reset').addEventListener('click',reset);$('again').addEventListener('click',reset);
  $('counter').addEventListener('change',event=>{
   e.enableAI(event.target.checked);
@@ -353,8 +366,9 @@ function controls(){
  });
  $('difficulty').addEventListener('change',event=>{e.difficulty=event.target.value});
  window.addEventListener('keydown',event=>{
-  if(event.code!=='KeyJ'||event.repeat)return;
-  event.preventDefault();playAction();
+  if(!['KeyJ','KeyQ'].includes(event.code)||event.repeat)return;
+  event.preventDefault();
+  if(event.code==='KeyQ')toggleWeapon();else playAction();
  });
 }
 // Identical 3D directional basis as src/main111.js: camera-relative movement.
@@ -387,6 +401,11 @@ function frame(now){
  renderer.startFrame(e.player);
  renderFloor();drawFighter(e.player,actors.player);
  for(const foe of e.opponents)drawFighter(foe,actors[foe.id]);
+ if(rifle&&e.weapon==='rifle'){
+  rifleActor.pos=e.player;rifleActor.angle=e.player.angle;
+  rifle.draw(renderer.vp,rifleActor,now);
+ }
+ drawTracers();
  followLabel('playerLabel',e.player);followLabel('enemyLabel',e.enemy);
  for(const ally of e.allies)followLabel(ally.id+'Label',ally);
  if(now>noticeUntil&&e.aggressive&&!e.winner){
@@ -439,6 +458,7 @@ window.armyFightLab={
   hasBlock2:!!actors?.player.anim.hasClip('Block2')}},
  attack:()=>{const ok=e.attack();react();return ok},
  reset,engine:e,
+ toggleWeapon,fire:()=>{const ok=e.shoot();react();return ok},
  get camera(){return {yaw:cameraYaw,pitch:cameraPitch,zoom:cameraZoom,targetZoom}},
  get movement(){return direction()}
 };
