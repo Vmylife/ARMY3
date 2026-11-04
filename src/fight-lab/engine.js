@@ -3,13 +3,14 @@
 /// then the NEXT hit launches the victim. Never touches camp NPCs.
 export const ATTACKS=Object.freeze({
  punch:{length:.72,hit:.29,damage:10,reach:1.93,push:1.35,freeze:.059},
- counter:{length:.80,hit:.33,damage:9,reach:1.90,push:1.28,freeze:.055}
+ counter:{length:.80,hit:.33,damage:9,reach:1.90,push:1.28,freeze:.055},
+ bullet:{length:0,hit:0,damage:16,reach:28,push:2.10,freeze:.042}
 });
 export const LAUNCH_AFTER_DAMAGE=30;
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const createFighter=(id,x,z)=>({id,x,z,angle:id==='player'?Math.PI/2:-Math.PI/2,hp:100,
- state:'idle',attack:null,stun:0,down:0,rise:0,cd:0,moveSpeed:0,
+ state:'idle',attack:null,stun:0,down:0,rise:0,cd:0,moveSpeed:0,gunKick:0,
  pushX:0,pushZ:0,lean:0,airTime:0,airHeight:0,chain:0,chainAt:-99,damageSinceFall:0,
  impactAnim:'Hit_Reaction',fallen:false});
 export class FightEngine{
@@ -22,6 +23,7 @@ export class FightEngine{
   this.opponents.forEach((f,i)=>{f.aiIndex=i;f.cd=1.0+i*.3});
   this.time=0;this.freeze=0;this.aggressive=false;this.reinforcements=false;this.alertAt=Infinity;
   this.difficulty='normal';this.aiEnabled=true;this.winner=null;
+  this.weapon='fists';this.shotCooldown=0;this.nextBulletId=1;this.projectiles=[];this.shotsFired=0;
   this.hits=0;this.enemyHits=0;this.events=[];
  }
  emit(kind,payload={}){this.events.push({kind,...payload})}
@@ -38,23 +40,68 @@ export class FightEngine{
  enableAI(on){this.aiEnabled=Boolean(on);
   if(!on)for(const f of this.opponents){f.attack=null;if(f.state==='attack')f.state='idle'}
  }
+  switchWeapon(){
+   if(this.winner||this.player.attack||['down','rise'].includes(this.player.state))return false;
+   this.weapon=this.weapon==='fists'?'rifle':'fists';
+   this.player.gunKick=0;this.emit('weapon',{weapon:this.weapon});return true;
+  }
+  shoot(){
+   const p=this.player;
+   if(this.weapon!=='rifle'||this.winner||p.hp<=0||p.attack||p.stun>0||
+     ['down','rise','hit'].includes(p.state)||this.shotCooldown>0)return false;
+   const angle=p.angle,dx=Math.sin(angle),dz=Math.cos(angle);
+   // Muzzle position from the original .38x rifle, not from the camera aim.
+   const x=p.x+dx*.85-Math.cos(angle)*.085,z=p.z+dz*.85+Math.sin(angle)*.085;
+   const bullet={id:this.nextBulletId++,x,z,prevX:x,prevZ:z,
+    startX:x,startZ:z,dx,dz,angle,remaining:28,speed:49,age:0};
+   this.projectiles.push(bullet);this.shotsFired++;this.shotCooldown=.25;p.gunKick=.12;
+   this.emit('shot',{who:p.id,id:bullet.id,angle,at:{x,z,y:1.08}});
+   return true;
+  }
+  updateProjectiles(dt){
+   if(!this.projectiles.length)return;
+   const remaining=[];
+   for(const b of this.projectiles){
+    const travel=Math.min(b.speed*dt,b.remaining);
+    b.prevX=b.x;b.prevZ=b.z;b.age+=dt;
+    let first=null,nearest=Infinity;
+    for(const target of this.opponents){
+     if(target.hp<=0||['down','rise'].includes(target.state))continue;
+     const ox=target.x-b.x,oz=target.z-b.z,along=ox*b.dx+oz*b.dz;
+     const sidewaysSq=Math.max(0,ox*ox+oz*oz-along*along),radius=.59;
+     if(sidewaysSq>radius*radius||along<-.59)continue;
+     const enter=Math.max(0,along-Math.sqrt(radius*radius-sidewaysSq));
+     if(enter<=travel&&enter<nearest){nearest=enter;first=target}
+    }
+    if(first){
+     b.x+=b.dx*nearest;b.z+=b.dz*nearest;
+     this.impact(this.player,first,'bullet',b.angle,true);
+     this.emit('bulletImpact',{id:b.id,target:first.id,at:{x:b.x,z:b.z,y:1.05}});
+    }else{
+     b.x+=b.dx*travel;b.z+=b.dz*travel;b.remaining-=travel;
+     if(b.remaining>.01)remaining.push(b);
+    }
+   }
+   this.projectiles=remaining;
+  }
  attack(){
   const p=this.player;
-  if(this.winner||p.attack||p.stun>0||p.cd>0||['down','rise'].includes(p.state))return false;
+  if(this.weapon!=='fists'||this.winner||p.attack||p.stun>0||p.cd>0||['down','rise'].includes(p.state))return false;
   // No lock-on. Punch travels in the direction the player was freely walking.
   p.attack={type:'punch',clock:0,fired:false};p.state='attack';p.cd=ATTACKS.punch.length+.07;
   this.emit('swing',{who:'player',type:'punch'});return true;
  }
- impact(a,b,type){
+ impact(a,b,type,shotAngle=a.angle,fromProjectile=false){
   const def=ATTACKS[type],d=distance(a,b);
-  const fx=Math.sin(a.angle),fz=Math.cos(a.angle);
+  const fx=Math.sin(shotAngle),fz=Math.cos(shotAngle);
   const face=((b.x-a.x)*fx+(b.z-a.z)*fz)/Math.max(.01,d);
-  if(d>def.reach||face<.27||b.hp<=0||['down','rise'].includes(b.state)){
+  if((!fromProjectile&&(d>def.reach||face<.27))||b.hp<=0||['down','rise'].includes(b.state)){
    this.emit('miss',{who:a.id,type});return false;
   }
   b.hp=Math.max(0,b.hp-def.damage);b.damageSinceFall+=def.damage;
   b.chain=this.time-b.chainAt<2.5?b.chain+1:1;b.chainAt=this.time;
-  b.attack=null;b.stun=.62;b.lean=-.35;b.state='hit';b.impactAnim='Hit_Reaction';
+  b.attack=null;b.stun=type==='bullet'?.48:.62;b.lean=type==='bullet'?-.26:-.35;
+  b.state='hit';b.impactAnim='Hit_Reaction';
   const ko=b.hp<=0,down=ko||(b.damageSinceFall>LAUNCH_AFTER_DAMAGE);
   if(down){
    b.damageSinceFall=0;b.state='down';b.down=ko?5:2.0;b.stun=0;b.lean=0;b.fallen=true;
@@ -91,6 +138,7 @@ export class FightEngine{
  }
  updateFighter(a,dt){
   a.cd=Math.max(0,a.cd-dt);
+  a.gunKick=Math.max(0,a.gunKick-dt*.80);
   if(a.state==='down'){
    if(a.airTime>0){
     a.airTime=Math.max(0,a.airTime-dt);
@@ -124,9 +172,11 @@ export class FightEngine{
    const desired=1.28+foe.aiIndex*.10;
    if(d>desired+.16){
     foe.state='walk';
-    const speed=this.difficulty==='hard'?3.10:2.60;
+    // Controlled run, under ARMY3's full sprint (8.3 m/s).
+    const speed=this.difficulty==='hard'?5.5:5.05;
     const step=Math.min(speed*dt,d-desired);
-    foe.x+=(p.x-foe.x)/d*step;foe.z+=(p.z-foe.z)/d*step;foe.moveSpeed=speed;
+    foe.x+=(p.x-foe.x)/d*step;foe.z+=(p.z-foe.z)/d*step;
+    foe.moveSpeed=dt>0?step/dt:0;
    }else{foe.state='idle';foe.moveSpeed=0}
    if(d<=1.86&&foe.cd<=0&&p.hp>0&&!['down','rise'].includes(p.state)){
     foe.attack={type:'counter',clock:0,fired:false};foe.state='attack';
@@ -139,6 +189,7 @@ export class FightEngine{
   dt=clamp(Number(dt)||0,0,.06);if(!dt)return;
   this.time+=dt;
   if(this.freeze>0){this.freeze=Math.max(0,this.freeze-dt);return}
+  this.shotCooldown=Math.max(0,this.shotCooldown-dt);
   const p=this.player;this.updateFighter(p,dt);
   for(const foe of this.opponents)this.updateFighter(foe,dt);
   if(this.winner)return;
@@ -155,6 +206,7 @@ export class FightEngine{
    this.reinforcements=true;this.emit('reinforcements',{count:this.allies.length});
   }
   this.think(dt);
+  this.updateProjectiles(dt);
   for(const a of [p,...this.opponents]){a.x=clamp(a.x,-15.6,15.6);a.z=clamp(a.z,-11.4,11.4)}
   // Keep 4 attackers from blending into one another; crowd surrounds, not stacks.
   const bodies=[p,...this.opponents];
@@ -170,5 +222,6 @@ export class FightEngine{
  get status(){return{playerHP:this.player.hp,enemyHP:this.enemy.hp,
   playerState:this.player.state,enemyState:this.enemy.state,aggressive:this.aggressive,
   reinforcements:this.reinforcements,allies:this.allies.map(a=>({id:a.id,hp:a.hp,state:a.state,x:a.x,z:a.z})),
-  aiEnabled:this.aiEnabled,hits:this.hits,enemyHits:this.enemyHits,winner:this.winner,freeze:this.freeze}}
+  aiEnabled:this.aiEnabled,hits:this.hits,enemyHits:this.enemyHits,winner:this.winner,freeze:this.freeze,
+  weapon:this.weapon,shotsFired:this.shotsFired,activeBullets:this.projectiles.length,shotCooldown:this.shotCooldown}}
 }
