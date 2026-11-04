@@ -803,27 +803,30 @@ async function replay(){
 async function finishImitate(){
  playerHeld=false;pointerId=null;E.rail.classList.remove('active');
  stopLiveVoice();
+ const index=activePhrase;
  const score=calculate(),warped=createWarp();
- takes[activePhrase]={index:activePhrase,score,trace:trace.slice(),buffer:warped};
- if(activePhrase<PHRASES.length-1){
-  const next=activePhrase+1;
-  E.speech.textContent='「第 '+(next)+' 句唱完了，接著聽第 '+(next+1)+' 句！」';
-  await applyPhrase(next);
-  await listen();
+ takes[index]={index,score,trace:trace.slice(),buffer:warped};
+ // Immediately grade this sentence beside the cartoon sergeant.
+ const id=session;
+ const survived=await showCoachReaction(score,index);
+ if(!survived||id!==session)return;
+ if(index<PHRASES.length-1){
+  await applyPhrase(index+1);
+  if(id===session)await listen();
   return;
  }
  const total=PHRASES.reduce((sum,part)=>sum+part.duration,0);
- const averaged=key=>takes.reduce((sum,take,index)=>sum+take.score[key]*PHRASES[index].duration,0)/total;
+ const averaged=key=>takes.reduce((sum,take,i)=>sum+take.score[key]*PHRASES[i].duration,0)/total;
  const points=Math.round(averaged('points'));
  lastScore={
   points,grade:grade(points),coverage:Math.round(averaged('coverage')),
   error:+averaged('error').toFixed(1),
-  comment:points>=90?'班長：七句居然都唱得像樣？我連檢討報告都白印了。':
-   points>=75?'班長：七句唱下來，至少隔壁連沒以為是防空警報。':
-   points>=50?'班長：唱完七句還有力氣嗎？音準先去集合再說。':
-   '班長：七句軍歌被你唱成七種求救訊號，回去加強練習。'
+  comment:points>=90?'班長：七句居然都唱得像樣？檢討報告白印了。':
+   points>=75?'班長：還可以，隔壁連沒有以為是空襲警報。':
+   points>=50?'班長：七句唱完了，音準還有幾個在逃兵。':
+   '班長：七句軍歌唱成七種求救訊號，回去加強練習！'
  };
- await replay();
+ if(id===session)await replay();
 }
 async function showComparedPhrase(index){
  if(mode!=='done')return;
