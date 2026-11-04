@@ -5,11 +5,10 @@
 <meta name="theme-color" content="#17372a">
 <title>軍歌鑑測｜跟著班長唱</title>
 <link rel="stylesheet" href="./singing-memory-test.css?v=12">
-</head><body>
+</head><body data-army-minigame="singing">
 <main class="app">
  <header class="top">
   <span class="brand">軍歌鑑測 <small>v1.2</small></span>
-  <a class="back" href="./index.html">退出</a>
  </header>
  <section class="controls" id="controlsPanel">
   <section class="singStage" aria-label="音準挑戰">
@@ -178,11 +177,13 @@
    </section>
   </div>
   <div class="sgr-actions">
-   <a href="./index.html" class="sgr-back">返回軍營</a>
+   <a href="./index.html" class="sgr-back" data-army-return>返回軍營</a>
    <button id="singReportAgain" class="sgr-again" type="button">再唱一次</button>
   </div>
  </div>
 </div>
+<script type="module" src="./src/systems/minigameQuickExit.js?v=192"></script>
+<script type="module" src="./src/systems/singingCampExit.js?v=13"></script>
 <script src="./singing-settlement.js?v=12" defer></script>
 <script src="./singing-memory-test.js?v=12" defer></script>
 </body></html>
