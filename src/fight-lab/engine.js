@@ -7,6 +7,8 @@ export const ATTACKS=Object.freeze({
  bullet:{length:0,hit:0,damage:16,reach:28,push:2.10,freeze:.042}
 });
 export const LAUNCH_AFTER_DAMAGE=30;
+// Aim assistance only locks onto living enemies inside the player's 15-degree forward cone.
+export const AUTO_AIM_HALF_ANGLE=7.5*Math.PI/180;
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const createFighter=(id,x,z)=>({id,x,z,angle:id==='player'?Math.PI/2:-Math.PI/2,hp:100,
@@ -49,19 +51,41 @@ export class FightEngine{
    const p=this.player;
    if(this.weapon!=='rifle'||this.winner||p.hp<=0||p.attack||p.stun>0||
      ['down','rise','hit'].includes(p.state)||this.shotCooldown>0)return false;
-   const angle=p.angle,dx=Math.sin(angle),dz=Math.cos(angle);
-   // Muzzle position from the original .38x rifle, not from the camera aim.
-   const x=p.x+dx*.85-Math.cos(angle)*.085,z=p.z+dz*.85+Math.sin(angle)*.085;
+   const forwardX=Math.sin(p.angle),forwardZ=Math.cos(p.angle);
+   // No full-screen targeting: only enemies within +/-7.5 degrees of player facing.
+   const target=this.opponents
+    .filter(foe=>foe.hp>0&&!['down','rise'].includes(foe.state))
+    .map(foe=>{
+     const vx=foe.x-p.x,vz=foe.z-p.z,dist=Math.hypot(vx,vz);
+     const forward=dist>.01?(vx*forwardX+vz*forwardZ)/dist:-1;
+     return {foe,dist,forward};
+    })
+    .filter(v=>v.dist<=28&&v.forward>=Math.cos(AUTO_AIM_HALF_ANGLE))
+    .sort((a,b)=>a.dist-b.dist)[0]?.foe||null;
+   const angle=target?Math.atan2(target.x-p.x,target.z-p.z):p.angle;
+   const dx=Math.sin(angle),dz=Math.cos(angle);
+   // Spawn at the rifle muzzle and keep visible projectiles, not instant-hit rays.
+   const x=p.x+forwardX*.85-Math.cos(p.angle)*.085;
+   const z=p.z+forwardZ*.85+Math.sin(p.angle)*.085;
    const bullet={id:this.nextBulletId++,x,z,prevX:x,prevZ:z,
-    startX:x,startZ:z,dx,dz,angle,remaining:28,speed:49,age:0};
+    startX:x,startZ:z,dx,dz,angle,targetId:target?.id||null,remaining:28,speed:49,age:0};
    this.projectiles.push(bullet);this.shotsFired++;this.shotCooldown=.25;p.gunKick=.12;
-   this.emit('shot',{who:p.id,id:bullet.id,angle,at:{x,z,y:1.08}});
+   this.emit('shot',{who:p.id,id:bullet.id,angle,lockedTarget:target?.id||null,at:{x,z,y:1.08}});
    return true;
   }
   updateProjectiles(dt){
    if(!this.projectiles.length)return;
    const remaining=[];
    for(const b of this.projectiles){
+    // Once acquired in the narrow forward cone, gently lead a moving NPC.
+    // A dead or fallen target releases the lock; unlocked shots stay straight.
+    const tracked=b.targetId?this.opponents.find(foe=>foe.id===b.targetId&&foe.hp>0&&!['down','rise'].includes(foe.state)):null;
+    if(tracked){
+     const desired=Math.atan2(tracked.x-b.x,tracked.z-b.z);
+     const delta=Math.atan2(Math.sin(desired-b.angle),Math.cos(desired-b.angle));
+     b.angle+=clamp(delta,-4.5*dt,4.5*dt);
+     b.dx=Math.sin(b.angle);b.dz=Math.cos(b.angle);
+    }else b.targetId=null;
     const travel=Math.min(b.speed*dt,b.remaining);
     b.prevX=b.x;b.prevZ=b.z;b.age+=dt;
     let first=null,nearest=Infinity;

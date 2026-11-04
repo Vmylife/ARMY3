@@ -12,6 +12,18 @@ precision mediump float;
 in vec4 c;out vec4 frag;
 void main(){frag=vec4(c.rgb*(.96+.04*c.a),1.);}`;
 const scale=(v)=>new Float32Array([v,0,0,0,0,v,0,0,0,0,v,0,0,0,0,1]);
+// Invert a joint's affine matrix once at calibration (supports non-unit bone scale).
+function invertAffine(m){
+ const a=m[0],b=m[4],c=m[8],d=m[1],e=m[5],f=m[9],g=m[2],h=m[6],i=m[10];
+ const det=a*(e*i-f*h)-b*(d*i-f*g)+c*(d*h-e*g);
+ if(Math.abs(det)<1e-9)return null;
+ const x=(e*i-f*h)/det,y=(c*h-b*i)/det,z=(b*f-c*e)/det;
+ const u=(f*g-d*i)/det,v=(a*i-c*g)/det,w=(c*d-a*f)/det;
+ const q=(d*h-e*g)/det,r=(b*g-a*h)/det,t=(a*e-b*d)/det;
+ const tx=m[12],ty=m[13],tz=m[14];
+ return new Float32Array([x,u,q,0,y,v,r,0,z,w,t,0,
+  -(x*tx+y*ty+z*tz),-(u*tx+v*ty+w*tz),-(q*tx+r*ty+t*tz),1]);
+}
 function shader(gl,type,source){const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;}
 function makeProgram(gl){const p=gl.createProgram();gl.attachShader(p,shader(gl,gl.VERTEX_SHADER,VS));gl.attachShader(p,shader(gl,gl.FRAGMENT_SHADER,FS));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));return p;}
 function bindMesh(gl,packed,indices){
@@ -31,7 +43,11 @@ function flashGeometry(){
  return {vert:new Float32Array(vert),indices:new Uint16Array(indices)};
 }
 export class RifleRenderer{
- constructor(gl){this.gl=gl;this.program=makeProgram(gl);this.vp=gl.getUniformLocation(this.program,'uVP');this.model=gl.getUniformLocation(this.program,'uModel');this.weapon=null;let f=flashGeometry();this.flash=bindMesh(gl,f.vert,f.indices);}
+ constructor(gl){this.gl=gl;this.program=makeProgram(gl);this.vp=gl.getUniformLocation(this.program,'uVP');this.model=gl.getUniformLocation(this.program,'uModel');this.weapon=null;this.referenceGripInverse=null;let f=flashGeometry();this.flash=bindMesh(gl,f.vert,f.indices);}
+ setGripReference(handWorld){
+  this.referenceGripInverse=handWorld?invertAffine(handWorld):null;
+  if(!this.referenceGripInverse)console.warn('[步槍] 找不到有效右手骨架，暫用角色定位');
+ }
  addModel(gltf){
   let verts=[],indices=[],count=0;
   for(const mesh of gltf.json.meshes||[])for(const p of mesh.primitives){
@@ -47,12 +63,17 @@ export class RifleRenderer{
   if(!indices.length)throw Error('步槍沒有可讀取的三角形');
   this.weapon=bindMesh(this.gl,new Float32Array(verts),new Uint32Array(indices));
  }
- draw(vp,actor,now,{force=false}={}){
-   if(!this.weapon||!(actor.anim.rifleAim>.01||force))return;
+ draw(vp,actor,now,{force=false,actorModel=null}={}){
+  if(!this.weapon||!(actor.anim.rifleAim>.01||force))return;
   const gl=this.gl,recoil=Math.max(0,(actor.shotUntil-now)/90);
-  // The rifle muzzle is local +X. With this right-handed rotateY, -90° maps +X to actor +Z.
-  const local=mul(translation(-.085,1.002,.300),mul(rotateY(-Math.PI/2),mul(translation(-.045*recoil,0,0),scale(.38))));
-  const model=mul(mul(translation(actor.pos.x,0,actor.pos.z),rotateY(actor.angle)),local);
+  // Calibrated local grip preserves the original rifle placement at rest.
+  // A moving wrist drives its rotation/position in Run/Walk/Idle, while
+  // actorModel adds the same root lift and torso leaning as the rendered body.
+  const local=mul(translation(-.085,.907,.300),mul(rotateY(-Math.PI/2),mul(translation(-.045*recoil,0,0),scale(.38))));
+  const grip=actor.anim.rightHandWorld&&this.referenceGripInverse
+   ?mul(actor.anim.rightHandWorld,this.referenceGripInverse):null;
+  const root=actorModel||mul(translation(actor.pos.x,0,actor.pos.z),rotateY(actor.angle));
+  const model=mul(root,grip?mul(grip,local):local);
   gl.useProgram(this.program);gl.uniformMatrix4fv(this.vp,false,vp);gl.uniformMatrix4fv(this.model,false,model);
   gl.bindVertexArray(this.weapon.vao);gl.drawElements(gl.TRIANGLES,this.weapon.count,this.weapon.type,0);
   if(recoil>0){gl.bindVertexArray(this.flash.vao);gl.drawElements(gl.TRIANGLES,this.flash.count,this.flash.type,0)}

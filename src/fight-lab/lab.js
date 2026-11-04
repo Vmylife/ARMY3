@@ -4,10 +4,10 @@ import {ArmyRenderer} from '../core/renderer.js?v=116';
 import {RigAnimator} from '../characters/rigAnimator.js?v=121';
 import {loadGlb} from '../core/glb111.js?v=111';
 import {mul,translation,rotateY} from '../core/math.js?v=060';
-import {FightEngine,ATTACKS,LAUNCH_AFTER_DAMAGE} from './engine.js?v=7';
+import {FightEngine,ATTACKS,LAUNCH_AFTER_DAMAGE} from './engine.js?v=8';
 import {installUserCombatClips} from './uploadedHitAnimations.js?v=1';
 import {setupInput} from '../ui/input.js?v=062';
-import {RifleRenderer} from '../training/rifleRenderer.js?v=117';
+import {RifleRenderer} from '../training/rifleRenderer.js?v=118';
 
 const $=id=>document.getElementById(id);
 const e=new FightEngine();
@@ -103,6 +103,7 @@ function drawFighter(f,actor){
  gl.uniform1i(r.uniforms.tex,0);
  gl.bindVertexArray(a.vao);gl.drawElements(gl.TRIANGLES,a.count,a.indexType,0);
  gl.bindVertexArray(null);
+ return model; // Let held weapons use exactly the same world transform as the soldier.
 }
 const CLIP={idle:'Idle',walk:'Walking',attack:'Punch_Combo_1',hit:'Hit_Reaction',down:'falling_down',rise:'Arise'};
 function syncActor(f,actor,dt){
@@ -262,7 +263,7 @@ function toggleWeapon(){
  if(ok){
   if(e.weapon==='rifle')preloadGunSound();
   syncWeaponControls();react();
-  tell(e.weapon==='rifle'?'步槍模式：面向哪裡，就往哪裡開槍！':'拳頭模式：靠近阿兵哥再攻擊！',1700);
+  tell(e.weapon==='rifle'?'步槍模式：前方左右各 7.5° 自動鎖定！':'拳頭模式：靠近阿兵哥再攻擊！',1700);
  }
  return ok;
 }
@@ -341,7 +342,7 @@ function reset(){
  syncWeaponControls();
  $('endScreen').hidden=true;$('burstLayer').replaceChildren();$('combo').hidden=true;
  shake=0;last=0;if(renderer)renderer.cameraReady=false;
- tell(e.weapon==='rifle'?'步槍已就位，面向哪裡就往哪裡射擊！':'像在軍營一樣自由移動，面向對手再揮拳！',1700);updateHUD();
+ tell(e.weapon==='rifle'?'步槍已就位，正前方 15° 內會自動追蹤！':'像在軍營一樣自由移動，面向對手再揮拳！',1700);updateHUD();
  if(actors){for(const a of Object.values(actors)){a.clip='';a.anim.setClip('Idle',{restart:true});a.anim.evaluate(0)}}
 }
 function controls(){
@@ -399,11 +400,11 @@ function frame(now){
  const cameraJitter=shake*Math.sin(now*.091)*.075;
  renderer.setCamera({yaw:cameraYaw+cameraJitter,pitch:cameraPitch+shake*Math.cos(now*.11)*.035,zoom:cameraZoom});
  renderer.startFrame(e.player);
- renderFloor();drawFighter(e.player,actors.player);
+ renderFloor();const playerModel=drawFighter(e.player,actors.player);
  for(const foe of e.opponents)drawFighter(foe,actors[foe.id]);
  if(rifle&&e.weapon==='rifle'){
   rifleActor.pos=e.player;rifleActor.angle=e.player.angle;
-  rifle.draw(renderer.vp,rifleActor,now);
+  rifle.draw(renderer.vp,rifleActor,now,{actorModel:playerModel});
  }
  drawTracers();
  followLabel('playerLabel',e.player);followLabel('enemyLabel',e.enemy);
@@ -437,7 +438,13 @@ async function boot(){
   $('loadText').textContent='載入原本的步槍模型與槍口火光…';
   const rifleGlb=await loadGlb('./assets/weapons/rifle.glb?v=111',{timeoutMs:45000});
   rifle=new RifleRenderer(renderer.gl);rifle.addModel(rifleGlb);
-  rifleActor={pos:e.player,angle:e.player.angle,anim:actors.player.anim,shotUntil:0};
+  // Calibrate the rifle at the original idle aiming pose. Thereafter the
+  // weapon follows the evaluated right-hand joint even while running.
+  const playerAnim=actors.player.anim;
+  playerAnim.rifleAim=1;playerAnim.evaluate(0);
+  rifle.setGripReference(playerAnim.rightHandWorld);
+  playerAnim.rifleAim=0;playerAnim.evaluate(0);
+  rifleActor={pos:e.player,angle:e.player.angle,anim:playerAnim,shotUntil:0};
   $('loadBar').style.width='100%';
   ready=true;$('loading').hidden=true;
   reset();requestAnimationFrame(frame);
