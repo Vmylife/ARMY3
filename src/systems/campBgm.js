@@ -57,11 +57,14 @@ function save(){try{localStorage.setItem(VOLUME_KEY,String(percent));localStorag
 function setPercent(v){percent=clamp(Math.round(+v||0),0,100);muted=percent===0;save();updateButton();if(percent>0&&started)play();fade();}
 const style=document.createElement('style');
 style.textContent=`
-#campMusicWrap{position:fixed;z-index:21;right:max(12px,env(safe-area-inset-right));top:calc(env(safe-area-inset-top) + 16px);display:none}
+/* Corner-pocket placement: just outside the round minimap's top-left arc. */
+#campMusicWrap{position:fixed;z-index:21;left:max(3px,env(safe-area-inset-left));right:auto;top:calc(env(safe-area-inset-top) + 3px);display:none}
 body.army-ready #campMusicWrap{display:block}
-#campMusicBtn{width:42px;height:42px;border:1.8px solid #a1b084;border-radius:14px;background:#244836ee;color:#f6ebc2;box-shadow:0 8px 20px #0b241a4a;font:900 20px/1 system-ui;display:grid;place-items:center;padding:0;touch-action:manipulation}
+#campMusicBtn{width:27px;height:27px;border:1px solid #a1b084;border-radius:9px;background:#244836e8;color:#f6ebc2;box-shadow:0 2px 8px #0b241a55;font:900 14px/1 system-ui;display:grid;place-items:center;padding:0;touch-action:manipulation}
 #campMusicBtn:focus-visible{outline:3px solid #e4b45d;outline-offset:3px}
-#campMusicPanel{position:absolute;top:50px;right:0;width:190px;padding:12px 12px 10px;border-radius:16px;border:1px solid #d9c78977;background:#112a20f6;color:#f7efd0;box-shadow:0 12px 26px #07160f8a}
+/* Expand beneath the minimap, not over the circle or camp battle HUD. */
+#campMusicPanel{position:absolute;top:139px;left:0;right:auto;width:190px;padding:12px 12px 10px;border-radius:14px;border:1px solid #d9c78977;background:#112a20f6;color:#f7efd0;box-shadow:0 8px 22px #07160f8a}
+@media(orientation:landscape){#campMusicPanel{top:116px}}
 #campMusicPanel[hidden]{display:none!important}
 #campMusicPanel .row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;font:800 12px/1.2 system-ui}
 #campMusicPanel output{font-variant-numeric:tabular-nums;color:#f2d88e}
