@@ -55,14 +55,18 @@ async function fetchCached(path){
 }
 // Only prefetch the CLOSEST relevant game, once the player approaches its portal.
 const NEAR_PREFETCH_DISTANCE=24;
+const candidates=new Map();
 let suggestion=null,prefetchTimer=null;
 function scheduleNearby(kind,distance){
- if(distance>NEAR_PREFETCH_DISTANCE||!isIdle())return;
  const now=performance.now();
- if(!suggestion||now-suggestion.at>900||distance<suggestion.distance-1.5){
-  suggestion={kind,distance,at:now};
- }
- if(prefetchTimer||prefetching)return;
+ if(distance<=NEAR_PREFETCH_DISTANCE)candidates.set(kind,{distance,at:now});
+ else candidates.delete(kind);
+ // Each portal reports its own distance. Select the actually nearest live one.
+ suggestion=[...candidates.entries()]
+  .filter(([,v])=>now-v.at<1200)
+  .sort((a,b)=>a[1].distance-b[1].distance)
+  .map(([name,v])=>({kind:name,...v}))[0]||null;
+ if(!suggestion||!isIdle()||prefetchTimer||prefetching)return;
  prefetchTimer=setTimeout(()=>{
   prefetchTimer=null;
   if(!suggestion||!isIdle()||window.armyAssetNetBusy||window.armyAssetUploadBusy)return;
