@@ -1,7 +1,7 @@
 // ARMY3 integrated camp combat V1 — civilian routines remain intact until provoked.
 // Shared A* navigation and static clearance; bullets respect buildings, props and perimeter.
 import {moveSquadMember,releaseForSquad} from './npcLife113.js?v=127';
-import {staticClearance,canOccupy,NPC_RADIUS} from '../map/navCollision109.js?v=124';
+import {staticClearance,canOccupy,NPC_RADIUS,moveNpc} from '../map/navCollision109.js?v=124';
 import {PistolRenderer} from '../fight-lab/pistolRenderer.js?v=1';
 import {RifleRenderer} from '../fight-lab/rifleRenderer.js?v=2';
 import {RigAnimator} from '../characters/rigAnimator.js?v=121';
@@ -13,6 +13,10 @@ const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const TAU=Math.PI*2;
 const WEAPONS={up:'fists',right:'pistol',bottom:'rifle',left:null};
 const WEAPON_NAME={fists:'拳頭',pistol:'手槍',rifle:'步槍'};
+export const COMBAT_KNOCKDOWN_DAMAGE=50;
+export const NPC_MAX_HP=100;
+export const COMBAT_DOWN_SECONDS=2.3;
+export const COMBAT_RISE_SECONDS=.85;
 const SENSE_RADIUS=k=>k>=10?Infinity:k===0?4:k<5?5.5+k*.9:10+(k-5)*1.2;
 
 // Obstacles are exactly those used to keep players/NPCs out of structures.
@@ -83,7 +87,9 @@ export class CampCombat{
   this.npcPistol.setGripReference(sampleAnim.rightHandWorld);
   this.npcRifle.setGripReference(sampleAnim.rightHandWorld);
   for(const n of npcs){
-   n.combatActive=false;n.combatDead=false;n.combatHP=55;
+   n.combatActive=false;n.combatDead=false;n.combatHP=NPC_MAX_HP;
+   n.combatDamageSinceFall=0;n.combatDown=0;n.combatRise=0;n.combatFall=0;
+   n.combatPush=null;n.combatRestLift=undefined;
    n.combatCooldown=0;n.combatAttack=0;n.combatStall=0;n.combatGoal=null;
    n.combatWeapon='fists';n.combatLastMove=-100;n.combatNextMove=0;
   }
@@ -265,7 +271,7 @@ export class CampCombat{
   const speed=this.weapon==='rifle'?58:48,scatter=0;
   const x=p.x+Math.sin(this.player.angle)*.75,z=p.z+Math.cos(this.player.angle)*.75;
   this.bullets.push({id:this.seq++,owner:'player',x,z,dx:Math.sin(aim+scatter),dz:Math.cos(aim+scatter),
-   range:27,speed,damage:this.weapon==='rifle'?18:34});
+   range:27,speed,damage:this.weapon==='rifle'?40:25});
   this.playerCooldown=this.weapon==='rifle'?.125:.25;
   this.playerShotAt=performance.now();
   this.player.shotUntil=this.playerShotAt+(this.weapon==='rifle'?100:115);
@@ -283,24 +289,41 @@ export class CampCombat{
   }
  }
  damageNPC(n,damage){
-  if(n.combatDead)return;
+  if(n.combatDead||damage<=0)return;
   this.provoked=true;
-  if(!n.combatActive)this.engage(n); // Vacate the training station and clear its old A* route.
+  if(!n.combatActive)this.engage(n);
+  const grounded=n.combatDown>0||n.combatRise>0;
   n.combatHP=Math.max(0,n.combatHP-damage);
-  if(n.combatHP>0){
-   n.combatHurt=.24;
+  // Damage while grounded/getting up never fills the next knockdown meter.
+  if(!grounded)n.combatDamageSinceFall+=damage;
+  if(n.combatHP<=0){
+   n.combatDead=true;n.combatActive=false;n.combatWeapon='fists';
+   n.combatDown=0;n.combatRise=0;n.combatFall=0;n.combatPush=null;
+   n.combatDamageSinceFall=0;n.combatGoal=null;n.combatHurt=0;n.combatRestLift=undefined;
+   n.anim.rifleAim=0;n.anim.setClip('Idle',{restart:true});
+   n.anim.transition=0;n.anim.prevClip=null;n.anim.evaluate(0);
+   n.renderLift=0;n.shotPending=false;n.home.job='life';n.activity='倒地';
+   this.kills++;
+   this.notice(this.kills===10?'全營警報！所有存活阿兵哥開始追擊！':
+    this.kills===5?'步槍警戒！':this.kills===1?'手槍警戒！':'擊殺 '+this.kills);
+   if(this.kills>=10)for(const alive of this.npcs)if(!alive.combatDead)this.engage(alive);
+   this.refreshHUD(true);
    return;
   }
-  n.combatDead=true;n.combatActive=false;n.combatWeapon='fists';
-  n.combatGoal=null;n.combatHurt=0;n.combatRestLift=undefined;
-  n.anim.rifleAim=0;n.anim.setClip('Idle',{restart:true});
-  n.anim.transition=0;n.anim.prevClip=null;n.anim.evaluate(0);
-  n.renderLift=0;n.shotPending=false;n.home.job='life';n.activity='倒地';
-  this.kills++;
-  this.notice(this.kills===10?'全營警報！所有存活阿兵哥開始追擊！':
-   this.kills===5?'步槍警戒！':this.kills===1?'手槍警戒！':'擊殺 '+this.kills);
-  if(this.kills>=10)for(const alive of this.npcs)if(!alive.combatDead)this.engage(alive);
-  this.refreshHUD(true);
+  if(!grounded&&n.combatDamageSinceFall>=COMBAT_KNOCKDOWN_DAMAGE){
+   n.combatDamageSinceFall=0;n.combatDown=COMBAT_DOWN_SECONDS;
+   n.combatRise=0;n.combatFall=.42;n.combatRestLift=undefined;
+   const dx=n.pos.x-this.player.pos.x,dz=n.pos.z-this.player.pos.z;
+   const len=Math.hypot(dx,dz)||1;
+   n.combatPush={x:dx/len,z:dz/len};
+   n.combatAttack=0;n.combatCooldown=.75;
+   n.route=null;n.routeGoal=null;n.routeIndex=0;n.replanAt=0;
+   n.anim.rifleAim=0;n.anim.setClip('Idle',{restart:true});
+   n.anim.transition=0;n.anim.prevClip=null;n.anim.evaluate(0);
+   n.state='combatDown';n.activity='被擊飛';
+   return;
+  }
+  if(!grounded)n.combatHurt=.24;
  }
  engage(n){
   if(n.combatActive||n.combatDead)return;
@@ -330,7 +353,7 @@ export class CampCombat{
  }
  shootingNPCs(){
   // Limit simultaneously firing NPCs; cache line-of-sight for large crowds.
-  return this.npcs.filter(n=>n.combatActive&&!n.combatDead&&n.combatWeapon!=='fists'&&
+  return this.npcs.filter(n=>n.combatActive&&!n.combatDead&&n.combatDown<=0&&n.combatRise<=0&&n.combatWeapon!=='fists'&&
    distance(n.pos,this.player.pos)<20&&this.canSeeNPC(n))
    .sort((a,b)=>distance(a.pos,this.player.pos)-distance(b.pos,this.player.pos)).slice(0,4);
  }
@@ -395,6 +418,28 @@ export class CampCombat{
   for(const n of this.npcs){
    if(!n.combatActive||n.combatDead)continue;
    n.clock+=dt;n.combatCooldown=Math.max(0,n.combatCooldown-dt);
+   if(n.combatDown>0){
+    n.combatDown=Math.max(0,n.combatDown-dt);
+    if(n.combatFall>0&&n.combatPush){
+     const k=Math.min(dt,n.combatFall);
+     const pushed=moveNpc(n,n.combatPush.x*3.0*k,n.combatPush.z*3.0*k,this.npcs,this.player.pos);
+     n.pos=pushed;
+     n.combatFall=Math.max(0,n.combatFall-dt);
+    }
+    n.anim.rifleAim=0;n.state='combatDown';n.activity='倒地中';
+    if(n.combatDown===0){n.combatRise=COMBAT_RISE_SECONDS;n.combatRestLift=undefined}
+    continue;
+   }
+   if(n.combatRise>0){
+    n.combatRise=Math.max(0,n.combatRise-dt);
+    n.anim.rifleAim=0;n.state='combatRise';n.activity='起身中';
+    if(n.combatRise===0){
+     n.combatDamageSinceFall=0;n.combatRestLift=undefined;
+     n.state='combat';n.activity='繼續追擊';
+     n.route=null;n.routeGoal=null;n.routeIndex=0;n.replanAt=0;
+    }
+    continue;
+   }
    n.combatWeapon=stage;
    n.anim.rifleAim=stage==='fists'?0:Math.min(1,(n.anim.rifleAim||0)+dt*7);
    n.renderLift=0;n.home.job='life';n.state='combat';n.activity='追擊玩家';

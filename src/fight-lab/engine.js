@@ -1,12 +1,12 @@
 // ARMY3 Fight Lab V2 — expanded open yard, 4 independent recruits and group retaliation.
-// Damage threshold is cumulative SINCE the last knockdown: 30 normal damage,
-/// then the NEXT hit launches the victim. Never touches camp NPCs.
+// Reaching 50 accumulated standing damage launches the victim. Grounded hits
+// still deal HP damage, but cannot refill the next knockdown meter.
 export const ATTACKS=Object.freeze({
  punch:{length:.72,hit:.29,damage:10,reach:1.93,push:1.35,freeze:.059},
  counter:{length:.80,hit:.33,damage:9,reach:1.90,push:1.28,freeze:.055},
- bullet:{length:0,hit:0,damage:16,reach:28,push:2.10,freeze:.042}
+ bullet:{length:0,hit:0,damage:25,reach:28,push:2.10,freeze:.042}
 });
-export const LAUNCH_AFTER_DAMAGE=30;
+export const LAUNCH_AFTER_DAMAGE=50;
 // Aim assistance only locks onto living enemies inside the player's 15-degree forward cone.
 export const AUTO_AIM_HALF_ANGLE=7.5*Math.PI/180;
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
@@ -56,7 +56,7 @@ export class FightEngine{
    const forwardX=Math.sin(p.angle),forwardZ=Math.cos(p.angle);
    // No full-screen targeting: only enemies within +/-7.5 degrees of player facing.
    const target=this.opponents
-    .filter(foe=>foe.hp>0&&!['down','rise'].includes(foe.state))
+    .filter(foe=>foe.hp>0)
     .map(foe=>{
      const vx=foe.x-p.x,vz=foe.z-p.z,dist=Math.hypot(vx,vz);
      const forward=dist>.01?(vx*forwardX+vz*forwardZ)/dist:-1;
@@ -70,7 +70,7 @@ export class FightEngine{
    const muzzle=this.weapon==='rifle'?1.00:.73;
    const x=p.x+forwardX*muzzle-Math.cos(p.angle)*.085;
    const z=p.z+forwardZ*muzzle+Math.sin(p.angle)*.085;
-   const bullet={id:this.nextBulletId++,x,z,prevX:x,prevZ:z,
+   const bullet={id:this.nextBulletId++,x,z,prevX:x,prevZ:z,damage:this.weapon==='rifle'?40:25,
     startX:x,startZ:z,dx,dz,angle,targetId:target?.id||null,remaining:28,speed:49,age:0};
    this.projectiles.push(bullet);this.shotsFired++;
    this.shotCooldown=this.weapon==='rifle'?.125:.25;
@@ -85,7 +85,7 @@ export class FightEngine{
    for(const b of this.projectiles){
     // Once acquired in the narrow forward cone, gently lead a moving NPC.
     // A dead or fallen target releases the lock; unlocked shots stay straight.
-    const tracked=b.targetId?this.opponents.find(foe=>foe.id===b.targetId&&foe.hp>0&&!['down','rise'].includes(foe.state)):null;
+    const tracked=b.targetId?this.opponents.find(foe=>foe.id===b.targetId&&foe.hp>0):null;
     if(tracked){
      const desired=Math.atan2(tracked.x-b.x,tracked.z-b.z);
      const delta=Math.atan2(Math.sin(desired-b.angle),Math.cos(desired-b.angle));
@@ -96,7 +96,7 @@ export class FightEngine{
     b.prevX=b.x;b.prevZ=b.z;b.age+=dt;
     let first=null,nearest=Infinity;
     for(const target of this.opponents){
-     if(target.hp<=0||['down','rise'].includes(target.state))continue;
+     if(target.hp<=0)continue;
      const ox=target.x-b.x,oz=target.z-b.z,along=ox*b.dx+oz*b.dz;
      const sidewaysSq=Math.max(0,ox*ox+oz*oz-along*along),radius=.59;
      if(sidewaysSq>radius*radius||along<-.59)continue;
@@ -105,7 +105,7 @@ export class FightEngine{
     }
     if(first){
      b.x+=b.dx*nearest;b.z+=b.dz*nearest;
-     this.impact(this.player,first,'bullet',b.angle,true);
+     this.impact(this.player,first,'bullet',b.angle,true,b.damage);
      this.emit('bulletImpact',{id:b.id,target:first.id,at:{x:b.x,z:b.z,y:1.05}});
     }else{
      b.x+=b.dx*travel;b.z+=b.dz*travel;b.remaining-=travel;
@@ -121,30 +121,41 @@ export class FightEngine{
   p.attack={type:'punch',clock:0,fired:false};p.state='attack';p.cd=ATTACKS.punch.length+.07;
   this.emit('swing',{who:'player',type:'punch'});return true;
  }
- impact(a,b,type,shotAngle=a.angle,fromProjectile=false){
+ impact(a,b,type,shotAngle=a.angle,fromProjectile=false,damageOverride=null){
   const def=ATTACKS[type],d=distance(a,b);
   const fx=Math.sin(shotAngle),fz=Math.cos(shotAngle);
   const face=((b.x-a.x)*fx+(b.z-a.z)*fz)/Math.max(.01,d);
-  if((!fromProjectile&&(d>def.reach||face<.27))||b.hp<=0||['down','rise'].includes(b.state)){
+  if((!fromProjectile&&(d>def.reach||face<.27))||b.hp<=0||
+      (a.id!=='player'&&['down','rise'].includes(b.state))){
    this.emit('miss',{who:a.id,type});return false;
   }
-  b.hp=Math.max(0,b.hp-def.damage);b.damageSinceFall+=def.damage;
+  const damage=Number.isFinite(damageOverride)?damageOverride:def.damage;
+  const grounded=['down','rise'].includes(b.state);
+  b.hp=Math.max(0,b.hp-damage);
+  if(!grounded)b.damageSinceFall+=damage;
   b.chain=this.time-b.chainAt<2.5?b.chain+1:1;b.chainAt=this.time;
-  b.attack=null;b.stun=type==='bullet'?.48:.62;b.lean=type==='bullet'?-.26:-.35;
-  b.state='hit';b.impactAnim='Hit_Reaction';
-  const ko=b.hp<=0,down=ko||(b.damageSinceFall>LAUNCH_AFTER_DAMAGE);
-  if(down){
-   b.damageSinceFall=0;b.state='down';b.down=ko?5:2.0;b.stun=0;b.lean=0;b.fallen=true;
-   b.airTime=.63;b.airHeight=0;if(ko)b.deathAt=this.time;
+  const ko=b.hp<=0,launched=!grounded&&(ko||b.damageSinceFall>=LAUNCH_AFTER_DAMAGE);
+  if(launched){
+   b.damageSinceFall=0;b.attack=null;b.state='down';b.down=ko?5:2.0;
+   b.stun=0;b.lean=0;b.fallen=true;b.airTime=.63;b.airHeight=0;
+  }else if(!grounded){
+   b.attack=null;b.stun=type==='bullet'?.48:.62;
+   b.lean=type==='bullet'?-.26:-.35;b.state='hit';b.impactAnim='Hit_Reaction';
   }
-  const push=down?12.0:def.push;
-  b.pushX=fx*push;b.pushZ=fz*push;
+  if(ko){
+   b.deathAt=this.time;b.damageSinceFall=0;
+   b.state='down';b.down=5;b.stun=0;b.lean=0;b.fallen=true;
+   if(grounded){b.airTime=0;b.airHeight=0}
+  }
+  const down=launched||ko;
+  const push=grounded?0:down?12.0:def.push;
+  if(!grounded){b.pushX=fx*push;b.pushZ=fz*push;}
   if(a.id==='player'){
    this.hits++;this.aggressive=true;
    if(this.alertAt===Infinity){this.alertAt=this.time+.70;this.emit('alarm',{who:b.id})}
   }else this.enemyHits++;
   this.freeze=Math.max(this.freeze,type==='bullet'&&a.id==='player'&&this.weapon==='rifle'?.012:def.freeze);
-  this.emit('hit',{who:a.id,target:b.id,type,damage:def.damage,down,ko,chain:b.chain,
+  this.emit('hit',{who:a.id,target:b.id,type,damage,down,ko,groundedHit:grounded,chain:b.chain,
    health:b.hp,damageSinceFall:b.damageSinceFall,at:{x:b.x,z:b.z}});
   if(down)this.emit('down',{who:b.id,ko});
   if(ko&&a.id!=='player'){this.winner='opponents';this.emit('finished',{winner:'opponents'})}
@@ -158,7 +169,7 @@ export class FightEngine{
   const def=ATTACKS.punch,fx=Math.sin(a.angle),fz=Math.cos(a.angle);
   // Nearest eligible target in the active punching arc; does not change facing.
   const eligible=this.opponents
-   .filter(b=>b.hp>0&&!['down','rise'].includes(b.state))
+   .filter(b=>b.hp>0)
    .map(b=>({b,d:distance(a,b)})).sort((l,r)=>l.d-r.d);
   for(const {b,d} of eligible){
    const dot=((b.x-a.x)*fx+(b.z-a.z)*fz)/Math.max(.01,d);

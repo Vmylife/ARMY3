@@ -1,4 +1,5 @@
 import {I,mul,perspective,lookAt,translation,rotateY} from './math.js?v=060';
+const rotateX=rad=>{const c=Math.cos(rad),sn=Math.sin(rad);return new Float32Array([1,0,0,0,0,c,sn,0,0,-sn,c,0,0,0,0,1]);};
 const CORPSE_ROTATE_X=new Float32Array([1,0,0,0,0,0,-1,0,0,1,0,0,0,0,0,1]);
 const CORPSE_PIVOT=mul(translation(0,.75,0),mul(CORPSE_ROTATE_X,translation(0,-.75,0)));
 import {makeEnvironment} from '../map/campGeometry.js?v=092';
@@ -40,8 +41,8 @@ function groundLift(asset,actor){
 }
 // Skinned-body minimum is evaluated once when the corpse first becomes visible.
 // Reusing the height prevents sinking and avoids per-frame vertex CPU work.
-function corpseLift(asset,actor){
- if(Number.isFinite(actor.combatRestLift))return actor.combatRestLift;
+function corpseLift(asset,actor,pivot=CORPSE_PIVOT,cache=true){
+ if(cache&&Number.isFinite(actor.combatRestLift))return actor.combatRestLift;
  let low=Infinity;const bones=actor.anim.bones;
  for(const s of asset.sample){
   let x=0,y=0,z=0;
@@ -52,10 +53,11 @@ function corpseLift(asset,actor){
    y+=weight*(bones[b+1]*px+bones[b+5]*py+bones[b+9]*pz+bones[b+13]);
    z+=weight*(bones[b+2]*px+bones[b+6]*py+bones[b+10]*pz+bones[b+14]);
   }
-  low=Math.min(low,CORPSE_PIVOT[1]*x+CORPSE_PIVOT[5]*y+CORPSE_PIVOT[9]*z+CORPSE_PIVOT[13]);
+  low=Math.min(low,pivot[1]*x+pivot[5]*y+pivot[9]*z+pivot[13]);
  }
- actor.combatRestLift=Number.isFinite(low)?Math.max(0,.042-low):.8;
- return actor.combatRestLift;
+ const lift=Number.isFinite(low)?Math.max(0,.042-low):.8;
+ if(cache)actor.combatRestLift=lift;
+ return lift;
 }
 export class ArmyRenderer{
  constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:true,alpha:false,depth:true,powerPreference:'high-performance'});if(!gl)throw Error('這個瀏覽器不支援 WebGL2');this.gl=gl;this.p=program(gl,SKIN_VS,SKIN_FS);this.pFlat=program(gl,STATIC_VS,STATIC_FS);this.assets=new Map();this.environment=makeEnvironment();this.flatVAO=gl.createVertexArray();gl.bindVertexArray(this.flatVAO);attrib(gl,0,this.environment.verts,3,gl.FLOAT);attrib(gl,1,this.environment.cols,3,gl.FLOAT);attrib(gl,2,this.environment.norms,3,gl.FLOAT);gl.bindVertexArray(null);
@@ -113,9 +115,20 @@ export class ArmyRenderer{
   return Math.abs(sx)<w*1.20+.5 && Math.abs(sy)<w*1.22+.6 && sz>=-w-.6 && sz<=w+.6;
  }
  drawActor(asset,actor){const gl=this.gl,a=this.assets.get(asset);if(!a)return;
- gl.useProgram(this.p);gl.uniformMatrix4fv(this.uniforms.vp,false,this.vp);const model=actor.combatDead?
-  mul(translation(actor.pos.x,corpseLift(a,actor),actor.pos.z),mul(rotateY(actor.angle),CORPSE_PIVOT)):
-  mul(translation(actor.pos.x,groundLift(a,actor)+(actor.renderLift||0),actor.pos.z),rotateY(actor.angle));
+ gl.useProgram(this.p);gl.uniformMatrix4fv(this.uniforms.vp,false,this.vp);let model;
+ if(actor.combatDead||actor.combatDown>0||actor.combatRise>0){
+  // Use the same grounded, chest-up rest pose for KO and temporary knockdowns.
+  // Transition smoothly upright while always keeping the skinned minimum off the ground.
+  const inFall=!actor.combatDead&&actor.combatDown>0&&actor.combatFall>0;
+  const inRise=!actor.combatDead&&actor.combatRise>0;
+  let angle=-Math.PI/2;
+  if(inFall){const t=1-Math.min(1,actor.combatFall/.42);angle*=t*t*(3-2*t)}
+  else if(inRise){const t=Math.min(1,actor.combatRise/.85);angle*=t*t*(3-2*t)}
+  const pivot=inFall||inRise?mul(translation(0,.75,0),mul(rotateX(angle),translation(0,-.75,0))):CORPSE_PIVOT;
+  const lift=corpseLift(a,actor,pivot,!(inFall||inRise));
+  const air=inFall?.20*Math.sin(Math.PI*(1-Math.min(1,actor.combatFall/.42))):0;
+  model=mul(translation(actor.pos.x,lift+air,actor.pos.z),mul(rotateY(actor.angle),pivot));
+ }else model=mul(translation(actor.pos.x,groundLift(a,actor)+(actor.renderLift||0),actor.pos.z),rotateY(actor.angle));
  gl.uniformMatrix4fv(this.uniforms.model,false,model);
  gl.uniformMatrix4fv(this.uniforms.bones,false,actor.anim.bones);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,a.tex);gl.uniform1i(this.uniforms.tex,0);gl.bindVertexArray(a.vao);gl.drawElements(gl.TRIANGLES,a.count,a.indexType,0);
  }

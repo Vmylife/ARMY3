@@ -4,7 +4,7 @@ import {ArmyRenderer} from '../core/renderer.js?v=116';
 import {RigAnimator} from '../characters/rigAnimator.js?v=121';
 import {loadGlb} from '../core/glb111.js?v=111';
 import {mul,translation,rotateY} from '../core/math.js?v=060';
-import {FightEngine,ATTACKS,LAUNCH_AFTER_DAMAGE} from './engine.js?v=8';
+import {FightEngine,ATTACKS,LAUNCH_AFTER_DAMAGE} from './engine.js?v=9';
 import {installUserCombatClips} from './uploadedHitAnimations.js?v=1';
 import {setupInput} from '../ui/input.js?v=062';
 import {PistolRenderer} from './pistolRenderer.js?v=1';
@@ -405,8 +405,8 @@ function react(){
    if(event.type!=='bullet')thump(Boolean(event.down));
    if(event.who==='player'){
     tell(event.down?(event.type==='bullet'?'子彈擊飛！':'擊飛！這拳直接讓他躺平！'):
-     event.damageSinceFall>=LAUNCH_AFTER_DAMAGE?'累積受傷 30%！下一擊會被擊飛！':
-     (event.type==='bullet'?'射擊命中！':'拳擊命中！')+'累積受傷 '+event.damageSinceFall+' / '+LAUNCH_AFTER_DAMAGE,1300);
+     event.groundedHit?'倒地補傷！不累積下一次擊飛值':
+     (event.type==='bullet'?'射擊命中！':'拳擊命中！')+'累積擊飛 '+event.damageSinceFall+' / '+LAUNCH_AFTER_DAMAGE,1300);
    }else{
     tell(event.down?'你被打趴了！其他人還在追！':'靠北！你被反擊了！',1150);
    }
