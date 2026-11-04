@@ -1,15 +1,15 @@
 // ARMY3 enemy-wave sandbox, intentionally NOT imported by the main camp.
 // Uses the approved punch, gun, knockdown and stand-up combat mechanics.
 import {CampCombat,lineClear,COMBAT_RISE_SECONDS,COMBAT_DOWN_SECONDS} from '../systems/campCombat.js?v=12';
-import {moveNpc,staticClearance} from '../map/navCollision109.js?v=124';
-import {moveSquadMember} from '../systems/npcLife113.js?v=128';
-import {waveEntry} from './breaches.js?v=1';
+import {moveNpc,staticClearance,canOccupy} from '../map/navCollision109.js?v=124';
+import {battleRoute} from './battleNav.js?v=1';
+import {waveEntry} from './breaches.js?v=2';
 import {insidePerimeter} from '../map/camp.js?v=093';
 const $=id=>document.getElementById(id);
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 export const BATTLE_SPAWN={player:{x:22.4,z:13.2},allies:[
- {x:16.6,z:14.1},{x:19.3,z:13.5},{x:22.0,z:11.0},{x:24.9,z:13.6},{x:27.1,z:11.7}
+ {x:17.6,z:13.8},{x:22.0,z:11.0},{x:26.0,z:13.4}
 ]};
 export const WAVE_SIZE=wave=>Math.min(24,3+Math.ceil(wave*2.5));
 export class ArmyBattleCombat extends CampCombat{
@@ -32,7 +32,7 @@ export class ArmyBattleCombat extends CampCombat{
    a.combatDead=false;a.combatActive=true;a.combatHP=100;
    a.combatDown=0;a.combatRise=0;a.combatFall=0;a.combatDeathClip=false;
    a.combatHurt=0;a.combatHurtFull=0;a.combatWeapon='rifle';
-   a.shotAt=i*.19;a.shotUntil=0;a.anim.rifleAim=.75;
+   a.shotAt=i*.36;a.shotUntil=0;a.anim.rifleAim=.75;
    a.anim.setClip('Idle',{restart:true});a.anim.evaluate(0);
   }
   for(const n of enemies){
@@ -40,7 +40,7 @@ export class ArmyBattleCombat extends CampCombat{
    n.combatDead=true;n.combatActive=false;
    n.pos={x:200+n.id,z:200};n.home.job='life';
   }
-  this.showIntroBanner('南側哨口、西側營舍圍欄遭突破！',1700);
+  this.showIntroBanner('單戰場正面推進，辦公大樓多路包抄！',1700);
   const god=$('battleGodToggle');
   if(god){god.addEventListener('click',()=>this.setInvincible(!this.invincible));this.setInvincible(false)}
  }
@@ -71,48 +71,55 @@ export class ArmyBattleCombat extends CampCombat{
  // "all NPCs must chase the player" code disabled in this battle sandbox.
  tryAttack(){const result=super.tryAttack();this.provoked=false;return result}
  damageNPC(n,damage,kind='bullet'){super.damageNPC(n,damage,kind);this.provoked=false}
+ // Allied bullets must never contribute to the player's floating damage or HIT COMBO.
+ // Keep an unlabelled hit spark, with no hit-stop or screen shake on allied shots.
+ onCombatHit(pos,damage,info={}){
+  if(this.friendlyHit&&!info.playerTarget){
+   this.spawnFx({...pos,y:1.17},'campHitBurst bullet','',240);
+   return;
+  }
+  return super.onCombatHit(pos,damage,info);
+ }
+ findWaveStart(requested,used){
+  // Decorations and soldiers are solid; distribute around blocked launch marks.
+  for(const radius of [0,1.1,2.0,3.1,4.6,6.2]){
+   for(let j=0;j<(radius===0?1:20);j++){
+    const angle=j*Math.PI*2/20;
+    const p={x:requested.x+Math.cos(angle)*radius,z:requested.z+Math.sin(angle)*radius};
+    if(!canOccupy(p,.50)||used.some(o=>dist(o,p)<1.05))continue;
+    return p;
+   }
+  }
+  return requested;
+ }
  spawnWave(){
   this.wave++;
-  const count=WAVE_SIZE(this.wave),pool=this.enemies.slice(0,count);
+  const count=WAVE_SIZE(this.wave),pool=this.enemies.slice(0,count),used=[];
   this.waveDelay=0;this.waveActive=true;
   for(let i=0;i<pool.length;i++){
    const n=pool[i],entry=waveEntry(i,count);
-   n.pos={...entry.start};n.entryTarget={...entry.entry};n.entrySide=entry.side;
-   n.angle=entry.side==='gate'?0:Math.PI/2;
-   n.assaultVisible=true;n.incoming=true;
-   n.combatDead=false;n.combatActive=false;n.combatHP=100;n.combatDamageSinceFall=0;
+   n.pos=this.findWaveStart(entry.start,used);used.push(n.pos);
+   n.entrySide=entry.side;
+   n.angle=Math.atan2(BATTLE_SPAWN.player.x-n.pos.x,BATTLE_SPAWN.player.z-n.pos.z);
+   n.assaultVisible=true;n.incoming=false;
+   n.combatDead=false;n.combatActive=true;n.combatHP=100;n.combatDamageSinceFall=0;
    n.combatDown=0;n.combatRise=0;n.combatFall=0;n.combatDeathClip=false;n.combatRestLift=undefined;
    n.combatHurt=0;n.combatHurtFull=0;n.combatCooldown=.45+(i%4)*.18;
    n.combatAttack=0;n.combatStrikeApplied=true;n.combatGoal=null;n.combatNextMove=0;n.combatLastMove=-100;
    n.combatPush=null;n.combatWeapon=this.wave>=3?'rifle':this.wave>=2?'pistol':'fists';
    n.battleSight=null;n.assaultTarget=null;n.assaultGoalTarget=null;
+   n.battlePath=null;n.battlePathIndex=0;n.battlePathGoal=null;n.battleNextPlan=0;
+   n.battleFlank=((i%7)-3)*1.30;n.combatStall=0;
    n.route=null;n.routeGoal=null;n.routeIndex=0;n.replanAt=0;n.squadEscape=null;
-   n.anim.setClip('Running',{restart:true});n.anim.speed=1.15;n.anim.rifleAim=0;
+   n.anim.setClip('Idle',{restart:true});n.anim.speed=1;n.anim.rifleAim=0;
   }
   for(const n of this.enemies.slice(count)){
    n.assaultVisible=false;n.combatDead=true;n.combatActive=false;n.incoming=false;n.pos={x:200+n.id,z:200}
   }
   this.totalSpawns+=count;
-  this.showIntroBanner('第 '+this.wave+' 波 · '+count+' 名紅軍（哨口＋營舍）',2200);
+  this.showIntroBanner('第 '+this.wave+' 波 · '+count+' 名紅軍（單戰場＋辦公大樓）',2200);
   this.updateBattleHUD();
  }
- updateIncoming(dt){
-  for(const n of this.enemies){
-   if(!n.incoming||n.combatDead)continue;
-   const goal=n.entryTarget,dx=goal.x-n.pos.x,dz=goal.z-n.pos.z,d=Math.hypot(dx,dz);
-   const step=Math.min(d,dt*(5+(n.id%3)*.25));
-   if(d>.005){
-    n.pos={x:n.pos.x+dx/d*step,z:n.pos.z+dz/d*step};
-    n.angle=Math.atan2(dx,dz);
-    n.anim.setClip('Running');n.anim.speed=1.1;n.anim.rifleAim=0;
-   }
-   if(d<=step+.01){
-    n.pos={...goal};n.incoming=false;n.combatActive=true;n.state='combat';
-    n.combatGoal=null;n.combatNextMove=0;n.anim.setClip('Idle');n.anim.speed=1;
-   }
-  }
- }
-
 
  // Stable target lock: don't switch direction every time another red runs by.
  chooseAllyTarget(a,reds){
@@ -225,7 +232,7 @@ export class ArmyBattleCombat extends CampCombat{
      dx:Math.sin(bulletHeading),dz:Math.cos(bulletHeading),
      range:27,speed:46,damage:18});
     a.shotUntil=performance.now()+110;
-    a.shotAt=this.time+1.03+((a.id||0)%3)*.14+Math.random()*.18;
+    a.shotAt=this.time+1.72+((a.id||0)%3)*.18+Math.random()*.26;
     this.playRangeShot(targetDistance,performance.now());
    }
   }
@@ -360,33 +367,42 @@ export class ArmyBattleCombat extends CampCombat{
    // target behind them. This prevents side-sliding while routing around props.
    let actualMove=null;
    if(chase){
-    if(n.assaultGoalTarget!==target||!n.combatGoal||
-       dist(n.combatGoal,target.pos)>1.8||this.time-n.combatLastMove>1.5){
-     n.assaultGoalTarget=target;n.combatGoal={...target.pos};n.combatLastMove=this.time;
-     n.route=null;n.routeGoal=null;n.routeIndex=0;n.replanAt=0;
+    // Keep the line spread out until close, then converge on the nearest defender.
+    const flank=d>10?{x:target.pos.x+n.battleFlank,z:target.pos.z-1.1}:target.pos;
+    const goal=canOccupy(flank,.40)?flank:target.pos;
+    if(!n.battlePath||!n.battlePathGoal||n.assaultGoalTarget!==target||
+       dist(n.battlePathGoal,goal)>2.2||this.time>=n.battleNextPlan){
+     n.assaultGoalTarget=target;n.battlePathGoal={...goal};
+     n.battlePath=battleRoute(n.pos,goal);n.battlePathIndex=0;
+     n.battleNextPlan=this.time+1.45+(n.id%4)*.24;
     }
+    let waypoint=n.battlePath?.[n.battlePathIndex]||goal;
+    while(n.battlePath&&n.battlePathIndex<n.battlePath.length-1&&
+          dist(n.pos,waypoint)<.65)
+     waypoint=n.battlePath[++n.battlePathIndex];
     const before={...n.pos};
-    moveSquadMember(n,n.combatGoal,dt,true,false);
+    const distanceToPoint=dist(before,waypoint);
+    if(distanceToPoint>.12){
+     const step=Math.min(distanceToPoint,2.18*dt);
+     const next=moveNpc(n,(waypoint.x-before.x)/distanceToPoint*step,
+       (waypoint.z-before.z)/distanceToPoint*step,
+       [...this.allies,...this.enemies],this.player.pos);
+     n.pos=next;
+    }
     const moved=dist(before,n.pos);
     if(moved>.008){
      actualMove={x:n.pos.x-before.x,z:n.pos.z-before.z};
      n.combatStall=0;
-     // Squad pathfinding sometimes selects a walking escape. Preserve it,
-     // and scale the gait to distance actually travelled this frame.
-     if(!['Running','Walking','RunFast'].includes(n.anim.clip))n.anim.setClip('Running');
-     const walk=n.anim.clip==='Walking';
-     n.anim.speed=clamp(moved/Math.max(dt,.001)/(walk?1.36:2.18),.65,1.35);
+     if(n.anim.clip!=='Running')n.anim.setClip('Running');
+     n.anim.speed=clamp(moved/Math.max(dt,.001)/2.18,.65,1.3);
     }else{
      n.combatStall=(n.combatStall||0)+dt;
-     // A* can request Running even when collision blocks every step.
-     // Don't let stationary soldiers keep running on the spot.
-     if(['Running','Walking','RunFast'].includes(n.anim.clip)){
-      n.anim.setClip('Idle');n.anim.speed=1;
-     }
+     if(n.anim.clip!=='Idle')n.anim.setClip('Idle');
+     n.anim.speed=1;
     }
-    if(n.combatStall>1.4){
-     n.route=null;n.routeGoal=null;n.routeIndex=0;n.replanAt=0;
-     n.combatStall=0;n.combatGoal={...target.pos};
+    // A crowded front re-plans around people instead of waiting in a road queue.
+    if(n.combatStall>1.15){
+     n.battlePath=null;n.battleNextPlan=0;n.combatStall=0;
     }
    }else if(n.combatAttack>0&&n.anim.hasClip('Punch_Combo_1')){
     if(n.anim.clip!=='Punch_Combo_1')this.playCombatClip(n,'Punch_Combo_1',.70);
@@ -450,7 +466,7 @@ export class ArmyBattleCombat extends CampCombat{
   this.nameplateState=code;
   if($('battleWave'))$('battleWave').textContent='第 '+Math.max(1,this.wave)+' 波';
   if($('battleRemaining'))$('battleRemaining').textContent='敵軍 '+live;
-  if($('battleAllies'))$('battleAllies').textContent='友軍 '+allies+' / 5';
+  if($('battleAllies'))$('battleAllies').textContent='友軍 '+allies+' / '+this.allies.length;
  }
  update(dt,now,{blocked=false}={}){
   if(blocked||window.armyMinigameActive)return;
@@ -460,7 +476,6 @@ export class ArmyBattleCombat extends CampCombat{
    this.waveDelay-=dt;
    if(this.waveDelay<=0){this.spawnWave();this.running=true}
   }
-  this.updateIncoming(dt);
   // Normal shooting/knockdown/recoil still run, without player-only camp aggro.
   this.provoked=false;
   super.update(dt,now,{blocked});
