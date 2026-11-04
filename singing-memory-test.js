@@ -1,4 +1,4 @@
-/* ARMY3 singing memory v1.0 — seven-line coach mode and continuous original backing review.
+/* ARMY3 singing memory v1.1 — seven-line coach mode and continuous original backing review.
    Original vocals play during drills; original uninterrupted instrumental plays only during the final full-song review.
    Correct pitch is derived from the selected vocal waveform (no invented tune).
    Browser-only processing: Web Audio + short-time pitch detection + OLA pitch warp.
@@ -106,19 +106,31 @@ function setCoach(message,grade='READY',mood=''){
  E.speech.textContent=message;
  E.reaction.textContent=grade;
  E.coachScore.textContent='';
- E.coach.classList.remove('mood-bad','mood-good','mood-great','mood-perfect','react');
+ E.coach.classList.remove('mood-bad','mood-okay','mood-good','mood-great','mood-perfect','react');
  if(mood)E.coach.classList.add('mood-'+mood);
 }
+// Five intentionally stricter rhythm-game tiers, shared by every per-line result.
+const RATING_TIERS=[
+ {min:90,english:'PERFECT',chinese:'軍歌之神',mood:'perfect'},
+ {min:75,english:'GREAT',chinese:'全連領唱',mood:'great'},
+ {min:55,english:'GOOD',chinese:'尚可入耳',mood:'good'},
+ {min:30,english:'OKAY',chinese:'音符菜鳥',mood:'okay'},
+ {min:0,english:'BAD',chinese:'音準逃兵',mood:'bad'}
+];
+function ratingFor(points){return RATING_TIERS.find(tier=>points>=tier.min)||RATING_TIERS.at(-1)}
 function getCoachReaction(score,index){
- const points=score.points;
- const level=points>=90?'PERFECT':points>=70?'GREAT':points>=40?'GOOD':'BAD';
+ const tier=ratingFor(score.points);
  const lines={
-  BAD:['這是軍歌，還是你在發求救訊號？','你這個音準，已經離營出走了。','全連的耳朵申請提前退伍。','你唱的不是走音，是集體迷路！'],
-  GOOD:['還行！至少隔壁連沒有拉警報。','有抓到旋律，再穩一點就過關。','這句不錯，繼續保持。','嗯，有點軍人的樣子了。'],
-  GREAT:['漂亮！這句有認真練喔。','不錯！這樣才有領唱的氣勢。','有料！班長准你抬頭挺胸。','很好，這句我給過！'],
-  PERFECT:['這句完美！下次換你當班長。','音準漂亮，差點以為是原唱。','太扯！你去領唱，我休息。','這句直接免操課！']
+  BAD:['全連耳朵已經申請退伍！','音準擅離職守，現在給我集合！','你這是在唱軍歌，還是在發求救訊號？','連哨兵聽了都想拉警報。'],
+  OKAY:['勉強有唱，但音符還在新訓。','有努力啦，音準還得多操幾次。','聽得出是軍歌，算你過第一關。','這句有到，但離領唱還很遠。'],
+  GOOD:['嗯，這句勉強可以聽。','有進步，音高大致跟上了。','這回有抓到旋律，繼續保持。','不錯，但別以為這樣就能放假！'],
+  GREAT:['這句像樣！可以帶著全班唱。','漂亮，班長總算不用摀耳朵。','夠穩！音符都有準時集合。','很好，差點以為你練過！'],
+  PERFECT:['全音到位！直接升任軍歌教官。','唱得太準，今天讓你領唱！','這句零失誤，班長佩服！','哇，這水平可以去司令台領唱。']
  };
- return {level,mood:level.toLowerCase(),message:lines[level][index%lines[level].length]};
+ return {
+  level:tier.english,subtitle:tier.chinese,mood:tier.mood,
+  message:lines[tier.english][index%lines[tier.english].length]
+ };
 }
 function waitCoachReaction(seconds,id){
  const c=getAudio(),until=c.currentTime+seconds;
@@ -135,7 +147,7 @@ async function showCoachReaction(score,index){
  setMode('react');
  const rating=getCoachReaction(score,index);
  setCoach(rating.message,rating.level,rating.mood);
- E.coachScore.textContent='第 '+(index+1)+' 句 · '+score.points+' 分';
+ E.coachScore.textContent=rating.subtitle+' · 第 '+(index+1)+' 句 '+score.points+' 分';
  E.coach.classList.add('react');
  return waitCoachReaction(1.6,session);
 }
@@ -703,27 +715,36 @@ E.rail.addEventListener('keyup',e=>{
 function grade(s){return s>=92?'S':s>=80?'A':s>=65?'B':s>=45?'C':s>=25?'D':'F'}
 function calculate(){
  const n=Math.floor(CLIP/STEP);
- let count=0,held=0,totalError=0,good=0;
+ let count=0,held=0,errorSum=0,scoreSum=0,precise=0,close=0;
  for(let i=0;i<n;i++){
-  const t=i*STEP,ref=expectedVoiced(t),p=trace[i];
-  if(!ref)continue;
+  const t=i*STEP;
+  if(!expectedVoiced(t))continue;
   count++;
-  if(p?.on){held++;const diff=Math.abs((p.m||refBase)-pitchForGuide(t));totalError+=Math.min(20,diff);if(diff<=1.5)good++}
+  const sample=trace[i];
+  if(!sample?.on||!Number.isFinite(sample.m))continue;
+  held++;
+  const diff=Math.abs(sample.m-pitchForGuide(t));
+  errorSum+=Math.min(20,diff);
+  if(diff<=.6)precise++;
+  if(diff<=1.15)close++;
+  // Tight quarter-semitone forgiveness followed by a steep curved penalty.
+  // One semitone off earns ~58% for that frame, two semitones ~13%.
+  const miss=Math.max(0,diff-.25);
+  scoreSum+=100*Math.pow(Math.max(0,1-miss/2.8),1.8);
  }
- const coverage=held/Math.max(1,count),error=held?totalError/held:20;
- const points=clamp(Math.round(100-error*8.4-(1-coverage)*55),0,100);
- const comments=[
- '班長：我是叫你唱軍紀歌，不是叫你模仿機車發不動。',
- '全連唱得好好的，只有你的音符被禁假。',
- '你這個音準，連軍中廣播都想申請靜音。',
- '班長：唱歌不是亂拉滑鼠！這份戰報寫不下去了。',
- '我唱的是軍歌，你回的是隔壁營區求救訊號。'
- ];
- let comment=comments[Math.floor(Math.random()*comments.length)];
- if(coverage<.12)comment='班長：你根本沒開口，安靜不代表音準正確。';
- else if(points>=90)comment='班長：很好，竟然唱得像原唱，我本來準備罵你的。';
- else if(points>=75)comment='班長：至少隔壁連沒有以為發生空襲。';
- return {points,grade:grade(points),coverage:Math.round(coverage*100),error:+error.toFixed(1),comment,good};
+ const coverage=held/Math.max(1,count);
+ const pitchScore=scoreSum/Math.max(1,count);
+ const preciseRate=precise/Math.max(1,count);
+ const points=clamp(Math.round(pitchScore*.84+preciseRate*16),0,100);
+ const error=held?errorSum/held:20;
+ const tier=ratingFor(points);
+ return {
+  points,grade:grade(points),rating:tier.english,coverage:Math.round(coverage*100),
+  error:+error.toFixed(2),precise:Math.round(preciseRate*100),
+  near:Math.round(close/Math.max(1,count)*100),
+  comment:coverage<.12?'班長：你根本沒開口，還想領分？':getCoachReaction({points},activePhrase).message,
+  good:precise
+ };
 }
 function tracePathFor(take){
  let path='',drawing=false;
@@ -786,7 +807,7 @@ async function replay(){
   stopBacking();
   await applyPhrase(PHRASES.length-1);
   setMode('done');comparison=false;E.feedback.hidden=false;
-  E.rank.textContent=lastScore.grade+' 級';
+  E.rank.textContent=ratingFor(lastScore.points).english;
   E.points.textContent=lastScore.points+' / 100';
   E.comment.textContent=lastScore.comment;
   E.phraseScores.textContent=takes.map((take,index)=>'第'+(index+1)+'句 '+take.score.points+'分').join(' · ');
