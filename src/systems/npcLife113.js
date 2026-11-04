@@ -665,6 +665,7 @@ export function updateCampNPCs(npcs,dt,now,playerPos=null,allColliders=npcs){
  ALL_NPCS=allColliders;PLAYER_POS=playerPos;
  dt=clamp(dt,0,.05);if(!dt)return;
  for(const n of npcs){
+  if(n.combatDead||n.combatActive)continue;
   n.clock+=dt;n.cooldown=Math.max(0,n.cooldown-dt);n.socialCooldown=Math.max(0,n.socialCooldown-dt);
   if(yieldToSquad(n,dt))continue;
   if(!n.task){pose(n,['Idle']);n.activity='短暫休息';if(n.cooldown<=0)decide(n);continue;}

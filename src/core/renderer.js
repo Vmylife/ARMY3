@@ -1,4 +1,6 @@
 import {I,mul,perspective,lookAt,translation,rotateY} from './math.js?v=060';
+const CORPSE_ROTATE_X=new Float32Array([1,0,0,0,0,0,-1,0,0,1,0,0,0,0,0,1]);
+const CORPSE_PIVOT=mul(translation(0,.75,0),mul(CORPSE_ROTATE_X,translation(0,-.75,0)));
 import {makeEnvironment} from '../map/campGeometry.js?v=092';
 const SKIN_VS=`#version 300 es
 precision highp float;
@@ -35,6 +37,25 @@ function groundLift(asset,actor){
   if(yy<low)low=yy;
  }
  return Number.isFinite(low)?Math.max(0,.015-low):0;
+}
+// Skinned-body minimum is evaluated once when the corpse first becomes visible.
+// Reusing the height prevents sinking and avoids per-frame vertex CPU work.
+function corpseLift(asset,actor){
+ if(Number.isFinite(actor.combatRestLift))return actor.combatRestLift;
+ let low=Infinity;const bones=actor.anim.bones;
+ for(const s of asset.sample){
+  let x=0,y=0,z=0;
+  for(let k=0;k<4;k++){
+   const weight=s.w[k];if(!weight)continue;
+   const b=s.j[k]*16,px=s.p[0],py=s.p[1],pz=s.p[2];
+   x+=weight*(bones[b]*px+bones[b+4]*py+bones[b+8]*pz+bones[b+12]);
+   y+=weight*(bones[b+1]*px+bones[b+5]*py+bones[b+9]*pz+bones[b+13]);
+   z+=weight*(bones[b+2]*px+bones[b+6]*py+bones[b+10]*pz+bones[b+14]);
+  }
+  low=Math.min(low,CORPSE_PIVOT[1]*x+CORPSE_PIVOT[5]*y+CORPSE_PIVOT[9]*z+CORPSE_PIVOT[13]);
+ }
+ actor.combatRestLift=Number.isFinite(low)?Math.max(0,.042-low):.8;
+ return actor.combatRestLift;
 }
 export class ArmyRenderer{
  constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:true,alpha:false,depth:true,powerPreference:'high-performance'});if(!gl)throw Error('這個瀏覽器不支援 WebGL2');this.gl=gl;this.p=program(gl,SKIN_VS,SKIN_FS);this.pFlat=program(gl,STATIC_VS,STATIC_FS);this.assets=new Map();this.environment=makeEnvironment();this.flatVAO=gl.createVertexArray();gl.bindVertexArray(this.flatVAO);attrib(gl,0,this.environment.verts,3,gl.FLOAT);attrib(gl,1,this.environment.cols,3,gl.FLOAT);attrib(gl,2,this.environment.norms,3,gl.FLOAT);gl.bindVertexArray(null);
@@ -92,7 +113,10 @@ export class ArmyRenderer{
   return Math.abs(sx)<w*1.20+.5 && Math.abs(sy)<w*1.22+.6 && sz>=-w-.6 && sz<=w+.6;
  }
  drawActor(asset,actor){const gl=this.gl,a=this.assets.get(asset);if(!a)return;
- gl.useProgram(this.p);gl.uniformMatrix4fv(this.uniforms.vp,false,this.vp);gl.uniformMatrix4fv(this.uniforms.model,false,mul(translation(actor.pos.x,groundLift(a,actor)+(actor.renderLift||0),actor.pos.z),rotateY(actor.angle)));
+ gl.useProgram(this.p);gl.uniformMatrix4fv(this.uniforms.vp,false,this.vp);const model=actor.combatDead?
+  mul(translation(actor.pos.x,corpseLift(a,actor),actor.pos.z),mul(rotateY(actor.angle),CORPSE_PIVOT)):
+  mul(translation(actor.pos.x,groundLift(a,actor)+(actor.renderLift||0),actor.pos.z),rotateY(actor.angle));
+ gl.uniformMatrix4fv(this.uniforms.model,false,model);
  gl.uniformMatrix4fv(this.uniforms.bones,false,actor.anim.bones);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,a.tex);gl.uniform1i(this.uniforms.tex,0);gl.bindVertexArray(a.vao);gl.drawElements(gl.TRIANGLES,a.count,a.indexType,0);
  }
 }

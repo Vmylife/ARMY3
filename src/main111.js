@@ -17,6 +17,7 @@ import {initWorldMap} from './ui/worldMap.js?v=093';
 import {setupInput} from './ui/input.js?v=062';
 import {options} from './systems/settings.js?v=060';
 import {createCampNPCs,updateCampNPCs,squadDebug} from './systems/npcSquads113.js?v=127';
+import {createCampCombat} from './systems/campCombat.js?v=1';
 
 const $=id=>document.getElementById(id);
 const debug=new URLSearchParams(location.search).has('debug');
@@ -76,6 +77,7 @@ async function boot(){
   const playRangeShot=createRangeAudio();
   // Avoid firing 23 simultaneous model downloads / image decodes into iOS Safari.
   // Keep 3 workers busy and show actual completed-model progress.
+  let combatRifleGlb=null;
   const jobs=[
     ...BUILDING_MODELS.map(m=>({label:'建築 '+m.id,fn:async()=>{
       const glb=await loadGlb(m.url,{timeoutMs:90000,onProgress:(got,total)=>{staticProgress.set('building'+m.id,Math.min(.95,total?got/total:got/5000000));progress('下載建築 '+m.id+'：'+mb(got)+(total?' / '+mb(total):''));}});
@@ -87,6 +89,7 @@ async function boot(){
     }})),
     {label:'步槍',fn:async()=>{
       const glb=await loadGlb('./assets/weapons/rifle.glb?v=111',{timeoutMs:90000});
+      combatRifleGlb=glb;
       await stage(rifleRenderer.addModel(glb),'建立步槍',45000);
     }}
   ];
@@ -124,6 +127,8 @@ async function boot(){
       }
     }
   }
+  const combat=createCampCombat({player,npcs,renderer,rifleGlb:combatRifleGlb,npcGlb});
+  window.armyCampCombat=combat;
   const blanketPortal=createBlanketPortal(renderer,{
     resuming:!!returnSnapshot,
     onTrainingStart:(trainingId)=>saveCampSession({
@@ -201,20 +206,27 @@ async function boot(){
    try{
     const dt=entered?Math.min(.05,Math.max(0,(now-last)/1000)):0;last=now;
     if(debug){fpsFrames++;if(now-fpsSince>=1000){measuredFps=Math.round(fpsFrames*1000/(now-fpsSince));fpsFrames=0;fpsSince=now;}}
-    const stick=worldMap.isOpen()?{x:0,y:0,magnitude:0}:input(),m=movement(stick.magnitude);
+    const mapOpen=worldMap.isOpen();
+    combat.root.style.visibility=mapOpen?'hidden':'visible';
+    const stick=(mapOpen||!combat.playerAlive)?{x:0,y:0,magnitude:0}:input(),m=movement(stick.magnitude);
+    const simDt=dt*(combat.wheelOpen?.12:1);
     cameraZoom+=(targetZoom-cameraZoom)*Math.min(1,dt*12);
     if(m.speed>0){
      const dx=stick.x/(stick.magnitude||1),dy=stick.y/(stick.magnitude||1);
      const c=Math.cos(camYaw),s=Math.sin(camYaw),mx=dx*c-dy*s,mz=-dx*s-dy*c;
      const before=player.pos;
-     player.pos=movePlayer(player.pos,mx*dt*m.speed,mz*dt*m.speed,npcs);
+     player.pos=movePlayer(player.pos,mx*simDt*m.speed,mz*simDt*m.speed,npcs);
      if(Math.hypot(player.pos.x-before.x,player.pos.z-before.z)>1e-5){face(player,mx,mz);mapYaw=camYaw;}
     }
     if(m.speed>0)audition=null;
-    if(audition&&player.anim.clip!==audition)player.anim.setClip(audition);
-    else if(!audition&&player.anim.clip!==m.clip)player.anim.setClip(m.clip);
-    player.anim.speed=m.rate;player.anim.evaluate(dt);
-    updateCampNPCs(npcs,dt,now,player.pos);
+    const pose=combat.playerPose(audition||m.clip,m.rate);
+    if(player.anim.clip!==pose.clip)player.anim.setClip(pose.clip);
+    player.anim.speed=pose.speed;
+    const targetAim=(!combat.playerAlive||combat.weapon==='fists')?0:1;
+    player.anim.rifleAim+=(targetAim-player.anim.rifleAim)*Math.min(1,simDt*10);
+    player.anim.evaluate(simDt);
+    updateCampNPCs(npcs,simDt,now,player.pos);
+    combat.update(simDt,now,{blocked:mapOpen});
     renderer.setCamera({yaw:camYaw,pitch:camPitch,zoom:cameraZoom});renderer.startFrame(player.pos);
     buildings.draw(renderer.vp,player.pos);
     props.draw(renderer.vp,player.pos);
@@ -224,11 +236,12 @@ async function boot(){
       const distance=Math.hypot(npc.pos.x-player.pos.x,npc.pos.z-player.pos.z);
       if(npc.shotPending){npc.shotPending=false;playRangeShot(distance)}
       if(renderer.isActorVisible(npc.pos)){
-       npc.anim.evaluate(dt);floorCorrectCrossSit(npc.anim);renderer.drawActor('lifeRecruit',npc);
+       npc.anim.evaluate(simDt);floorCorrectCrossSit(npc.anim);renderer.drawActor('lifeRecruit',npc);
        if(npc.anim.clip==='Sweeping_Both_Hands')sweepBroom.draw(renderer,npc);
-       if(npc.home.job==='shoot')rifleRenderer.draw(renderer.vp,npc,now);
+       if(npc.home.job==='shoot'&&!npc.combatActive&&!npc.combatDead)rifleRenderer.draw(renderer.vp,npc,now);
       }
     }
+    combat.drawWeapons(now);
     blanketPortal.update(player.pos,worldMap.isOpen());
     showNavDebug?.(renderer.vp,player.pos,npcs,now);
     mapFacing=Math.PI-player.angle+mapYaw;

@@ -1,0 +1,63 @@
+/* Army3 camp combat test HUD. Safe from Safari selection / double-tap zoom. */
+#campCombatUI,#campCombatUI *,#campProjectileLayer{
+ -webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;
+ -webkit-tap-highlight-color:transparent;overscroll-behavior:none;
+}
+#campCombatUI{position:fixed;inset:0;z-index:9;pointer-events:none;color:#f7f1d8;font-family:-apple-system,BlinkMacSystemFont,"PingFang TC",system-ui,sans-serif}
+#campCombatUI button{touch-action:none;appearance:none;outline-offset:3px}
+#campCombatStatus{position:absolute;top:calc(10px + env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));
+ display:flex;flex-direction:column;align-items:flex-end;gap:5px;pointer-events:none}
+#campCombatStatus span{padding:5px 10px;border-radius:9px;background:#173a2de8;border:1px solid #ebd4a46e;
+ box-shadow:0 2px 7px #0003;font-size:12px;font-weight:850;white-space:nowrap}
+#campCombatStatus #campKills{color:#ffd798}
+#campCombatStatus #campAlert{font-size:10px;color:#e8e8c9}
+.campCombatButtons{position:absolute;bottom:calc(88px + env(safe-area-inset-bottom));right:max(14px,env(safe-area-inset-right));
+ display:flex;align-items:center;gap:10px;pointer-events:auto}
+.campCombatButtons button{border:2px solid #f2d9a2;border-radius:16px;color:#fff5db;background:#254c3d;
+ display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;line-height:1;
+ box-shadow:0 5px 20px #0b2b1c80;font-weight:900}
+#campWeaponSwitch{width:61px;height:61px;background:linear-gradient(140deg,#54745b,#264735)}
+#campAttack{width:83px;height:83px;border-radius:50%;background:linear-gradient(140deg,#d6aa68,#995d37)}
+.campCombatButtons span{font-size:27px;line-height:1}
+.campCombatButtons small{font-size:11px}
+.campCombatButtons button:disabled{opacity:.45;filter:grayscale(1)}
+#campCombatTip{position:absolute;bottom:calc(181px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);
+ border-radius:10px;background:#173a2fea;color:#ffe4a4;padding:8px 12px;max-width:80vw;
+ text-align:center;font-size:12px;font-weight:850;box-shadow:0 4px 14px #0005}
+#campCombatTip[hidden],#campCombatWheel[hidden],#campCombatFinish[hidden]{display:none!important}
+#campCombatWheel{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;
+ pointer-events:auto;z-index:24;background:#071b16ae;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+ touch-action:none}
+#campWheelDisc{position:relative;width:min(78vw,320px,62dvh);height:min(78vw,320px,62dvh);border-radius:50%;
+ border:2px solid #eed7a29a;box-shadow:0 10px 42px #000b;
+ background:radial-gradient(circle at center,#17352b 0 23%,transparent 24%),
+ conic-gradient(from -45deg,#3e654d 0 24.7%,#be9657 25% 49.7%,#355e4b 50% 74.7%,#274638 75% 99.7%)}
+.campWheelSlot{position:absolute;width:28%;height:28%;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+ gap:2px;background:#143526cf;color:#fff0ca;border:1px solid #efd5a2;border-radius:15px;font-weight:850;
+ box-shadow:0 3px 10px #07130e88}
+.campWheelSlot>span{font-size:clamp(22px,6vw,31px)}
+.campWheelSlot>small{font-size:11px}
+.campWheelSlot.up{left:36%;top:5%}.campWheelSlot.right{right:5%;top:36%}
+.campWheelSlot.bottom{left:36%;bottom:5%}.campWheelSlot.left{left:5%;top:36%}
+.campWheelSlot.inactive{opacity:.5}
+.campWheelSlot.selected{background:#f6d993;color:#224637;box-shadow:0 0 0 3px #ffebaea1,0 0 24px #ffe3a7a3;border:2px solid #fff3d1}
+#campWheelCancel{position:absolute;top:32%;left:32%;height:36%;width:36%;z-index:2;background:#1a4032;color:#f8e6bc;
+ border-radius:50%;border:2px solid #f4dfaa;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+#campWheelCancel strong{font-size:14px}#campWheelCancel small{font-size:10px}
+.campWheelHint{margin-top:12px;font-weight:850;font-size:12px;letter-spacing:.4px}
+#campCombatFinish{position:fixed;inset:0;z-index:25;background:#122a22cd;
+ display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;pointer-events:auto}
+#campCombatFinish strong{font-size:26px;color:#ffe2aa}
+#campCombatFinish button{padding:12px 20px;border-radius:11px;border:0;background:#f0d290;color:#254633;font-weight:900}
+#campProjectileLayer{position:fixed;inset:0;pointer-events:none;z-index:7;overflow:hidden}
+.campBullet{position:absolute;height:3px;background:linear-gradient(90deg,#ffe3a622,#ffeda4,#fff);border-radius:9px;
+ box-shadow:0 0 8px #ffd17abb;transform-origin:left center;pointer-events:none}
+.campShotHit{position:absolute;pointer-events:none;color:#ffe5ab;font-weight:900;animation:campFloat .4s ease-out forwards}
+@keyframes campFloat{from{opacity:1}to{opacity:0;transform:translateY(-32px)}}
+@media(max-width:500px){#campCombatStatus span{padding:4px 7px;font-size:10px}#campCombatStatus #campAlert{font-size:9px}
+ .campCombatButtons{right:11px;bottom:calc(88px + env(safe-area-inset-bottom))}
+ #campAttack{width:76px;height:76px}#campWeaponSwitch{width:56px;height:56px}
+ #campCombatTip{bottom:calc(174px + env(safe-area-inset-bottom))}}
+@media(max-height:610px){.campCombatButtons{bottom:calc(56px + env(safe-area-inset-bottom))}
+ #campCombatTip{bottom:calc(143px + env(safe-area-inset-bottom))}
+ #campWheelDisc{width:min(60vw,63dvh);height:min(60vw,63dvh)}}

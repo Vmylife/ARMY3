@@ -93,16 +93,17 @@ export function movePlayer(pos,dx,dz,npcs){
  const distance=Math.hypot(next.x-pos.x,next.z-pos.z);
  if(distance<1e-6)return pos;
  for(const n of npcs){
+  if(n.combatDead)continue;
   const a=next.x-n.pos.x,b=next.z-n.pos.z,dist=Math.hypot(a,b),min=PLAYER_RADIUS+NPC_RADIUS+.015;
   if(dist>=min)continue;
   // A chair-bound soldier is fixed to a reserved bench: walking players must
   // go around rather than shoving the soldier away from the seat.
-  if(n.state==='seated')return pos;
+  if(n.state==='seated'&&!n.combatActive)return pos;
   // Players have priority; recruit yields, but never gets pushed through walls.
   const vx=dist>.001?-a/dist:dx/(Math.hypot(dx,dz)||1),vz=dist>.001?-b/dist:dz/(Math.hypot(dx,dz)||1);
   const shift=Math.min(.21,min-dist+.04);
   const pushed=moveWithCollision(n.pos,vx*shift,vz*shift,NPC_RADIUS);
-  const fits=npcs.every(o=>o===n||Math.hypot(pushed.x-o.pos.x,pushed.z-o.pos.z)>NPC_RADIUS*2-.03);
+  const fits=npcs.every(o=>o===n||o.combatDead||Math.hypot(pushed.x-o.pos.x,pushed.z-o.pos.z)>NPC_RADIUS*2-.03);
   if(fits&&Math.hypot(pushed.x-n.pos.x,pushed.z-n.pos.z)>.001){n.pos=pushed;n.route=null;}
   else return pos;
  }
@@ -116,7 +117,7 @@ export function moveNpc(n,dx,dz,npcs,playerPos){
  // making 30 rigid colliders freeze against one another.
  let ax=0,az=0;
  let oncoming=0;
- for(const o of npcs){if(o===n)continue;
+ for(const o of npcs){if(o===n||o.combatDead)continue;
   const vx=pos.x-o.pos.x,vz=pos.z-o.pos.z,dd=Math.hypot(vx,vz);
   if(dd>.001&&dd<1.55){const weight=(1.55-dd)/1.55;ax+=vx/dd*weight;az+=vz/dd*weight;
    // An opposite-going recruit should be passed on the right instead of
@@ -141,7 +142,7 @@ export function moveNpc(n,dx,dz,npcs,playerPos){
   // strictly REDUCES combined penetration. This lets a packed squad untangle;
   // actors that start separated still cannot pass through each other.
   let clearance=3,oldOverlap=0,newOverlap=0;
-  for(const o of npcs){if(o===n)continue;
+  for(const o of npcs){if(o===n||o.combatDead)continue;
    const before=Math.hypot(pos.x-o.pos.x,pos.z-o.pos.z);
    const after=Math.hypot(moved.x-o.pos.x,moved.z-o.pos.z);
    const min=NPC_RADIUS*2+(n.squadId!==undefined&&o.squadId===n.squadId ? .075 : -.015);

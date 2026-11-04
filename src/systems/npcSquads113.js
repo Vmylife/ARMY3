@@ -683,10 +683,21 @@ export function createCampNPCs(glb){
 }
 export function updateCampNPCs(npcs,dt,now,playerPos){
  // Only 10 free recruits use the utility/social AI; it still avoids ALL 35 bodies.
- updateIndividuals(npcs.filter(n=>FREE_IDS.has(n.id)),dt,now,playerPos,npcs);
+ updateIndividuals(npcs.filter(n=>FREE_IDS.has(n.id)&&!n.combatActive&&!n.combatDead),dt,now,playerPos,npcs);
  dt=clamp(dt,0,.05);
  CAMP_T+=dt;
  for(const s of GROUPS){
+  // Suspend drill orders once any member enters combat, and release stations.
+  if(s.members.some(n=>n.combatActive||n.combatDead)){
+   if(!s.combatSuspended){
+    releaseStage(s);s.combatSuspended=true;
+    for(const n of s.members)if(!n.combatActive&&!n.combatDead){
+     n.anim.rifleAim=0;n.anim.setClip('Idle');n.renderLift=0;n.state='pause';
+     n.activity='等待警戒命令';
+    }
+   }
+   continue;
+  }
   s.elapsed+=dt;
   for(const n of s.members)n.clock+=dt;
   if(!s.stage){setStage(s);continue;}
