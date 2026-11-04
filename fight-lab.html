@@ -5,14 +5,14 @@
  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
  <meta name="theme-color" content="#182c20">
  <title>國軍模擬器｜格鬥打擊實驗室</title>
- <link rel="stylesheet" href="./src/fight-lab/lab.css?v=3">
+ <link rel="stylesheet" href="./src/fight-lab/lab.css?v=4">
 </head>
 <body>
  <canvas id="arena" aria-label="3D軍營格鬥實驗場"></canvas>
  <div id="flash" aria-hidden="true"></div>
  <div id="burstLayer" aria-hidden="true"></div>
  <header class="header">
-  <div class="headerLeft"><div class="eyebrow">ARMY3 · COMBAT TEST</div><h1>格鬥打擊實驗室 <small>V2</small></h1></div>
+  <div class="headerLeft"><div class="eyebrow">ARMY3 · COMBAT TEST</div><h1>格鬥打擊實驗室 <small>V2.2</small></h1></div>
   <a class="exit" href="./index.html?v=205">← 返回軍營</a>
  </header>
  <section class="scores" aria-label="雙方狀態">
@@ -43,7 +43,8 @@
  <div id="floatingStick" aria-hidden="true"><div class="stick-base"><div id="stickThumb" class="stick-thumb"></div></div></div>
  <section class="controls" aria-label="戰鬥控制">
   <div class="actionArea">
-   <button id="attack" class="action attack" type="button"><span>✊</span><small>攻擊</small></button>
+   <button id="weaponSwitch" class="weapon-switch" type="button" aria-pressed="false" aria-label="切換拳頭和步槍"><span id="weaponIcon">🔫</span><small id="weaponLabel">拿槍</small></button>
+   <button id="attack" class="action attack" type="button"><span id="attackIcon">✊</span><small id="attackLabel">攻擊</small></button>
   </div>
  </section>
  <footer class="footer">
@@ -52,8 +53,8 @@
    <label class="difficultyLabel" for="difficulty">反擊強度 <select id="difficulty"><option value="normal">一般</option><option value="hard">兇猛</option></select></label>
    <button id="reset" class="reset" type="button">↻ 重開測試</button>
   </div>
-  <p>電腦：WASD 移動 · J 攻擊。手機：下半部移動、上半部轉鏡頭、雙指縮放；單顆攻擊鍵。</p>
-  <p>連續受到 30 點傷害後，下一拳擊飛倒地。實驗室獨立運作，不影響主軍營 NPC。</p>
+  <p>電腦：WASD 移動 · Q 換武器 · J 攻擊／開火。手機：下半部移動、上半部轉鏡頭、雙指縮放。</p>
+  <p>NPC 現在會跑步追擊；射擊只朝主角面向，沒有自動瞄準。實驗室不影響正式軍營。</p>
  </footer>
  <div id="loading" class="loading" role="status">
   <div class="loadingCard">
@@ -74,6 +75,6 @@
    <a href="./index.html?v=205">返回軍營</a>
   </div>
  </div>
- <script type="module" src="./src/fight-lab/lab.js?v=5"></script>
+ <script type="module" src="./src/fight-lab/lab.js?v=6"></script>
 </body>
 </html>
