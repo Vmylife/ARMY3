@@ -198,6 +198,75 @@ function thump(heavy=false){
  gain.gain.exponentialRampToValueAtTime(.001,t+(heavy?.21:.145));
  osc.connect(gain);gain.connect(audio.destination);osc.start(t);osc.stop(t+(heavy?.22:.16));
 }
+
+function preloadGunSound(){
+ const ctx=unlockAudio();
+ if(!ctx||gunAudioBuffer||gunAudioPromise)return;
+ gunAudioPromise=fetch('./assets/audio/rifle/npc_rifle_B.mp3?v=1')
+  .then(response=>{if(!response.ok)throw Error('槍聲 HTTP '+response.status);return response.arrayBuffer()})
+  .then(bytes=>ctx.decodeAudioData(bytes))
+  .then(buffer=>{gunAudioBuffer=buffer})
+  .catch(error=>{console.warn('步槍音效讀取失敗，繼續使用合成槍聲',error);gunAudioPromise=null});
+}
+function rifleSound(){
+ const ctx=unlockAudio();if(!ctx)return;
+ if(gunAudioBuffer){
+  const source=ctx.createBufferSource(),gain=ctx.createGain();
+  source.buffer=gunAudioBuffer;source.playbackRate.value=.97+Math.random()*.055;
+  gain.gain.value=.63;source.connect(gain);gain.connect(ctx.destination);source.start(ctx.currentTime);
+ }else{
+  // The first shot remains immediate while Safari decodes the original rifle sample.
+  noise(.17,.45,2800);noise(.10,.21,750);
+  const osc=ctx.createOscillator(),gain=ctx.createGain(),t=ctx.currentTime;
+  osc.type='triangle';osc.frequency.setValueAtTime(190,t);
+  osc.frequency.exponentialRampToValueAtTime(58,t+.18);
+  gain.gain.setValueAtTime(.31,t);gain.gain.exponentialRampToValueAtTime(.001,t+.19);
+  osc.connect(gain);gain.connect(ctx.destination);osc.start(t);osc.stop(t+.20);
+ }
+}
+function clearTracers(){for(const node of tracerNodes.values())node.remove();tracerNodes.clear()}
+function showMuzzle(at){
+ const pos=project(at.x,at.y,at.z),burst=document.createElement('div');
+ burst.className='gunMuzzle';burst.style.left=pos.x+'px';burst.style.top=pos.y+'px';
+ $('burstLayer').appendChild(burst);setTimeout(()=>burst.remove(),125);
+}
+function drawTracers(){
+ const live=new Set();
+ for(const b of e.projectiles){
+  live.add(b.id);
+  let node=tracerNodes.get(b.id);
+  if(!node){node=document.createElement('div');node.className='bulletTracer';
+   $('burstLayer').appendChild(node);tracerNodes.set(b.id,node)}
+  // This streak follows the real projectile in world coordinates, not an aimed enemy.
+  const a=project(b.x-b.dx*1.16,1.05,b.z-b.dz*1.16),tip=project(b.x,1.05,b.z);
+  const dx=tip.x-a.x,dy=tip.y-a.y;
+  node.style.left=a.x+'px';node.style.top=a.y+'px';
+  node.style.width=Math.max(4,Math.min(140,Math.hypot(dx,dy)))+'px';
+  node.style.transform='rotate('+Math.atan2(dy,dx)+'rad)';
+ }
+ for(const [id,node] of tracerNodes)if(!live.has(id)){node.remove();tracerNodes.delete(id)}
+}
+function syncWeaponControls(){
+ const rifleMode=e.weapon==='rifle';
+ $('weaponIcon').textContent=rifleMode?'✊':'🔫';
+ $('weaponLabel').textContent=rifleMode?'收槍':'拿槍';
+ $('attackIcon').textContent=rifleMode?'🔫':'✊';
+ $('attackLabel').textContent=rifleMode?'開火':'攻擊';
+ $('weaponSwitch').setAttribute('aria-pressed',String(rifleMode));
+ $('attack').classList.toggle('rifle',rifleMode);
+}
+function toggleWeapon(){
+ if(!ready||!rifle)return false;
+ unlockAudio();
+ const ok=e.switchWeapon();
+ if(ok){
+  if(e.weapon==='rifle')preloadGunSound();
+  syncWeaponControls();react();
+  tell(e.weapon==='rifle'?'步槍模式：面向哪裡，就往哪裡開槍！':'拳頭模式：靠近阿兵哥再攻擊！',1700);
+ }
+ return ok;
+}
+
 function react(){
  for(const event of e.drain()){
   if(event.kind==='swing'){
