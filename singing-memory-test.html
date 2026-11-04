@@ -4,11 +4,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#17372a">
 <title>軍歌鑑測｜跟著班長唱</title>
-<link rel="stylesheet" href="./singing-memory-test.css?v=11">
+<link rel="stylesheet" href="./singing-memory-test.css?v=12">
 </head><body>
 <main class="app">
  <header class="top">
-  <span class="brand">軍歌鑑測 <small>v1.1</small></span>
+  <span class="brand">軍歌鑑測 <small>v1.2</small></span>
   <a class="back" href="./index.html">退出</a>
  </header>
  <section class="controls" id="controlsPanel">
@@ -140,5 +140,48 @@
   <button id="previewClip" type="button" disabled>試聽</button>
  </div>
 </main>
-<script src="./singing-memory-test.js?v=11" defer></script>
+<div id="singResultOverlay" class="sgr-layer" hidden role="dialog" aria-modal="true" aria-labelledby="singResultTitle">
+ <div class="sgr-report">
+  <div class="sgr-head">
+   <div class="sgr-kicker"><span>國軍軍歌鑑測　/　結算報告</span><span>NO. M-007</span></div>
+   <h1 id="singResultTitle">軍歌鑑測結算</h1>
+   <div class="sgr-subtitle">報告班長！我真的有在唱。</div>
+   <div class="sgr-scorebox">
+    <div class="sgr-scoreleft"><small>本次鑑測總分</small><div class="sgr-big"><strong id="singReportPoints">0</strong><span>/ 100</span></div></div>
+    <div class="sgr-scoreright"><span id="singReportEnglish">BAD</span><strong id="singReportChinese">音準逃兵</strong><small id="singReportBest">歷史最高 0 分</small></div>
+   </div>
+  </div>
+  <div class="sgr-scroll">
+   <section class="sgr-section">
+    <div class="sgr-sectionhead"><strong>七句鑑測戰報</strong><small id="singReportStats"></small></div>
+    <div class="sgr-rounds" id="singReportRounds"></div>
+   </section>
+   <section class="sgr-section">
+    <div class="sgr-sectionhead"><strong>最後音準比較</strong><small>金色原唱・紅色玩家</small></div>
+    <div class="sgr-comparebox">
+     <svg viewBox="0 0 800 240" preserveAspectRatio="none" aria-label="原曲完整音準與玩家音準比較">
+      <path id="singReportGold" fill="none" stroke="#f2d39b" stroke-width="9" stroke-linecap="butt" stroke-linejoin="miter"/>
+      <path id="singReportRed" fill="none" stroke="#e78a97" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+     </svg>
+    </div>
+    <div class="sgr-comparepick" id="singReportCompareChoices" aria-label="選擇要查看的句子音準"></div>
+   </section>
+   <section class="sgr-section">
+    <div class="sgr-sectionhead"><strong>本次解鎖成就</strong><small id="singReportAchCount">0 項</small></div>
+    <div class="sgr-achgrid" id="singReportAchievements"></div>
+    <button id="singReportGalleryToggle" class="sgr-gallerybtn" type="button">🏅 查看全部成就圖鑑</button>
+    <div id="singReportGallery" class="sgr-gallery" hidden></div>
+   </section>
+   <section class="sgr-section">
+    <div class="sgr-sectionhead"><strong>班長講評</strong><small>出於愛護，僅供參考</small></div>
+    <blockquote id="singReportQuote" class="sgr-officer"></blockquote>
+   </section>
+  </div>
+  <div class="sgr-actions">
+   <a href="./index.html" class="sgr-back">返回軍營</a>
+   <button id="singReportAgain" class="sgr-again" type="button">再唱一次</button>
+  </div>
+ </div>
+</div>
+<script src="./singing-memory-test.js?v=12" defer></script>
 </body></html>
