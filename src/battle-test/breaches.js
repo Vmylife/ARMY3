@@ -1,31 +1,32 @@
-// Keep the previously approved gate/barracks fence openings in this isolated
-// test. Assault origins are now INSIDE the camp at the single-combat ground and
-// on several sides of the HQ office, rather than funnelled through those gates.
-export const SOUTH_BREACH={label:'大門哨口',xMin:-21,xMax:21,z:-21};
-export const WEST_BREACH={label:'營舍外圍',zMin:-17,zMax:12};
+// Only the independent battle test cuts these perimeter gaps.
+export const SOUTH_BREACH={label:'南側防線',xMin:-21,xMax:35,z:-21};
+export const WEST_BREACH={label:'西側營舍',zMin:-17,zMax:15};
 export function removedFence(p){
- return p.type==='fence'&&(
-  (p.z<=-19.8&&p.x>=SOUTH_BREACH.xMin&&p.x<=SOUTH_BREACH.xMax)||
-  (p.x<=-43&&p.z>=WEST_BREACH.zMin&&p.z<=WEST_BREACH.zMax)
- );
+ if(p.type!=='fence')return false;
+ return (p.z<=-19.7&&p.x>=-21&&p.x<=35)||
+  (p.x<=-43&&p.z>=-17&&p.z<=15)||
+  (p.z>=22&&((p.x>=-16.5&&p.x<=-13)||(p.x>=-6&&p.x<=1)));
 }
-function singleFront(index,count){
- const columns=Math.min(7,Math.max(3,Math.ceil(count/2)));
- const row=Math.floor(index/columns),column=index%columns;
- const t=columns<=1?.5:column/(columns-1);
- return {x:3.0+t*15.5+(row%2)*.28,z:5.7-row*2.7};
-}
-function officeFlanks(index){
- const side=index%3,lane=Math.floor(index/3);
- if(side===0)return {x:-12+lane*4.7,z:15.8+(lane%2)*1.8}; // HQ north
- if(side===1)return {x:-11.4+lane*4.5,z:2.45-(lane%2)*1.7}; // HQ south
- return {x:2.4+lane*3.8,z:8.4+(lane%2)*2.6}; // HQ east
-}
+// Verified against camp collisions, including the lamp/tree on the south wall.
+const SINGLE_LANES=[10.5,13.4,14.7,16.1,17.5,18.8,20.2,21.6,23,24.4,25.8,29.2,30.6,32,33.4];
+const southEdge=x=>x<=18?-21:-21+(x-18)/17;
+const northEdge=x=>x<=-12?19+(x+32)*7/20:26;
+const westEdge=z=>-47+(z-5)*.4;
+const south=x=>{const z=southEdge(x);return {start:{x,z:z-3.55},entry:{x,z:z+1.78}}};
+const north=i=>{const x=[-15.7,-14.1,-4.6,-2.1][i%4],z=northEdge(x);return {start:{x,z:z+1.17},entry:{x,z:z-2}}};
+const west=i=>{const z=[9.4,11,14.9][i%3],x=westEdge(z);return {start:{x:x-2.25,z},entry:{x:x+3.2,z}}};
+const office=i=>{
+ const side=i%3,lane=Math.floor(i/3);
+ if(side===0)return {side:'hq-north',...north(lane)};
+ if(side===1)return {side:'hq-south',...south(-14.4+Math.min(2,lane)*3)};
+ return {side:'hq-west',...west(lane)};
+};
 export function waveEntry(index,total){
- // 3/5 single-combat field, 2/5 office; both attack at the same time.
- const single=index%5<3;
- let lane=0,singleCount=0;
- for(let i=0;i<total;i++)if(i%5<3)singleCount++;
+ // Two simultaneous assault groups; the HQ group has three entrances.
+ const single=index%5<3;let lane=0,totalSingle=0;
+ for(let i=0;i<total;i++)if(i%5<3)totalSingle++;
  for(let i=0;i<index;i++)if((i%5<3)===single)lane++;
- return {side:single?'single':'office',start:single?singleFront(lane,singleCount):officeFlanks(lane)};
+ if(!single)return office(lane);
+ const slot=Math.round((totalSingle<=1?.5:lane/(totalSingle-1))*(SINGLE_LANES.length-1));
+ return {side:'single-south',...south(SINGLE_LANES[slot])};
 }

@@ -3,7 +3,7 @@
 import {CampCombat,lineClear,COMBAT_RISE_SECONDS,COMBAT_DOWN_SECONDS} from '../systems/campCombat.js?v=12';
 import {moveNpc,staticClearance,canOccupy} from '../map/navCollision109.js?v=124';
 import {battleRoute} from './battleNav.js?v=1';
-import {waveEntry} from './breaches.js?v=2';
+import {waveEntry} from './breaches.js?v=3';
 import {insidePerimeter} from '../map/camp.js?v=093';
 const $=id=>document.getElementById(id);
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
@@ -11,7 +11,8 @@ const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 export const BATTLE_SPAWN={player:{x:22.4,z:13.2},allies:[
  {x:17.6,z:13.8},{x:22.0,z:11.0},{x:26.0,z:13.4}
 ]};
-export const WAVE_SIZE=wave=>Math.min(24,3+Math.ceil(wave*2.5));
+// First wave doubled from 6 to 12; later waves continue increasing.
+export const WAVE_SIZE=wave=>Math.min(24,12+Math.ceil(Math.max(0,wave-1)*2.5));
 export class ArmyBattleCombat extends CampCombat{
  constructor({player,enemies,allies,renderer,rifleGlb,npcGlb}){
   super({player,npcs:enemies,renderer,rifleGlb,npcGlb});
@@ -40,7 +41,7 @@ export class ArmyBattleCombat extends CampCombat{
    n.combatDead=true;n.combatActive=false;
    n.pos={x:200+n.id,z:200};n.home.job='life';
   }
-  this.showIntroBanner('單戰場正面推進，辦公大樓多路包抄！',1700);
+  this.showIntroBanner('圍牆外紅軍集結！南側與辦公大樓多路來襲',1900);
   const god=$('battleGodToggle');
   if(god){god.addEventListener('click',()=>this.setInvincible(!this.invincible));this.setInvincible(false)}
  }
@@ -80,29 +81,37 @@ export class ArmyBattleCombat extends CampCombat{
   }
   return super.onCombatHit(pos,damage,info);
  }
- findWaveStart(requested,used){
-  // Decorations and soldiers are solid; distribute around blocked launch marks.
-  for(const radius of [0,1.1,2.0,3.1,4.6,6.2]){
-   for(let j=0;j<(radius===0?1:20);j++){
-    const angle=j*Math.PI*2/20;
-    const p={x:requested.x+Math.cos(angle)*radius,z:requested.z+Math.sin(angle)*radius};
-    if(!canOccupy(p,.50)||used.some(o=>dist(o,p)<1.05))continue;
-    return p;
+ // Outside-perimeter run must bypass normal inside-only navigation until
+ // crossing the approved visible gap. No instantaneous inside spawn.
+ updateIncoming(dt){
+  if(!this.running||this.gameOver||dt<=0)return;
+  for(const n of this.enemies){
+   if(!n.incoming||n.combatDead)continue;
+   const goal=n.entryTarget,dx=goal.x-n.pos.x,dz=goal.z-n.pos.z;
+   const distance=Math.hypot(dx,dz),step=Math.min(distance,(4.6+(n.id%4)*.25)*dt);
+   if(distance>.001){
+    n.pos={x:n.pos.x+dx/distance*step,z:n.pos.z+dz/distance*step};
+    this.turnAlly(n,Math.atan2(dx,dz),dt);
+    if(n.anim.clip!=='Running')n.anim.setClip('Running');
+    n.anim.speed=1.20;n.anim.rifleAim=0;
+   }
+   if(distance<=step+.005){
+    n.pos={...goal};n.incoming=false;n.combatActive=true;
+    n.state='combat';n.battlePath=null;n.battleNextPlan=0;
+    n.anim.setClip('Idle');n.anim.speed=1;
    }
   }
-  return requested;
  }
  spawnWave(){
   this.wave++;
-  const count=WAVE_SIZE(this.wave),pool=this.enemies.slice(0,count),used=[];
+  const count=Math.min(this.enemies.length,WAVE_SIZE(this.wave)),pool=this.enemies.slice(0,count);
   this.waveDelay=0;this.waveActive=true;
   for(let i=0;i<pool.length;i++){
    const n=pool[i],entry=waveEntry(i,count);
-   n.pos=this.findWaveStart(entry.start,used);used.push(n.pos);
-   n.entrySide=entry.side;
-   n.angle=Math.atan2(BATTLE_SPAWN.player.x-n.pos.x,BATTLE_SPAWN.player.z-n.pos.z);
-   n.assaultVisible=true;n.incoming=false;
-   n.combatDead=false;n.combatActive=true;n.combatHP=100;n.combatDamageSinceFall=0;
+   n.pos={...entry.start};n.entryTarget={...entry.entry};n.entrySide=entry.side;
+   n.angle=Math.atan2(entry.entry.x-n.pos.x,entry.entry.z-n.pos.z);
+   n.assaultVisible=true;n.incoming=true;
+   n.combatDead=false;n.combatActive=false;n.combatHP=100;n.combatDamageSinceFall=0;
    n.combatDown=0;n.combatRise=0;n.combatFall=0;n.combatDeathClip=false;n.combatRestLift=undefined;
    n.combatHurt=0;n.combatHurtFull=0;n.combatCooldown=.45+(i%4)*.18;
    n.combatAttack=0;n.combatStrikeApplied=true;n.combatGoal=null;n.combatNextMove=0;n.combatLastMove=-100;
@@ -111,13 +120,13 @@ export class ArmyBattleCombat extends CampCombat{
    n.battlePath=null;n.battlePathIndex=0;n.battlePathGoal=null;n.battleNextPlan=0;
    n.battleFlank=((i%7)-3)*1.30;n.combatStall=0;
    n.route=null;n.routeGoal=null;n.routeIndex=0;n.replanAt=0;n.squadEscape=null;
-   n.anim.setClip('Idle',{restart:true});n.anim.speed=1;n.anim.rifleAim=0;
+   n.anim.setClip('Running',{restart:true});n.anim.speed=1.20;n.anim.rifleAim=0;
   }
   for(const n of this.enemies.slice(count)){
    n.assaultVisible=false;n.combatDead=true;n.combatActive=false;n.incoming=false;n.pos={x:200+n.id,z:200}
   }
   this.totalSpawns+=count;
-  this.showIntroBanner('第 '+this.wave+' 波 · '+count+' 名紅軍（單戰場＋辦公大樓）',2200);
+  this.showIntroBanner('第 '+this.wave+' 波 · '+count+' 名紅軍從圍牆外多路突破！',2200);
   this.updateBattleHUD();
  }
 
@@ -476,6 +485,7 @@ export class ArmyBattleCombat extends CampCombat{
    this.waveDelay-=dt;
    if(this.waveDelay<=0){this.spawnWave();this.running=true}
   }
+  this.updateIncoming(dt);
   // Normal shooting/knockdown/recoil still run, without player-only camp aggro.
   this.provoked=false;
   super.update(dt,now,{blocked});
