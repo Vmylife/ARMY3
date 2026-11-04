@@ -22,17 +22,6 @@ export const BUILDING_MODELS=[
  {id:5,url:'./assets/buildings/building-5-wash.glb?v=112'},
  {id:6,url:'./assets/buildings/building-6-office.glb?v=112'}
 ];
-// Prioritize model *types* used near the spawn/return point, not all map instances.
-export function nearbyBuildingModelIds(position,limit=3){
- const distance=new Map();
- for(const b of BUILDINGS){
-  const type=PLAN[b.id]?.type;
-  if(!type)continue;
-  const d=Math.hypot(b.x-position.x,b.z-position.z);
-  if(d<(distance.get(type)??Infinity))distance.set(type,d);
- }
- return [...distance.entries()].sort((a,b)=>a[1]-b[1]).slice(0,limit).map(([id])=>id);
-}
 // Meshy output is front-facing +Z. Follow each actual doorway/interaction waypoint.
 function faceAngle(b){
  // The open-side of the uploaded wash-station GLB faces local +Z.
@@ -91,38 +80,8 @@ async function createTexture(gl,source){
  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
  return tex;
 }
-// Shared, very cheap 3D silhouette for models that are still streaming.
-// Collision continues to use the complete original map, even before GLBs finish.
-function makeBuildingPlaceholder(gl){
- const faces=[
-  {p:[[-.5,0,.5],[.5,0,.5],[.5,1,.5],[-.5,1,.5]],n:[0,0,1]},
-  {p:[[.5,0,-.5],[-.5,0,-.5],[-.5,1,-.5],[.5,1,-.5]],n:[0,0,-1]},
-  {p:[[.5,0,.5],[.5,0,-.5],[.5,1,-.5],[.5,1,.5]],n:[1,0,0]},
-  {p:[[-.5,0,-.5],[-.5,0,.5],[-.5,1,.5],[-.5,1,-.5]],n:[-1,0,0]},
-  {p:[[-.5,1,.5],[.5,1,.5],[.5,1,-.5],[-.5,1,-.5]],n:[0,1,0]},
-  {p:[[-.5,0,-.5],[.5,0,-.5],[.5,0,.5],[-.5,0,.5]],n:[0,-1,0]}
- ];
- const pos=[],normal=[],uv=[],indices=[];
- for(const f of faces){
-  const k=pos.length/3;
-  for(let j=0;j<4;j++){pos.push(...f.p[j]);normal.push(...f.n);uv.push(j===1||j===2?1:0,j>=2?1:0)}
-  indices.push(k,k+1,k+2,k,k+2,k+3);
- }
- const vao=gl.createVertexArray();gl.bindVertexArray(vao);
- for(const [index,data,size] of [[0,new Float32Array(pos),3],[1,new Float32Array(normal),3],[2,new Float32Array(uv),2]]){
-  const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(index);gl.vertexAttribPointer(index,size,gl.FLOAT,false,0,0);
- }
- const ib=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ib);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(indices),gl.STATIC_DRAW);
- const tex=gl.createTexture();gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,tex);
- gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([158,177,149,255]));
- gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
- gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
- gl.bindVertexArray(null);
- return {vao,tex,count:indices.length};
-}
 export class CampBuildings{
- constructor(gl){this.gl=gl;this.shader=prog(gl);this.vp=gl.getUniformLocation(this.shader,'uVP');this.model=gl.getUniformLocation(this.shader,'uModel');this.tint=gl.getUniformLocation(this.shader,'uTint');this.sampler=gl.getUniformLocation(this.shader,'uAlbedo');this.models=new Map();this.instances=[];this.placeholder=makeBuildingPlaceholder(gl);this.buildInstances();}
+ constructor(gl){this.gl=gl;this.shader=prog(gl);this.vp=gl.getUniformLocation(this.shader,'uVP');this.model=gl.getUniformLocation(this.shader,'uModel');this.tint=gl.getUniformLocation(this.shader,'uTint');this.sampler=gl.getUniformLocation(this.shader,'uAlbedo');this.models=new Map();this.instances=[];}
  async add(id,g){const gl=this.gl;const dimensions=getDimensions(g);const meshes=g.json.meshes.flatMap(m=>m.primitives.map(p=>createMesh(gl,g,p)));
   const materials=await Promise.all((g.json.materials||[]).map(async m=>{
    const idx=m.pbrMetallicRoughness?.baseColorTexture?.index;
@@ -132,14 +91,7 @@ export class CampBuildings{
   if(materials.length===0)materials.push(await createTexture(gl,null));
   this.models.set(id,{dimensions,meshes,materials});this.buildInstances();
  }
- buildInstances(){this.instances=[];for(const b of BUILDINGS){
-  const cfg=PLAN[b.id];if(!cfg)continue;
-  if(!this.models.has(cfg.type)){
-   const yaw=faceAngle(b);
-   const model=mul(translation(b.x,.025,b.z),mul(rotateY(yaw),matScale(b.w*.9,b.h,b.d*.9)));
-   this.instances.push({type:cfg.type,model,tint:new Float32Array([1,1,1]),placeholder:true,x:b.x,z:b.z});
-   continue;
-  }
+ buildInstances(){this.instances=[];for(const b of BUILDINGS){const cfg=PLAN[b.id];if(!cfg||!this.models.has(cfg.type))continue;
   const d=this.models.get(cfg.type).dimensions,yaw=faceAngle(b),turned=Math.abs(Math.sin(yaw))>.5;
   const footprintWidth=b.w*.91,footprintDepth=b.d*.91;
   let sx=(turned?footprintDepth:footprintWidth)/d.size[0];
@@ -166,15 +118,7 @@ export class CampBuildings{
  }}
  draw(vp,target){const gl=this.gl;gl.useProgram(this.shader);gl.uniformMatrix4fv(this.vp,false,vp);gl.uniform1i(this.sampler,0);
   for(const i of this.instances){
-   const m=this.models.get(i.type);
-   gl.uniformMatrix4fv(this.model,false,i.model);gl.uniform3fv(this.tint,i.tint);
-   if(i.placeholder){
-    gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.placeholder.tex);
-    gl.bindVertexArray(this.placeholder.vao);
-    gl.drawElements(gl.TRIANGLES,this.placeholder.count,gl.UNSIGNED_SHORT,0);
-    continue;
-   }
-   if(!m)continue;
+   const m=this.models.get(i.type);if(!m)continue;gl.uniformMatrix4fv(this.model,false,i.model);gl.uniform3fv(this.tint,i.tint);
    for(const part of m.meshes){gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,m.materials[part.material]||m.materials[0]);gl.bindVertexArray(part.vao);gl.drawElements(gl.TRIANGLES,part.count,part.indexType,0)}
   }
   gl.bindVertexArray(null);
