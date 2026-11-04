@@ -46,7 +46,7 @@ export class FightEngine{
   }
   b.hp=Math.max(0,b.hp-def.damage);b.damageSinceFall+=def.damage;
   b.chain=this.time-b.chainAt<2.5?b.chain+1:1;b.chainAt=this.time;
-  b.attack=null;b.stun=.37;b.lean=-.35;b.state='hit';b.impactAnim='Hit_Reaction';
+  b.attack=null;b.stun=.62;b.lean=-.35;b.state='hit';b.impactAnim='Hit_Reaction';
   const ko=b.hp<=0,down=ko||(b.damageSinceFall>LAUNCH_AFTER_DAMAGE);
   if(down){
    b.damageSinceFall=0;b.state='down';b.down=ko?5:2.0;b.stun=0;b.lean=0;b.fallen=true;
