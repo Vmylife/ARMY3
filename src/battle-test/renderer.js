@@ -1,0 +1,179 @@
+import {I,mul,perspective,lookAt,translation,rotateY} from '../core/math.js?v=060';
+const rotateX=rad=>{const c=Math.cos(rad),sn=Math.sin(rad);return new Float32Array([1,0,0,0,0,c,sn,0,0,-sn,c,0,0,0,0,1]);};
+const CORPSE_ROTATE_X=new Float32Array([1,0,0,0,0,0,-1,0,0,1,0,0,0,0,0,1]);
+const CORPSE_PIVOT=mul(translation(0,.75,0),mul(CORPSE_ROTATE_X,translation(0,-.75,0)));
+import {makeEnvironment} from '../map/campGeometry.js?v=092';
+const SKIN_VS=`#version 300 es
+precision highp float;
+layout(location=0) in vec3 p;layout(location=1) in vec3 n;layout(location=2) in vec2 uv;layout(location=3) in vec4 j;layout(location=4) in vec4 w;
+uniform mat4 uVP,uModel;uniform mat4 uBones[44];
+out vec2 vUV;out vec3 vN;out vec3 vPos;
+void main(){ivec4 ji=ivec4(j+0.5);mat4 skin=uBones[ji.x]*w.x+uBones[ji.y]*w.y+uBones[ji.z]*w.z+uBones[ji.w]*w.w;vec4 wp=uModel*skin*vec4(p,1.0);gl_Position=uVP*wp;vUV=uv;vN=normalize(mat3(uModel)*mat3(skin)*n);vPos=wp.xyz;}`;
+const SKIN_FS=`#version 300 es
+precision highp float;in vec2 vUV;in vec3 vN;in vec3 vPos;uniform sampler2D uTexture;
+uniform float uEnemyTint;out vec4 frag;
+void main(){vec3 base=texture(uTexture,vUV).rgb;
+ if(uEnemyTint>0.5){
+  // Recolor uniform-green fabric scarlet, preserve warm face/skin tones.
+  float mask=clamp((base.g-base.r+.045)*4.6,0.,1.)*clamp((base.g-base.b+.055)*3.5,0.,1.);
+  vec3 scarlet=vec3(max(.23,base.g*.99),base.g*.20,base.b*.18);
+  base=mix(base,scarlet,mask*.97);
+ }
+ float sun=max(0.,dot(normalize(vN),normalize(vec3(-0.4,1.1,0.55))));float light=.78+.25*sun;frag=vec4(base*light,1.);}`;
+const STATIC_VS=`#version 300 es
+precision highp float;layout(location=0)in vec3 p;layout(location=1)in vec3 c;layout(location=2)in vec3 n;uniform mat4 uVP;out vec3 vColor;out vec3 vN;void main(){gl_Position=uVP*vec4(p,1.);vColor=c;vN=n;}`;
+const STATIC_FS=`#version 300 es
+precision mediump float;in vec3 vColor;in vec3 vN;out vec4 frag;void main(){float sun=max(0.,dot(normalize(vN),normalize(vec3(-.5,1.,.4))));frag=vec4(vColor*(.82+.22*sun),1.);}`;
+function shader(gl,t,s){const a=gl.createShader(t);gl.shaderSource(a,s);gl.compileShader(a);if(!gl.getShaderParameter(a,gl.COMPILE_STATUS))throw Error('Shader：'+gl.getShaderInfoLog(a));return a}
+function program(gl,vs,fs){const p=gl.createProgram();gl.attachShader(p,shader(gl,gl.VERTEX_SHADER,vs));gl.attachShader(p,shader(gl,gl.FRAGMENT_SHADER,fs));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error('Program：'+gl.getProgramInfoLog(p));return p}
+function attrib(gl,ix,arr,size,type){const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,arr,gl.STATIC_DRAW);gl.enableVertexAttribArray(ix);gl.vertexAttribPointer(ix,size,type,false,0,0)}
+// Meshy hit / fall / stand-up clips contain negative root translations.
+// Lift only these actions so their lowest sampled point never passes the floor.
+const FLOOR_ACTIONS=new Set(['Dead','Arise','BeHit_FlyUp','Knock_Down','falling_down','Hit_Reaction','Sleep_Normally','push_up','situps']);
+function groundLift(asset,actor){
+ const anim=actor.anim;
+ if(!FLOOR_ACTIONS.has(anim.clip)&&!(anim.transition>0&&FLOOR_ACTIONS.has(anim.prevClip)))return 0;
+ const bones=anim.bones;
+ let low=Infinity;
+ for(const sample of asset.sample){
+  const [x,y,z]=sample.p;
+  let yy=0;
+  for(let i=0;i<4;i++){
+   const weight=sample.w[i];if(weight<=0)continue;
+   const base=sample.j[i]*16;
+   yy+=weight*(bones[base+1]*x+bones[base+5]*y+bones[base+9]*z+bones[base+13]);
+  }
+  if(yy<low)low=yy;
+ }
+ return Number.isFinite(low)?Math.max(0,.015-low):0;
+}
+// The lab's actual skinned fall/arise bones use their own hip translations.
+ // Keep the mesh upright in world space; do not rotate the whole NPC on top
+ // of a full-body falling animation. Use the same floor sample as the lab.
+function fullCombatFloorLift(asset,anim){
+ let low=Infinity;
+ for(const sample of asset.sample){
+  let y=0;
+  for(let k=0;k<4;k++){
+   const weight=sample.w[k];if(weight<=0)continue;
+   const base=sample.j[k]*16,bones=anim.bones;
+   y+=weight*(bones[base+1]*sample.p[0]+bones[base+5]*sample.p[1]+
+      bones[base+9]*sample.p[2]+bones[base+13]);
+  }
+  if(y<low)low=y;
+ }
+ return .095+(Number.isFinite(low)?Math.max(0,Math.min(1,.015-low)):0);
+}
+// Skinned-body minimum is evaluated once when the corpse first becomes visible.
+// Reusing the height prevents sinking and avoids per-frame vertex CPU work.
+function corpseLift(asset,actor,pivot=CORPSE_PIVOT,cache=true){
+ if(cache&&Number.isFinite(actor.combatRestLift))return actor.combatRestLift;
+ let low=Infinity;const bones=actor.anim.bones;
+ for(const s of asset.sample){
+  let x=0,y=0,z=0;
+  for(let k=0;k<4;k++){
+   const weight=s.w[k];if(!weight)continue;
+   const b=s.j[k]*16,px=s.p[0],py=s.p[1],pz=s.p[2];
+   x+=weight*(bones[b]*px+bones[b+4]*py+bones[b+8]*pz+bones[b+12]);
+   y+=weight*(bones[b+1]*px+bones[b+5]*py+bones[b+9]*pz+bones[b+13]);
+   z+=weight*(bones[b+2]*px+bones[b+6]*py+bones[b+10]*pz+bones[b+14]);
+  }
+  low=Math.min(low,pivot[1]*x+pivot[5]*y+pivot[9]*z+pivot[13]);
+ }
+ const lift=Number.isFinite(low)?Math.max(0,.042-low):.8;
+ if(cache)actor.combatRestLift=lift;
+ return lift;
+}
+export class ArmyRenderer{
+ constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:true,alpha:false,depth:true,powerPreference:'high-performance'});if(!gl)throw Error('這個瀏覽器不支援 WebGL2');this.gl=gl;this.p=program(gl,SKIN_VS,SKIN_FS);this.pFlat=program(gl,STATIC_VS,STATIC_FS);this.assets=new Map();this.environment=makeEnvironment();this.flatVAO=gl.createVertexArray();gl.bindVertexArray(this.flatVAO);attrib(gl,0,this.environment.verts,3,gl.FLOAT);attrib(gl,1,this.environment.cols,3,gl.FLOAT);attrib(gl,2,this.environment.norms,3,gl.FLOAT);gl.bindVertexArray(null);
+ this.uniforms={vp:gl.getUniformLocation(this.p,'uVP'),model:gl.getUniformLocation(this.p,'uModel'),bones:gl.getUniformLocation(this.p,'uBones[0]'),tex:gl.getUniformLocation(this.p,'uTexture'),red:gl.getUniformLocation(this.p,'uEnemyTint')};
+ this.flatVP=gl.getUniformLocation(this.pFlat,'uVP');this.vp=I;this.cameraYaw=.67;this.cameraPitch=.60;this.cameraZoom=9;this.cameraTarget={x:0,z:0};this.cameraReady=false;this.size={w:0,h:0};
+ }
+ async addModel(name,gltf,{textureUrl=null}={}){const gl=this.gl,pr=gltf.json.meshes[0].primitives[0],vao=gl.createVertexArray();gl.bindVertexArray(vao);
+  const map=[['POSITION',0,3],['NORMAL',1,3],['TEXCOORD_0',2,2],['JOINTS_0',3,4],['WEIGHTS_0',4,4]];
+  for(const [k,loc,size] of map){const idx=pr.attributes[k],acc=gltf.json.accessors[idx];attrib(gl,loc,gltf.read(idx),size,acc.componentType)}
+  const idxAcc=gltf.json.accessors[pr.indices],inds=gltf.read(pr.indices),buf=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buf);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,inds,gl.STATIC_DRAW);gl.bindVertexArray(null);
+  const material=gltf.json.materials[pr.material],tid=material.pbrMetallicRoughness.baseColorTexture.index,imgid=gltf.json.textures[tid].source,url=textureUrl||URL.createObjectURL(gltf.imageFrom(imgid));let image=new Image();try{await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=reject;image.src=url})}finally{if(!textureUrl)URL.revokeObjectURL(url)}
+  const tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);// Meshy puts closely packed UV islands into a 2048px color atlas.
+  // On mobile, auto-generated mipmaps can blend adjacent islands and expose
+  // fine dark lines around sleeves, cap, neck and hands. Keep full-resolution
+  // bilinear sampling; UVs of this asset are all within 0..1.
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  
+  // Small CPU sample for ground contact: correct Meshy clip-specific root offsets
+  // without editing the supplied rig or animation curves.
+  const positions=gltf.read(pr.attributes.POSITION), joints=gltf.read(pr.attributes.JOINTS_0),weights=gltf.read(pr.attributes.WEIGHTS_0);
+  const total=positions.length/3,groundSamples=[];
+  for(let i=0;i<total;i+=Math.max(1,Math.floor(total/420))){groundSamples.push(i)}
+  // O(n) minimum-height sampling; avoid sorting every mesh vertex on iPhone.
+  const low=[];
+  for(let i=0;i<total;i++){
+    const y=positions[i*3+1];
+    if(low.length<32){low.push({i,y});if(low.length===32)low.sort((a,b)=>b.y-a.y);}
+    else if(y<low[0].y){low[0]={i,y};low.sort((a,b)=>b.y-a.y);}
+  }
+  groundSamples.push(...low.map(v=>v.i));
+  const sample=groundSamples.map(i=>({p:[positions[i*3],positions[i*3+1],positions[i*3+2]],j:[...joints.slice(i*4,i*4+4)],w:[...weights.slice(i*4,i*4+4)]}));
+  this.assets.set(name,{vao,tex,count:inds.length,indexType:idxAcc.componentType,sample});
+ }
+ setCamera(opts){Object.assign(this,{cameraYaw:opts.yaw??this.cameraYaw,cameraPitch:opts.pitch??this.cameraPitch,cameraZoom:opts.zoom??this.cameraZoom})}
+ startFrame(target){const gl=this.gl,canvas=this.canvas,ratio=Math.min(window.armyEco?1:1.65,window.devicePixelRatio||1),w=Math.max(1,Math.round(canvas.clientWidth*ratio)),h=Math.max(1,Math.round(canvas.clientHeight*ratio));if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h)}
+ gl.clearColor(.76,.84,.73,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.disable(gl.CULL_FACE);
+ const portrait=w/h<.94,dist=this.cameraZoom*(portrait?1.23:1),yaw=this.cameraYaw,pitch=this.cameraPitch;if(!this.cameraReady){this.cameraTarget={x:target.x,z:target.z};this.cameraReady=true;}this.cameraTarget.x+=(target.x-this.cameraTarget.x)*.10;this.cameraTarget.z+=(target.z-this.cameraTarget.z)*.10;
+ const ex=this.cameraTarget.x+Math.sin(yaw)*Math.cos(pitch)*dist,ey=.9+Math.sin(pitch)*dist,ez=this.cameraTarget.z+Math.cos(yaw)*Math.cos(pitch)*dist;
+ this.vp=mul(perspective(portrait?Math.PI/3.7:Math.PI/4.15,w/h,.1,150),lookAt([ex,ey,ez],[this.cameraTarget.x,.65,this.cameraTarget.z]));
+ gl.useProgram(this.pFlat);gl.uniformMatrix4fv(this.flatVP,false,this.vp);gl.bindVertexArray(this.flatVAO);gl.drawArrays(gl.TRIANGLES,0,this.environment.count);
+ }
+ // Cull only when an actor is outside the actual camera view.
+ // A near/far 28m radius would incorrectly make NPCs pop out in the distance.
+ isActorVisible(pos){
+  const m=this.vp,x=pos.x,y=.9,z=pos.z;
+  const w=m[3]*x+m[7]*y+m[11]*z+m[15];
+  if(w<=.01)return false;
+  const sx=m[0]*x+m[4]*y+m[8]*z+m[12];
+  const sy=m[1]*x+m[5]*y+m[9]*z+m[13];
+  const sz=m[2]*x+m[6]*y+m[10]*z+m[14];
+  // Generous padding covers the whole chibi, not just its pelvis.
+  return Math.abs(sx)<w*1.20+.5 && Math.abs(sy)<w*1.22+.6 && sz>=-w-.6 && sz<=w+.6;
+ }
+ drawActor(asset,actor){const gl=this.gl,a=this.assets.get(asset);if(!a)return;
+ gl.useProgram(this.p);gl.uniformMatrix4fv(this.uniforms.vp,false,this.vp);gl.uniform1f(this.uniforms.red,actor.isEnemy?1:0);let model;
+ const actualCombatMotion=(
+    (actor.combatDead&&actor.combatDeathClip)||
+    (actor.combatDown>0||actor.combatRise>0)
+   )&&(['falling_down','Arise'].includes(actor.anim.clip));
+ if(actualCombatMotion){
+  // Animated bones already perform the fall/roll/get-up; pivoting the root
+  // again would double-rotate the soldier into the floor.
+  const falling=actor.combatDown>0&&actor.combatFall>0;
+  const phase=falling?Math.max(0,Math.min(1,1-actor.combatFall/.42)):1;
+  const air=falling?.25*Math.sin(Math.PI*phase):0;
+  model=mul(translation(actor.pos.x,fullCombatFloorLift(a,actor.anim)+air,actor.pos.z),rotateY(actor.angle));
+ }else if(actor.combatDead||actor.combatDown>0||actor.combatRise>0){
+  // Fallback only if a smaller model lacks the lab's actual clips.
+  // Use the same grounded, chest-up rest pose for KO and temporary knockdowns.
+  // Transition smoothly upright while always keeping the skinned minimum off the ground.
+  const inFall=!actor.combatDead&&actor.combatDown>0&&actor.combatFall>0;
+  const inRise=!actor.combatDead&&actor.combatRise>0;
+  let angle=-Math.PI/2;
+  if(inFall){const t=1-Math.min(1,actor.combatFall/.42);angle*=t*t*(3-2*t)}
+  else if(inRise){const t=Math.min(1,actor.combatRise/1.70);angle*=t*t*(3-2*t)}
+  const pivot=inFall||inRise?mul(translation(0,.75,0),mul(rotateX(angle),translation(0,-.75,0))):CORPSE_PIVOT;
+  const lift=corpseLift(a,actor,pivot,!(inFall||inRise));
+  const air=inFall?.20*Math.sin(Math.PI*(1-Math.min(1,actor.combatFall/.42))):0;
+  model=mul(translation(actor.pos.x,lift+air,actor.pos.z),mul(rotateY(actor.angle),pivot));
+ }else if((actor.combatHurt||0)>0){
+  // Lightweight visual recoil even if the camp's trimmed NPC GLB does not
+  // include Hit_Reaction. The same skinned floor sample keeps boots above ground.
+  const recoil=Math.min(1,actor.combatHurt/(actor.combatHurtFull||.25));
+  const pivot=mul(translation(0,.75,0),mul(rotateX(-.22*recoil),translation(0,-.75,0)));
+  const lift=corpseLift(a,actor,pivot,false);
+  model=mul(translation(actor.pos.x,lift+(actor.renderLift||0),actor.pos.z),mul(rotateY(actor.angle),pivot));
+ }else model=mul(translation(actor.pos.x,groundLift(a,actor)+(actor.renderLift||0),actor.pos.z),rotateY(actor.angle));
+ gl.uniformMatrix4fv(this.uniforms.model,false,model);
+ gl.uniformMatrix4fv(this.uniforms.bones,false,actor.anim.bones);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,a.tex);gl.uniform1i(this.uniforms.tex,0);gl.bindVertexArray(a.vao);gl.drawElements(gl.TRIANGLES,a.count,a.indexType,0);
+ }
+}

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#b7c9b2">
+<title>軍營保衛戰｜獨立測試</title>
+<link rel="preload" as="fetch" href="./assets/characters/cadet/cadet-green.glb?v=120" crossorigin="anonymous">
+<link rel="stylesheet" href="./src/ui/playtest.css?v=077">
+<link rel="stylesheet" href="./src/ui/campCombat.css?v=8">
+<link rel="stylesheet" href="./src/battle-test/battle.css?v=1">
+</head>
+<body class="battle-test">
+<canvas id="world" aria-label="軍營保衛戰 3D 場景"></canvas>
+<button id="minimap" type="button" aria-label="開啟軍營地圖"><canvas id="miniCanvas" width="224" height="224"></canvas></button>
+<section id="worldMap" class="world-map" role="dialog" aria-label="軍營地圖" aria-modal="true" hidden>
+ <div class="world-map-panel">
+  <header class="world-map-header"><div><strong>軍營保衛戰</strong><small>彈藥庫防線 · 藍色箭頭代表玩家</small></div>
+   <button id="closeWorldMap" type="button" aria-label="關閉地圖">✕</button>
+  </header>
+  <div class="world-map-body"><div class="map-canvas-holder"><canvas id="worldMapCanvas" aria-label="軍營平面地圖"></canvas></div></div>
+ </div>
+</section>
+<div id="floatingStick" aria-hidden="true"><div class="stick-base"><div id="stickThumb" class="stick-thumb"></div></div></div>
+<div id="notice" role="status" hidden></div>
+<div id="debug" hidden></div>
+<div id="fatal" role="alert" hidden><strong>測試版載入失敗</strong><p id="errorText"></p><button id="retry" type="button">重新載入</button></div>
+<div id="battleHUD" hidden>
+ <span id="battleWave">第 1 波</span>
+ <span id="battleRemaining">敵軍 0</span>
+ <span id="battleAllies">友軍 5 / 5</span>
+</div>
+<div id="battleIntro" role="dialog" aria-label="軍營保衛戰">
+ <div class="battle-intro-card">
+  <div class="battle-intro-kicker">獨立測試版</div>
+  <h1>軍營保衛戰</h1>
+  <p>彈藥庫旁與 5 名友軍集合。北側圍欄已被突破，敵軍會一波接一波湧入。</p>
+  <div class="battle-intro-sub">拳頭、手槍、步槍均可測試。使用右下角武器輪盤切換。</div>
+  <button id="battleStart" type="button">開始防守</button>
+  <div id="battleLoading" hidden><span id="battleLoadText">準備軍營場景…</span><div class="battle-progress"><i id="battleLoadBar"></i></div></div>
+  <a href="./index.html" class="battle-back">返回正式軍營</a>
+ </div>
+</div>
+<div id="battleWaveBanner" hidden aria-live="polite"></div>
+
+<button id="battleExit" type="button" aria-label="退出測試版">← 退出</button>
+<script type="module" src="./src/battle-test/bootstrap.js?v=1"></script>
+</body>
+</html>
