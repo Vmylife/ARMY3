@@ -18,7 +18,7 @@ export class FightEngine{
   this.time=0;this.freeze=0;this.aggressive=false;this.difficulty='normal';
   this.aiEnabled=true;this.winner=null;this.hits=0;this.enemyHits=0;this.events=[];
  }
- emit(type,payload={}){this.events.push({type,...payload})}
+ emit(type,payload={}){this.events.push({kind:type,...payload})}
  drain(){return this.events.splice(0)}
  face(a,b){a.angle=Math.atan2(b.x-a.x,b.z-a.z)}
  enableAI(on){this.aiEnabled=!!on;if(!on){this.enemy.attack=null;this.enemy.state='idle'}}
