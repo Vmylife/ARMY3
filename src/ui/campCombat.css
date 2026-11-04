@@ -97,3 +97,13 @@
 .campWheelSlot .campRifleGlyph{width:53px;height:35px}
 #campAttackIcon:has(.campRifleGlyph){display:flex;align-items:center;justify-content:center}
 #campAttackIcon .campRifleGlyph{width:56px;height:35px}
+
+/* Combat Lab hit-chain feedback, ported to the real camp. */
+#campCombatCombo{position:fixed;top:calc(58px + env(safe-area-inset-top));left:50%;z-index:12;
+ transform:translateX(-50%);padding:7px 13px;border-radius:9px;
+ border:1px solid #f3d99a;color:#f9e7b4;background:#123a2ce8;
+ box-shadow:0 3px 12px #08201566;font-size:14px;letter-spacing:.05em;
+ font-weight:950;white-space:nowrap;text-shadow:0 1px 2px #092f2388;pointer-events:none;
+ -webkit-user-select:none!important;user-select:none!important}
+#campCombatCombo[hidden]{display:none!important}
+@media(max-width:520px){#campCombatCombo{top:calc(78px + env(safe-area-inset-top));font-size:12px}}

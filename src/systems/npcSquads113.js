@@ -4,7 +4,7 @@
 import {createCampNPCs as createRecruits,updateCampNPCs as updateIndividuals,
  releaseForSquad,claimSquadStation,releaseSquadStation,availableSquadSlots,
  claimSquadSlot,releaseSquadSlot,moveSquadMember,poseSquadMember,
- faceSquadMember,squadWorldGoal,settleSquadTrainingSpot} from './npcLife113.js?v=127';
+ faceSquadMember,squadWorldGoal,settleSquadTrainingSpot} from './npcLife113.js?v=128';
 import {canOccupy,moveNpc,moveWithCollision} from '../map/navCollision109.js?v=124';
 import {PROPS} from '../map/camp.js?v=093';
 import {ARMY_SWEEP} from '../characters/proceduralActions117.js?v=117';
@@ -614,9 +614,9 @@ function trainSquad(s,dt,now,all,playerPos){
   releaseStage(s);setStage(s);
  }
 }
-export function createCampNPCs(glb){
+export function createCampNPCs(glb,heroAnim=null){
  CAMP_T=0;STATION_COOLDOWN.grenade=0;
- const npcs=createRecruits(glb);
+ const npcs=createRecruits(glb,heroAnim);
  if(npcs.length!==35)throw new Error('小隊配置需要 35 名 NPC');
  GROUPS.length=0;
  const training=npcs.filter(n=>!FREE_IDS.has(n.id));

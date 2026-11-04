@@ -1,6 +1,6 @@
 // ARMY3 integrated camp combat V1 — civilian routines remain intact until provoked.
 // Shared A* navigation and static clearance; bullets respect buildings, props and perimeter.
-import {moveSquadMember,releaseForSquad} from './npcLife113.js?v=127';
+import {moveSquadMember,releaseForSquad} from './npcLife113.js?v=128';
 import {staticClearance,canOccupy,NPC_RADIUS,moveNpc} from '../map/navCollision109.js?v=124';
 import {PistolRenderer} from '../fight-lab/pistolRenderer.js?v=1';
 import {RifleRenderer} from '../fight-lab/rifleRenderer.js?v=2';
@@ -16,7 +16,7 @@ const WEAPON_NAME={fists:'拳頭',pistol:'手槍',rifle:'步槍'};
 export const COMBAT_KNOCKDOWN_DAMAGE=50;
 export const NPC_MAX_HP=100;
 export const COMBAT_DOWN_SECONDS=2.3;
-export const COMBAT_RISE_SECONDS=.85;
+export const COMBAT_RISE_SECONDS=1.70; // Match the fight lab's full standing-up motion.
 // Larger local aggro zones, but ten kills still uniquely triggers GLOBAL pursuit.
 const SENSE_RADIUS=k=>k>=10?Infinity:k===0?7:k<5?8.5+k*1.5:17+(k-5)*2;
 
@@ -112,6 +112,9 @@ export class CampCombat{
   this.bullets=[];this.seq=1;this.playerShotAt=-100;this.npcFireAt=-100;
   this.canvas=renderer.canvas;this.lastState='';this.lastRangeShotMs=-1000;
   this.hitStop=0;this.shake=0;this.cameraRecoil=0;this.playerHurt=0;
+  this.playerDamageSinceFall=0;this.playerDown=0;this.playerRise=0;
+  this.player.combatDown=0;this.player.combatRise=0;this.player.combatDead=false;this.player.combatDeathClip=false;
+  this.hitChain=0;this.hitChainAt=-100;
   this.mountUI();
   // Start the MP3 preload during camp boot instead of waiting for the first volley.
   // Listen in capture phase so the home/start button and virtual joystick count too.
@@ -140,8 +143,8 @@ export class CampCombat{
   for(const n of npcs){
    n.combatActive=false;n.combatDead=false;n.combatHP=NPC_MAX_HP;
    n.combatDamageSinceFall=0;n.combatDown=0;n.combatRise=0;n.combatFall=0;
-   n.combatPush=null;n.combatRestLift=undefined;
-   n.combatCooldown=0;n.combatAttack=0;n.combatStall=0;n.combatGoal=null;
+   n.combatPush=null;n.combatRestLift=undefined;n.combatDeathClip=false;n.combatDeathAt=-100;
+   n.combatCooldown=0;n.combatAttack=0;n.combatStrikeApplied=true;n.combatStall=0;n.combatGoal=null;
    n.combatWeapon='fists';n.combatLastMove=-100;n.combatNextMove=0;
   }
   this.refreshHUD(true);
@@ -154,6 +157,7 @@ export class CampCombat{
     <button id="campAttack" type="button" aria-label="攻擊"><span id="campAttackIcon">✊</span><small id="campAttackText">攻擊</small></button>
    </div>
    <div id="campCombatTip" hidden></div>
+   <div id="campCombatCombo" hidden></div>
    <div id="campCombatWheel" role="dialog" aria-label="武器輪盤" hidden>
     <div id="campWheelDisc">
      <button data-choice="up" class="campWheelSlot up" type="button"><span>✊</span><small>拳頭</small></button>
@@ -194,7 +198,8 @@ export class CampCombat{
    this.refreshHUD(true);
   };
   const open=()=>{
-   if(this.gameOver||this.wheelOpen||window.armyMinigameActive)return false;
+   if(this.gameOver||this.wheelOpen||this.playerDown>0||this.playerRise>0||
+      this.playerHurt>0||this.playerAttack>0||window.armyMinigameActive)return false;
    this.wheelOpen=true;this.attackPointer=null;this.attackKeyboard=false;
    this.wheelSelection=this.weapon==='rifle'?'bottom':this.weapon==='pistol'?'right':'up';
    wheel.hidden=false;document.body.classList.add('campWheelOpen');
@@ -353,20 +358,57 @@ export class CampCombat{
    this.spawnFx({...pos,y:1.43},'campFloatDamage','-'+Math.round(damage),800);
   }else this.spawnFx({...pos,y:1.9},'campFloatDamage hostile','-'+Math.round(damage),800);
   this.flashScreen(playerTarget,heavy);
+  if(!playerTarget){
+   this.hitChain=this.time-this.hitChainAt<2.5?this.hitChain+1:1;
+   this.hitChainAt=this.time;
+   const display=$('campCombatCombo');
+   if(display){
+    display.hidden=this.hitChain<2;
+    if(this.hitChain>=2){
+     display.textContent=this.hitChain+' HIT COMBO';
+     clearTimeout(this.comboTimer);
+     this.comboTimer=setTimeout(()=>{display.hidden=true},950);
+    }
+   }
+  }
+ }
+ // Start a real sampled combat clip. All 35 NPCs share the same immutable
+ // skeleton clip data, so this doesn't allocate 35 sets of animation tracks.
+ playCombatClip(actor,name,seconds,{restart=true}={}){
+  const anim=actor.anim;
+  if(!anim?.hasClip?.(name))return false;
+  if(anim.clip!==name||restart)anim.setClip(name,{restart});
+  anim.transition=0;anim.prevClip=null;
+  const duration=anim.clips[name]?.duration||seconds;
+  anim.speed=duration/Math.max(.1,seconds);
+  return true;
  }
  get isActive(){return this.provoked}
  get playerAlive(){return !this.gameOver}
  playerPose(normalClip,normalSpeed){
-  if(this.gameOver)return {clip:'Idle',speed:1};
-  if(this.playerHurt>0&&this.player.anim.hasClip('Hit_Reaction'))return {clip:'Hit_Reaction',speed:1.55};
+  if(this.gameOver){
+   if(this.player.combatDeathClip)return {clip:'falling_down',speed:this.player.anim.speed||1};
+   return {clip:'Idle',speed:1};
+  }
+  if(this.playerDown>0){
+   if(this.player.anim.hasClip('falling_down'))return {clip:'falling_down',speed:this.player.anim.clips.falling_down.duration/COMBAT_DOWN_SECONDS};
+   return {clip:'Idle',speed:1};
+  }
+  if(this.playerRise>0){
+   if(this.player.anim.hasClip('Arise'))return {clip:'Arise',speed:this.player.anim.clips.Arise.duration/COMBAT_RISE_SECONDS};
+   return {clip:'Idle',speed:1};
+  }
+  if(this.playerHurt>0&&this.player.anim.hasClip('Hit_Reaction'))
+   return {clip:'Hit_Reaction',speed:this.player.anim.clips.Hit_Reaction.duration/.64};
   if(this.playerAttack>0&&this.weapon==='fists'&&this.player.anim.hasClip('Punch_Combo_1'))
-   return {clip:'Punch_Combo_1',speed:1.5};
+   return {clip:'Punch_Combo_1',speed:(this.player.anim.clips.Punch_Combo_1.duration||1.3)/(.72*1.45)};
   return {clip:normalClip,speed:normalSpeed};
  }
  tryAttack(){
-  if(this.gameOver||this.wheelOpen||window.armyMinigameActive||this.playerCooldown>0)return false;
+  if(this.gameOver||this.wheelOpen||this.playerDown>0||this.playerRise>0||
+     this.playerHurt>0||window.armyMinigameActive||this.playerCooldown>0)return false;
   if(this.weapon==='fists'){
-   this.provoked=true;this.playerAttack=.55;this.playerAttackApplied=false;this.playerCooldown=.72;
+   this.provoked=true;this.playerAttack=.72;this.playerAttackApplied=false;this.playerCooldown=.79;
    whooshSound();
    this.refreshHUD(true);return true;
   }
@@ -415,12 +457,21 @@ export class CampCombat{
   // Damage while grounded/getting up never fills the next knockdown meter.
   if(!grounded)n.combatDamageSinceFall+=damage;
   if(n.combatHP<=0){
+   const recovering=n.combatRise>0;
    n.combatDead=true;n.combatActive=false;n.combatWeapon='fists';
    n.combatDown=0;n.combatRise=0;n.combatFall=0;n.combatPush=null;
    n.combatHurtFull=0;
    n.combatDamageSinceFall=0;n.combatGoal=null;n.combatHurt=0;n.combatRestLift=undefined;
-   n.anim.rifleAim=0;n.anim.setClip('Idle',{restart:true});
-   n.anim.transition=0;n.anim.prevClip=null;n.anim.evaluate(0);
+   n.anim.rifleAim=0;
+   // Finish the falling animation even after a fatal blow. If already lying
+   // down, keep its current clip time so finishing shots don't restart it.
+   n.combatDeathAt=this.time;
+   n.combatDeathClip=this.playCombatClip(n,'falling_down',COMBAT_DOWN_SECONDS,
+    {restart:!grounded||recovering||n.anim.clip!=='falling_down'});
+   if(!n.combatDeathClip){
+    n.anim.setClip('Idle',{restart:true});n.anim.transition=0;n.anim.prevClip=null;
+   }
+   n.anim.evaluate(0);
    n.renderLift=0;n.shotPending=false;n.home.job='life';n.activity='倒地';
    this.kills++;
    this.notice(this.kills===10?'全營警報！所有存活阿兵哥開始追擊！':
@@ -431,6 +482,7 @@ export class CampCombat{
   }
   if(!grounded&&n.combatDamageSinceFall>=COMBAT_KNOCKDOWN_DAMAGE){
    n.combatDamageSinceFall=0;n.combatDown=COMBAT_DOWN_SECONDS;
+   n.combatDeathClip=false;
    n.combatHurt=0;n.combatHurtFull=0;
    n.combatRise=0;n.combatFall=.42;n.combatRestLift=undefined;
    const dx=n.pos.x-this.player.pos.x,dz=n.pos.z-this.player.pos.z;
@@ -438,14 +490,19 @@ export class CampCombat{
    n.combatPush={x:dx/len,z:dz/len};
    n.combatAttack=0;n.combatCooldown=.75;
    n.route=null;n.routeGoal=null;n.routeIndex=0;n.replanAt=0;
-   n.anim.rifleAim=0;n.anim.setClip('Idle',{restart:true});
-   n.anim.transition=0;n.anim.prevClip=null;n.anim.evaluate(0);
+   n.anim.rifleAim=0;
+   if(!this.playCombatClip(n,'falling_down',COMBAT_DOWN_SECONDS)){
+    n.anim.setClip('Idle',{restart:true});n.anim.transition=0;n.anim.prevClip=null;
+   }
+   n.anim.evaluate(0);
    n.state='combatDown';n.activity='被擊飛';
    return;
   }
   if(!grounded){
-   n.combatHurt=.25;
-   n.combatHurtFull=.25;
+   n.combatHurt=kind==='bullet'?.48:.62;
+   n.combatHurtFull=n.combatHurt;
+   n.combatAttack=0;n.combatStrikeApplied=true;
+   n.anim.rifleAim=0;
    if(n.anim.hasClip('Hit_Reaction')){
     n.anim.setClip('Hit_Reaction',{restart:true});
     n.anim.transition=0;n.anim.prevClip=null;
@@ -463,13 +520,38 @@ export class CampCombat{
  }
  damagePlayer(amount,kind='bullet'){
   if(this.gameOver)return;
+  const grounded=this.playerDown>0||this.playerRise>0;
   this.hp=Math.max(0,this.hp-amount);
-  this.playerHurt=Math.max(this.playerHurt||0,.24);
-  this.onCombatHit(this.player.pos,amount,{kind,playerTarget:true,dead:this.hp<=0});
-  if(this.hp<=0){
+  const dead=this.hp<=0;
+  if(!grounded)this.playerDamageSinceFall+=amount;
+  const down=!dead&&!grounded&&this.playerDamageSinceFall>=COMBAT_KNOCKDOWN_DAMAGE;
+  this.onCombatHit(this.player.pos,amount,{kind,down,playerTarget:true,dead,grounded});
+  if(dead){
    this.gameOver=true;this.attackPointer=null;this.attackKeyboard=false;
-   $('campCombatFinish').hidden=false;
+   if(this.wheelOpen)this.closeWheel(false);
+   this.player.combatDead=true;this.player.combatDown=0;this.player.combatRise=0;
+   this.playerDown=0;this.playerRise=0;this.playerDamageSinceFall=0;this.playerHurt=0;
+   this.player.anim.rifleAim=0;
+   this.player.combatDeathAt=this.time;
+   this.player.combatDeathClip=this.playCombatClip(this.player,'falling_down',COMBAT_DOWN_SECONDS,
+    {restart:!grounded||this.player.anim.clip!=='falling_down'});
+   // Keep the final fall visible instead of instantly covering it with a menu.
+   clearTimeout(this.endTimer);
+   this.endTimer=setTimeout(()=>{$('campCombatFinish').hidden=false},2100);
    this.notice('你被全營阿兵哥制伏了');
+  }else if(down){
+   this.playerDown=COMBAT_DOWN_SECONDS;this.player.combatDown=this.playerDown;
+   if(this.wheelOpen)this.closeWheel(false);
+   this.player.combatDeathClip=false;
+   this.playerRise=0;this.player.combatRise=0;this.playerDamageSinceFall=0;
+   this.playerHurt=0;this.playerAttack=0;this.attackPointer=null;this.attackKeyboard=false;
+   this.player.anim.rifleAim=0;
+   this.playCombatClip(this.player,'falling_down',COMBAT_DOWN_SECONDS);
+  }else if(!grounded){
+   this.playerHurt=Math.max(this.playerHurt||0,kind==='bullet'?.48:.62);
+   this.player.anim.rifleAim=0;
+   if(this.player.anim.hasClip('Hit_Reaction'))
+    this.playCombatClip(this.player,'Hit_Reaction',.64);
   }
   this.refreshHUD(true);
  }
@@ -481,12 +563,14 @@ export class CampCombat{
   return visible;
  }
  shootingNPCs(){
+  if(this.playerDown>0||this.playerRise>0||this.gameOver)return [];
   // Limit simultaneously firing NPCs; cache line-of-sight for large crowds.
   return this.npcs.filter(n=>n.combatActive&&!n.combatDead&&n.combatDown<=0&&n.combatRise<=0&&n.combatWeapon!=='fists'&&
    distance(n.pos,this.player.pos)<20&&this.canSeeNPC(n))
    .sort((a,b)=>distance(a.pos,this.player.pos)-distance(b.pos,this.player.pos)).slice(0,4);
  }
  fireNPC(n){
+  if(this.playerDown>0||this.playerRise>0||this.gameOver)return;
   const origin=n.pos,p=this.player.pos;
   if(!lineClear(origin,p,.13))return;
   const dx=p.x-origin.x,dz=p.z-origin.z,d=Math.hypot(dx,dz);
@@ -532,11 +616,41 @@ export class CampCombat{
   // Real hit-stop freezes AI, cooldowns and projectiles, not just animation.
   if(dt<=0)return;
   this.time+=dt;
+  if(this.player.combatDeathClip&&this.time-(this.player.combatDeathAt||0)>=COMBAT_DOWN_SECONDS){
+   this.player.combatDeathClip=false;
+   this.player.anim.setClip('Idle',{restart:true});
+   this.player.anim.transition=0;this.player.anim.prevClip=null;
+   this.player.combatRestLift=undefined;
+  }
+  for(const n of this.npcs){
+   if(!n.combatDead||!n.combatDeathClip)continue;
+   if(this.time-n.combatDeathAt>=COMBAT_DOWN_SECONDS){
+    n.combatDeathClip=false;
+    n.anim.setClip('Idle',{restart:true});
+    n.anim.transition=0;n.anim.prevClip=null;
+    n.combatRestLift=undefined;
+   }
+  }
   this.playerHurt=Math.max(0,(this.playerHurt||0)-dt);
+  // Players use the exact same falling/getting-up clips as camp NPCs.
+  if(this.playerDown>0){
+   this.playerDown=Math.max(0,this.playerDown-dt);
+   this.player.combatDown=this.playerDown;
+   if(this.playerDown===0&&this.hp>0){
+    this.playerRise=COMBAT_RISE_SECONDS;this.player.combatRise=this.playerRise;
+    this.playCombatClip(this.player,'Arise',COMBAT_RISE_SECONDS);
+   }
+  }else if(this.playerRise>0){
+   this.playerRise=Math.max(0,this.playerRise-dt);
+   this.player.combatRise=this.playerRise;
+   if(this.playerRise===0){
+    this.playerDamageSinceFall=0;this.player.combatRestLift=undefined;
+   }
+  }
   this.playerCooldown=Math.max(0,this.playerCooldown-dt);
   if(this.playerAttack>0){
    this.playerAttack=Math.max(0,this.playerAttack-dt);
-   if(!this.playerAttackApplied&&this.playerAttack<=.30){
+   if(!this.playerAttackApplied&&this.playerAttack<=.43){
     this.playerAttackApplied=true;this.melee();
    }
   }
@@ -552,16 +666,29 @@ export class CampCombat{
   for(const n of this.npcs){
    if(!n.combatActive||n.combatDead)continue;
    n.clock+=dt;n.combatCooldown=Math.max(0,n.combatCooldown-dt);
+   if(n.combatAttack>0){
+    n.combatAttack=Math.max(0,n.combatAttack-dt);
+    if(!n.combatStrikeApplied&&n.combatAttack<=.41){
+     n.combatStrikeApplied=true;
+     // Mid-swing hit frame: moving out of range makes the punch miss.
+     if(!this.playerDown&&!this.playerRise&&!this.gameOver&&
+         distance(n.pos,this.player.pos)<1.93&&this.canSeeNPC(n))
+      this.damagePlayer(8,'punch');
+    }
+   }
    if(n.combatDown>0){
     n.combatDown=Math.max(0,n.combatDown-dt);
     if(n.combatFall>0&&n.combatPush){
      const k=Math.min(dt,n.combatFall);
-     const pushed=moveNpc(n,n.combatPush.x*3.0*k,n.combatPush.z*3.0*k,this.npcs,this.player.pos);
+     const pushed=moveNpc(n,n.combatPush.x*7.0*k,n.combatPush.z*7.0*k,this.npcs,this.player.pos);
      n.pos=pushed;
      n.combatFall=Math.max(0,n.combatFall-dt);
     }
     n.anim.rifleAim=0;n.state='combatDown';n.activity='倒地中';
-    if(n.combatDown===0){n.combatRise=COMBAT_RISE_SECONDS;n.combatRestLift=undefined}
+    if(n.combatDown===0){
+     n.combatRise=COMBAT_RISE_SECONDS;n.combatRestLift=undefined;
+     this.playCombatClip(n,'Arise',COMBAT_RISE_SECONDS);
+    }
     continue;
    }
    if(n.combatRise>0){
@@ -578,8 +705,8 @@ export class CampCombat{
     n.combatHurt=Math.max(0,n.combatHurt-dt);
     n.state='combatHit';n.activity='受擊';
     if(n.anim.hasClip('Hit_Reaction')){
-     if(n.anim.clip!=='Hit_Reaction')n.anim.setClip('Hit_Reaction',{restart:true});
-     n.anim.speed=1.5;
+     if(n.anim.clip!=='Hit_Reaction')this.playCombatClip(n,'Hit_Reaction',.64);
+     n.anim.speed=n.anim.clips.Hit_Reaction.duration/.64;
     }else if(n.anim.clip!=='Idle')n.anim.setClip('Idle');
     if(n.combatHurt>0)continue;
    }
@@ -590,12 +717,11 @@ export class CampCombat{
    const ranged=stage!=='fists'&&d<20&&sees;
    if(stage==='fists'&&d<=1.64&&sees){
     n.anim.rifleAim=0;
-    if(n.combatCooldown<=0){
+    if(n.combatCooldown<=0&&n.combatAttack<=0){
      n.combatCooldown=1.42+n.id%3*.15;
      whooshSound(.25);
-     this.damagePlayer(8,'punch');
-     n.combatAttack=.5;
-     if(n.anim.hasClip('Punch_Combo_1')){n.anim.setClip('Punch_Combo_1',{restart:true});n.anim.speed=1.4}
+     n.combatAttack=.72;n.combatStrikeApplied=false;
+     if(n.anim.hasClip('Punch_Combo_1'))this.playCombatClip(n,'Punch_Combo_1',.70);
     }
    }else if(ranged&&shooterSet.has(n)){
     if(n.combatCooldown<=0&&n.anim.rifleAim>.55){
@@ -605,7 +731,7 @@ export class CampCombat{
    }
    // No firing at walls. Instead use the SAME A* route used by daily squad drills.
    // Periodically refresh the player's destination without rebuilding 35 paths per frame.
-   const shouldChase=stage==='fists'||!ranged||!shooterSet.has(n);
+   const shouldChase=n.combatAttack<=0&&(stage==='fists'||!ranged||!shooterSet.has(n));
    if(shouldChase&&d>(stage==='fists'?1.55:stage==='rifle'?5.0:4.0)&&this.time>=n.combatNextMove){
     if(!n.combatGoal||distance(n.combatGoal,this.player.pos)>3.5||
        this.time-n.combatLastMove>2.3){
@@ -622,11 +748,11 @@ export class CampCombat{
      n.combatStall=0;
     }
    }else if(n.combatAttack>0&&n.anim.hasClip('Punch_Combo_1')){
-    n.anim.setClip('Punch_Combo_1');n.anim.speed=1.4;
+    if(n.anim.clip!=='Punch_Combo_1')this.playCombatClip(n,'Punch_Combo_1',.70);
+    n.anim.speed=(n.anim.clips.Punch_Combo_1.duration||1.4)/.70;
    }else{
     n.anim.setClip('Idle');n.anim.speed=1;
    }
-   if(n.combatAttack>0)n.combatAttack=Math.max(0,n.combatAttack-dt);
    const dx=this.player.pos.x-n.pos.x,dz=this.player.pos.z-n.pos.z;
    if(Math.hypot(dx,dz)>.08){
     const aim=Math.atan2(dx,dz),delta=Math.atan2(Math.sin(aim-n.angle),Math.cos(aim-n.angle));
@@ -644,7 +770,8 @@ export class CampCombat{
  }
  drawWeapons(now){
   for(const {actor,weapon,npc} of [
-    {actor:this.player,weapon:this.weapon,npc:false},
+    ...(!this.playerDown&&!this.playerRise&&!this.gameOver&&!this.playerHurt
+      ?[{actor:this.player,weapon:this.weapon,npc:false}]:[]),
     ...this.npcs.filter(n=>n.combatActive&&!n.combatDead&&n.combatDown<=0&&n.combatRise<=0&&(n.combatHurt||0)<=0).map(n=>({actor:n,weapon:n.combatWeapon,npc:true}))
   ]){
    if(weapon==='fists'||(npc&&!this.renderer.isActorVisible(actor.pos)))continue;

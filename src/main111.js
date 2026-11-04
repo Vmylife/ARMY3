@@ -2,8 +2,9 @@
 import {CampBuildings,BUILDING_MODELS} from './buildings/buildingRenderer.js?v=112';
 import {CampProps,PROP_MODELS} from './props/propRenderer.js?v=120';
 import {loadGlb} from './core/glb111.js?v=111';
-import {ArmyRenderer} from './core/renderer.js?v=118';
+import {ArmyRenderer} from './core/renderer.js?v=119';
 import {RigAnimator} from './characters/rigAnimator.js?v=121';
+import {installUserCombatClips} from './fight-lab/uploadedHitAnimations.js?v=1';
 import {TwoHandBroomRenderer} from './characters/twoHandBroomRenderer119.js?v=119';
 import {CAMP} from './map/camp.js?v=093';
 import {movePlayer} from './map/navCollision109.js?v=124';
@@ -14,8 +15,8 @@ import {drawMinimap} from './ui/minimap.js?v=093';
 import {initWorldMap} from './ui/worldMap.js?v=093';
 import {setupInput} from './ui/input.js?v=062';
 import {options} from './systems/settings.js?v=060';
-import {createCampNPCs,updateCampNPCs,squadDebug} from './systems/npcSquads113.js?v=127';
-import {createCampCombat} from './systems/campCombat.js?v=5';
+import {createCampNPCs,updateCampNPCs,squadDebug} from './systems/npcSquads113.js?v=128';
+import {createCampCombat} from './systems/campCombat.js?v=6';
 
 const $=id=>document.getElementById(id);
 const debug=new URLSearchParams(location.search).has('debug');
@@ -110,8 +111,9 @@ async function boot(){
     player.angle=Number.isFinite(returnSnapshot.player.angle)?returnSnapshot.player.angle:0;
   }
   delete player.anim.clips.Jump_Over_Obstacle_2;
+  const heroCombatClips=installUserCombatClips(player.anim);
   player.anim.setClip('Idle');player.anim.evaluate(0);
-  const npcs=createCampNPCs(npcGlb);
+  const npcs=createCampNPCs(npcGlb,player.anim);
   if(returnSnapshot?.npcs){
     // Cold-resume fallback: preserve the visible crowd positions as well as the player.
     const savedNPCs=new Map(returnSnapshot.npcs.map(n=>[n.id,n]));
@@ -125,6 +127,15 @@ async function boot(){
   }
   const combat=createCampCombat({player,npcs,renderer,rifleGlb:combatRifleGlb,npcGlb});
   window.armyCampCombat=combat;
+  combat.animationStatus={
+   heroSupplement:heroCombatClips,
+   npcSupplement:!!npcs[0]?.anim?.combatAnimationPack,
+   npcPunch:!!npcs[0]?.anim?.hasClip('Punch_Combo_1'),
+   heroClips:Object.keys(player.anim.clips).filter(x=>['Punch_Combo_1','Hit_Reaction','falling_down','Arise','Block2'].includes(x)),
+   npcClips:Object.keys(npcs[0]?.anim?.clips||{}).filter(x=>['Punch_Combo_1','Hit_Reaction','falling_down','Arise','Block2'].includes(x))
+  };
+  if(!heroCombatClips||!combat.animationStatus.npcSupplement)
+   console.warn('[ARMY3] 戰鬥動畫骨架不相容，啟用原有替代姿勢',combat.animationStatus);
   const blanketPortal=createBlanketPortal(renderer,{
     resuming:!!returnSnapshot,
     onTrainingStart:(trainingId)=>saveCampSession({
@@ -204,7 +215,9 @@ async function boot(){
     if(debug){fpsFrames++;if(now-fpsSince>=1000){measuredFps=Math.round(fpsFrames*1000/(now-fpsSince));fpsFrames=0;fpsSince=now;}}
     const mapOpen=worldMap.isOpen();
     combat.root.style.visibility=mapOpen?'hidden':'visible';
-    const stick=(mapOpen||!combat.playerAlive)?{x:0,y:0,magnitude:0}:input(),m=movement(stick.magnitude);
+    const stick=(mapOpen||!combat.playerAlive||combat.playerDown>0||combat.playerRise>0||
+     combat.playerHurt>0||(combat.weapon==='fists'&&combat.playerAttack>0))
+     ?{x:0,y:0,magnitude:0}:input(),m=movement(stick.magnitude);
     const simDt=combat.scaledDt(dt);
     cameraZoom+=(targetZoom-cameraZoom)*Math.min(1,dt*12);
     if(m.speed>0){
@@ -216,9 +229,15 @@ async function boot(){
     }
     if(m.speed>0)audition=null;
     const pose=combat.playerPose(audition||m.clip,m.rate);
-    if(player.anim.clip!==pose.clip)player.anim.setClip(pose.clip);
+    if(player.anim.clip!==pose.clip){
+     player.anim.setClip(pose.clip);
+     if(['Punch_Combo_1','Hit_Reaction','falling_down','Arise'].includes(pose.clip)){
+      player.anim.transition=0;player.anim.prevClip=null;
+     }
+    }
     player.anim.speed=pose.speed;
-    const targetAim=(!combat.playerAlive||combat.weapon==='fists')?0:1;
+    const targetAim=(!combat.playerAlive||combat.playerDown>0||combat.playerRise>0||
+       combat.playerHurt>0||combat.weapon==='fists')?0:1;
     player.anim.rifleAim+=(targetAim-player.anim.rifleAim)*Math.min(1,simDt*10);
     player.anim.evaluate(simDt);
     updateCampNPCs(npcs,simDt,now,player.pos);
@@ -251,7 +270,7 @@ async function boot(){
        if(onRange)npc.anim.rifleAim=Math.max(.68,npc.anim.rifleAim||0);
        // Rifle trainers and combat soldiers share the calibrated 0.65x GLB.
        // Recoil only nudges the aiming arms, without disrupting lane timing.
-       if(onRange&&npc.shotUntil>now){
+       if((onRange||npc.combatActive)&&npc.shotUntil>now){
         const kick=Math.sin(Math.PI*Math.max(0,Math.min(1,1-(npc.shotUntil-now)/110)));
         npc.anim.rifleAim=Math.max(.01,npc.anim.rifleAim*(1-.13*kick));
        }
@@ -259,6 +278,11 @@ async function boot(){
        renderer.drawActor('lifeRecruit',npc);
        if(npc.anim.clip==='Sweeping_Both_Hands')sweepBroom.draw(renderer,npc);
        if(onRange)combat.npcRifle.draw(renderer.vp,npc,now,{force:true});
+      }else if(npc.combatDown>0||npc.combatRise>0||npc.combatHurt>0||
+          npc.combatAttack>0||(npc.combatDead&&npc.combatDeathClip)){
+       // Keep a combat clip's clock advancing while off-screen. Otherwise a
+       // knocked-down NPC can abruptly replay the fall when the camera returns.
+       npc.anim.evaluate(simDt);
       }
     }
     combat.drawWeapons(now);

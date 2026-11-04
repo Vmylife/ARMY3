@@ -21,7 +21,7 @@ function program(gl,vs,fs){const p=gl.createProgram();gl.attachShader(p,shader(g
 function attrib(gl,ix,arr,size,type){const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,arr,gl.STATIC_DRAW);gl.enableVertexAttribArray(ix);gl.vertexAttribPointer(ix,size,type,false,0,0)}
 // Meshy hit / fall / stand-up clips contain negative root translations.
 // Lift only these actions so their lowest sampled point never passes the floor.
-const FLOOR_ACTIONS=new Set(['Dead','Arise','BeHit_FlyUp','Knock_Down','Sleep_Normally','push_up','situps']);
+const FLOOR_ACTIONS=new Set(['Dead','Arise','BeHit_FlyUp','Knock_Down','falling_down','Hit_Reaction','Sleep_Normally','push_up','situps']);
 function groundLift(asset,actor){
  const anim=actor.anim;
  if(!FLOOR_ACTIONS.has(anim.clip)&&!(anim.transition>0&&FLOOR_ACTIONS.has(anim.prevClip)))return 0;
@@ -38,6 +38,23 @@ function groundLift(asset,actor){
   if(yy<low)low=yy;
  }
  return Number.isFinite(low)?Math.max(0,.015-low):0;
+}
+// The lab's actual skinned fall/arise bones use their own hip translations.
+ // Keep the mesh upright in world space; do not rotate the whole NPC on top
+ // of a full-body falling animation. Use the same floor sample as the lab.
+function fullCombatFloorLift(asset,anim){
+ let low=Infinity;
+ for(const sample of asset.sample){
+  let y=0;
+  for(let k=0;k<4;k++){
+   const weight=sample.w[k];if(weight<=0)continue;
+   const base=sample.j[k]*16,bones=anim.bones;
+   y+=weight*(bones[base+1]*sample.p[0]+bones[base+5]*sample.p[1]+
+      bones[base+9]*sample.p[2]+bones[base+13]);
+  }
+  if(y<low)low=y;
+ }
+ return .095+(Number.isFinite(low)?Math.max(0,Math.min(1,.015-low)):0);
 }
 // Skinned-body minimum is evaluated once when the corpse first becomes visible.
 // Reusing the height prevents sinking and avoids per-frame vertex CPU work.
@@ -116,14 +133,26 @@ export class ArmyRenderer{
  }
  drawActor(asset,actor){const gl=this.gl,a=this.assets.get(asset);if(!a)return;
  gl.useProgram(this.p);gl.uniformMatrix4fv(this.uniforms.vp,false,this.vp);let model;
- if(actor.combatDead||actor.combatDown>0||actor.combatRise>0){
+ const actualCombatMotion=(
+    (actor.combatDead&&actor.combatDeathClip)||
+    (actor.combatDown>0||actor.combatRise>0)
+   )&&(['falling_down','Arise'].includes(actor.anim.clip));
+ if(actualCombatMotion){
+  // Animated bones already perform the fall/roll/get-up; pivoting the root
+  // again would double-rotate the soldier into the floor.
+  const falling=actor.combatDown>0&&actor.combatFall>0;
+  const phase=falling?Math.max(0,Math.min(1,1-actor.combatFall/.42)):1;
+  const air=falling?.25*Math.sin(Math.PI*phase):0;
+  model=mul(translation(actor.pos.x,fullCombatFloorLift(a,actor.anim)+air,actor.pos.z),rotateY(actor.angle));
+ }else if(actor.combatDead||actor.combatDown>0||actor.combatRise>0){
+  // Fallback only if a smaller model lacks the lab's actual clips.
   // Use the same grounded, chest-up rest pose for KO and temporary knockdowns.
   // Transition smoothly upright while always keeping the skinned minimum off the ground.
   const inFall=!actor.combatDead&&actor.combatDown>0&&actor.combatFall>0;
   const inRise=!actor.combatDead&&actor.combatRise>0;
   let angle=-Math.PI/2;
   if(inFall){const t=1-Math.min(1,actor.combatFall/.42);angle*=t*t*(3-2*t)}
-  else if(inRise){const t=Math.min(1,actor.combatRise/.85);angle*=t*t*(3-2*t)}
+  else if(inRise){const t=Math.min(1,actor.combatRise/1.70);angle*=t*t*(3-2*t)}
   const pivot=inFall||inRise?mul(translation(0,.75,0),mul(rotateX(angle),translation(0,-.75,0))):CORPSE_PIVOT;
   const lift=corpseLift(a,actor,pivot,!(inFall||inRise));
   const air=inFall?.20*Math.sin(Math.PI*(1-Math.min(1,actor.combatFall/.42))):0;

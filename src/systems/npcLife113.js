@@ -3,6 +3,7 @@
 // accept a two-way social invite. Facility positions use the approved layout103.
 // No generative API, remote services, or new meshes are required by the brains.
 import {RigAnimator} from '../characters/rigAnimator.js?v=119';
+import {installUserCombatClips} from '../fight-lab/uploadedHitAnimations.js?v=1';
 import {installArmyProceduralActions,ARMY_PULLUP,ARMY_SWEEP} from '../characters/proceduralActions117.js?v=117';
 import {installSimplePullupPreview,SIMPLE_PULLUP} from '../animation-lab/simplePullup120.js?v=121';
 import {updateRangeShooter} from '../training/rangeTraining.js?v=111';
@@ -571,11 +572,37 @@ const INITIAL_TASKS=['jog','jog','jog','basketball','patrol','sweep','patrol','c
  'walk','weed','sweep','chat','grenade','weed','patrol','basketball',
  'basketballCoach','basketball','patrol','floor','sentry','walk','wash','sentry',
  'walk','walk','walk','walk','walk'];
-export function createCampNPCs(glb){
+// Share the fight lab's packed animation pack, and copy any missing punch
+// tracks from the already-loaded hero by bone name (no extra GLB download).
+function inheritCombatClips(hero,target){
+ if(!hero?.clips||!hero?.nodes)return [];
+ const targetByName=new Map(target.nodes.map((n,i)=>[n.name,i]));
+ const added=[];
+ for(const name of ['Punch_Combo_1','Knock_Down','BeHit_FlyUp']){
+  const clip=hero.clips[name];if(!clip||target.hasClip(name))continue;
+  const tracks=new Map();let used=0;
+  for(const [key,track] of clip.tracks){
+   const pieces=key.split('/'),sourceIndex=Number(pieces[0]);
+   const part=pieces[1];
+   if(!Number.isInteger(sourceIndex)||!['rotation','translation','scale'].includes(part))continue;
+   const nodeName=hero.nodes[sourceIndex]?.name;
+   const index=targetByName.get(nodeName);
+   if(index===undefined)continue;
+   tracks.set(index+'/'+part,track);used++;
+  }
+  if(used<15)continue;
+  target.clips[name]={duration:clip.duration,tracks};
+  added.push(name);
+ }
+ return added;
+}
+export function createCampNPCs(glb,heroAnim=null){
  navInit();fixtureInit();
  // Parsing 18 GLB animation clips 14 times wastes CPU and memory on mobile.
  // Share immutable clip data while giving each recruit its own bones and clock.
  const prototype=installSimplePullupPreview(installArmyProceduralActions(new RigAnimator(glb)));
+ prototype.combatAnimationPack=installUserCombatClips(prototype);
+ prototype.inheritedCombatClips=inheritCombatClips(heroAnim,prototype);
  delete prototype.clips.Jump_Over_Obstacle_2; // Retired runtime animation; source GLB unchanged.
  const makeAnimator=()=>{
    const anim=Object.assign(Object.create(Object.getPrototypeOf(prototype)),prototype);
