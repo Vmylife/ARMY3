@@ -1,5 +1,5 @@
-/* ARMY3 singing memory v0.9 — ORIGINAL VOICE STEM ONLY.
-   Original isolated vocal MP3 is bundled with ARMY3; users never upload files. Music stem is NEVER played.
+/* ARMY3 singing memory v1.0 — seven-line coach mode and continuous original backing review.
+   Original vocals play during drills; original uninterrupted instrumental plays only during the final full-song review.
    Correct pitch is derived from the selected vocal waveform (no invented tune).
    Browser-only processing: Web Audio + short-time pitch detection + OLA pitch warp.
 */
@@ -14,6 +14,7 @@ const E={
  main:$('mainButton'),repeat:$('skipButton'),stage:$('stageTag'),words:$('words'),
  board:$('board'),controls:$('controlsPanel'),overlay:$('boardOverlay'),guide:$('guideLine'),trace:$('yourLine'),
  head:$('playhead'),dot:$('controlDot'),mouth:$('mouth'),speech:$('speech'),
+ coach:$('coachStage'),reaction:$('reactionGrade'),coachScore:$('coachMiniScore'),
  feedback:$('feedback'),rank:$('finalRank'),points:$('finalScore'),comment:$('comment'),
  replay:$('replayButton'),compare:$('compareButton'),hint:$('hint'),count:$('takeCount'),
  countdown:$('countdown'),countdownWord:$('countdownWord'),countdownLabel:$('countdownLabel'),
@@ -24,7 +25,7 @@ const E={
 let ctx=null,vocals=null,clipStart=0,activePhrase=0,audioBuffers=[],sourcePitch=[];
 let pitch=[],refBase=62,validPitch=0,mode='empty',session=0,frame=0,playerHeld=false;
 let midiValue=refBase,pointerId=null,trace=[],lastScore=null,playSource=null,playPromise=null,comparison=false;
-let ownActionCount=0,analysisToken=0,guideSegments=[],metronomeNodes=[],cancelCountIn=null,takes=[],liveVoice=null,backingBuffer=null,backingSource=null;
+let ownActionCount=0,analysisToken=0,guideSegments=[],metronomeNodes=[],cancelCountIn=null,takes=[],liveVoice=null,backingBuffer=null,backingSource=null,reviewNodes=[];
 const AUDIO_URL='./singing-samples/junji-original-vocals-intro.mp3?v=3';
 // Extracted offline from the same original vocal MP3 with spectral tracking.
 // A sung chorus has harmonics/overlapping voices; the old browser autocorrelation
@@ -55,16 +56,16 @@ const PHRASES=[
   audioUrl:'./singing-samples/junji-line7-v8.mp3',pitch:null}
 ];
 const PITCH_URL='./singing-samples/junji-pitches-v8.json?v=8';
-const BACKING_URL='./singing-samples/junji-backing-review-v9.mp3?v=9';
-// This accompaniment was extracted from the user's original music stem at 8.35s.
-const BACKING_FIRST_ORIGINAL_SECOND=8.35;
+const BACKING_URL='./singing-samples/junji-backing-from-start-v10.mp3?v=10';
+// The instrumental begins at the actual song's 0:00. Each warped vocal part is
+// inserted at its original song timestamp; the backing buffer is never split.
 const BACKING_PHRASE_STARTS=[8.35,12.45,16.28,20.62,24.72,28.82,32.98];
 const MIDI=f=>69+12*Math.log2(f/440);
 function getAudio(){if(!ctx){const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)throw Error('此裝置不支援 Web Audio');ctx=new Audio()}return ctx}
 function setText(s){E.info.textContent=s}
 function setMode(next){
  mode=next;
- const playing=['countinTeacher','countinPlayer','listen','imitate','playback'].includes(next);
+ const playing=['countinTeacher','countinPlayer','listen','imitate','playback','react'].includes(next);
  E.main.disabled=playing||(!vocals&&next!=='error');
  E.repeat.disabled=playing||!vocals;
  E.preview.disabled=playing||!vocals;
@@ -81,10 +82,10 @@ function setMode(next){
  E.main.textContent=next==='empty'?'載入中':next==='error'?'重新載入':next==='ready'?'開始':
   next==='countinPlayer'||next==='countinTeacher'?'準備開唱':
   next==='listen'?'班長演唱中':next==='imitate'?'玩家演唱中':
-  next==='playback'?'總回顧播放中':'重新挑戰';
+  next==='playback'?'總回顧播放中':next==='react'?'班長講評中':'重新挑戰';
  E.stage.textContent=next==='empty'?'載入中':next==='error'?'載入失敗':next==='ready'?'準備好了':
   next==='countinPlayer'||next==='countinTeacher'?'3 · 2 · 1 · 唱':
-  next==='listen'?'班長示範':next==='imitate'?'換你唱':next==='playback'?'總回顧':'完成';
+  next==='listen'?'班長示範':next==='imitate'?'換你唱':next==='react'?'班長評語':next==='playback'?'總回顧':'完成';
  E.overlay.textContent=next==='empty'?'正在載入內建原版人聲…':next==='error'?'載入失敗，點擊重新載入':vocals?'按「班長先唱」開始':'正在載入內建原版人聲…';
  if(next==='countinTeacher')E.speech.textContent='「聽好！我直接唱，不用等！」';
  if(next==='countinPlayer')E.speech.textContent='「3、2、1、唱！第五拍才開始！」';
@@ -93,6 +94,50 @@ function setMode(next){
  if(next==='playback')E.speech.textContent='「讓我聽聽你剛才唱成怎樣！」';
  if(next==='done')E.speech.textContent='「你自己聽聽看！這樣對嗎？」';
  if(next==='ready')E.speech.textContent='「記得剛才的旋律，等一下看你表現！」';
+ if(next==='empty')setCoach('載入原版人聲中…','READY');
+ if(next==='ready')setCoach('耳朵借我用一下，唱完一句我就評一次！','READY');
+ if(next==='listen')setCoach('注意聽！這一句跟著我唱。','♪');
+ if(next==='countinPlayer')setCoach('先把音高拉準，數完四拍換你唱！','READY');
+ if(next==='imitate')setCoach('來！讓我聽聽你的實力。','GO!');
+ if(next==='playback')setCoach('全連注意！來聽他的成果！','REPLAY');
+ if(next==='done')setCoach('七句都唱完了，這是你的成績。','DONE');
+}
+function setCoach(message,grade='READY',mood=''){
+ E.speech.textContent=message;
+ E.reaction.textContent=grade;
+ E.coachScore.textContent='';
+ E.coach.classList.remove('mood-bad','mood-good','mood-great','mood-perfect','react');
+ if(mood)E.coach.classList.add('mood-'+mood);
+}
+function getCoachReaction(score,index){
+ const points=score.points;
+ const level=points>=90?'PERFECT':points>=70?'GREAT':points>=40?'GOOD':'BAD';
+ const lines={
+  BAD:['這是軍歌，還是你在發求救訊號？','你這個音準，已經離營出走了。','全連的耳朵申請提前退伍。','你唱的不是走音，是集體迷路！'],
+  GOOD:['還行！至少隔壁連沒有拉警報。','有抓到旋律，再穩一點就過關。','這句不錯，繼續保持。','嗯，有點軍人的樣子了。'],
+  GREAT:['漂亮！這句有認真練喔。','不錯！這樣才有領唱的氣勢。','有料！班長准你抬頭挺胸。','很好，這句我給過！'],
+  PERFECT:['這句完美！下次換你當班長。','音準漂亮，差點以為是原唱。','太扯！你去領唱，我休息。','這句直接免操課！']
+ };
+ return {level,mood:level.toLowerCase(),message:lines[level][index%lines[level].length]};
+}
+function waitCoachReaction(seconds,id){
+ const c=getAudio(),until=c.currentTime+seconds;
+ return new Promise(resolve=>{
+  const check=()=>{
+   if(session!==id){resolve(false);return}
+   if(c.currentTime>=until){resolve(true);return}
+   frame=requestAnimationFrame(check);
+  };
+  frame=requestAnimationFrame(check);
+ });
+}
+async function showCoachReaction(score,index){
+ setMode('react');
+ const rating=getCoachReaction(score,index);
+ setCoach(rating.message,rating.level,rating.mood);
+ E.coachScore.textContent='第 '+(index+1)+' 句 · '+score.points+' 分';
+ E.coach.classList.add('react');
+ return waitCoachReaction(1.6,session);
 }
 function resetHead(){E.head.setAttribute('x1','0');E.head.setAttribute('x2','0')}
 function plotX(t){return VIEW_W*(PRE_ROLL+(1-PRE_ROLL)*clamp(t/CLIP,0,1))}
