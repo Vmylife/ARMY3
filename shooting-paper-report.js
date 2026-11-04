@@ -266,23 +266,17 @@ function showRun(input={}){
  save();current={run,earned,fresh};renderStagePicker();
  $('resultTitle').textContent=completed?'五關射擊總結算':'鑑測提前結束';
  $('resultRank').textContent=completed?'第1～5關完成 · '+grade+' 級':'第 '+run.failedStage+' 關未過 · '+grade+' 級';
- $('resultStamp').textContent=completed?'五關制霸':'重測';
  $('reportText').textContent=choose(RUN_COMMENTS.find(x=>x.when(run)).texts);
  $('shootStageOutcome').textContent=completed?'🏆 五關全部通關！':'✕ 第 '+run.failedStage+' 關失敗，整輪結束';
  $('shootStageOutcome').className='shootStageOutcome '+(completed?'pass':'fail');
  $('shootScore').textContent=score;$('shootGrade').textContent=grade+' 級';
- $('shootHistoryBest').textContent='歷史最高總分 '+progress.bestRun+' 分';
+ $('shootHistoryBest').textContent='歷史最高 '+progress.bestRun+' 分';
  $('resultHits').textContent=hits;$('resultShots').textContent=shots;$('resultRate').textContent=run.accuracy+'%';
- $('resultMisses').textContent=misses;$('resultFriendly').textContent=friends;$('shootCenter').textContent=center;
- $('shootScoreExplanation').textContent='總分 = 五關分數總和 ÷ 5 · 累計 '+shots+' 發';
- $('shootNextHint').textContent=completed?'本次鑑測完成，成就與紀錄已保存。':'本次鑑測已結束；再次挑戰必須從第1關開始。';
- $('againBtn').textContent='從第1關重新挑戰';
- const strip=$('shootResultStageProgress'),rows=$('shootRunRows');
- strip.replaceChildren();if(rows)rows.replaceChildren();
+ $('againBtn').textContent='重新挑戰';
+ const rows=$('shootRunRows');
+ if(rows)rows.replaceChildren();
  for(let i=1;i<=5;i++){
   const passed=stages.find(s=>s.stage===i),failedHere=failed?.stage===i,entry=passed||(failedHere?failed:null);
-  strip.append(make('span','shootStageDot'+(passed?' passed':'')+(failedHere?' failed':''),
-   passed?'✓':failedHere?'✕':String(i)));
   if(!rows)continue;
   const row=make('div','shootRunRow'+(failedHere?' failed':'')+(!entry?' unplayed':''));
   row.append(make('span','shootRunLevel','第 '+i+' 關'));

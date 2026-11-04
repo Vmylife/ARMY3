@@ -37,6 +37,7 @@ export function weaponForKills(kills){return kills>=5?'rifle':kills>=1?'pistol':
 
 
 const CAMP_GUN_SAMPLE='./assets/audio/rifle/npc_rifle_B.mp3?v=1';
+function soundDisabled(){try{return localStorage.getItem('ARMY3_sfx_muted_v1')==='1'}catch{return false}}
 // A distinguishable side-on rifle silhouette, shared by the weapon wheel and HUD.
 const RIFLE_ICON='<svg class="campRifleGlyph" viewBox="0 0 100 56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="currentColor" d="M4 21h14l10 6h24v-7h28v-5h5v5h11v8H71l-9 6-3 17H47l1-17H36l-10 9-10-11H4z"/><path fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" d="M38 19l5-7h19l5 7M9 17v-7M57 34l-3 12"/></svg>';
 function startAudio(){
@@ -65,6 +66,7 @@ function startAudio(){
  }catch(err){console.warn('[戰鬥音效] 初始化失敗',err);return null}
 }
 function noise(duration,level,frequency,highpass=false){
+ if(soundDisabled())return;
  const ctx=startAudio(),pcm=startAudio.pcm;if(!ctx||!pcm)return;
  const t=ctx.currentTime,source=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),gain=ctx.createGain();
  source.buffer=pcm;filter.type=highpass?'highpass':'lowpass';filter.frequency.value=frequency;
@@ -75,6 +77,7 @@ function noise(duration,level,frequency,highpass=false){
 }
 function whooshSound(level=1){noise(.13,.09*level,900,true)}
 function thumpSound(heavy=false,level=1){
+ if(soundDisabled())return;
  const ctx=startAudio();if(!ctx)return;
  noise(heavy?.19:.115,(heavy?.30:.23)*level,heavy?900:1300);
  const t=ctx.currentTime,osc=ctx.createOscillator(),gain=ctx.createGain();
@@ -85,6 +88,7 @@ function thumpSound(heavy=false,level=1){
  osc.connect(gain);gain.connect(ctx.destination);osc.start(t);osc.stop(t+(heavy?.22:.16));
 }
 function shotSound(rifle=false,level=1){
+ if(soundDisabled())return;
  const ctx=startAudio();if(!ctx)return;
  const buffer=startAudio.gunBuffer,volume=Math.max(.05,Math.min(1,level));
  if(buffer){
@@ -107,7 +111,7 @@ export class CampCombat{
  constructor({player,npcs,renderer,rifleGlb,npcGlb}){
   this.player=player;this.npcs=npcs;this.renderer=renderer;this.hp=100;this.kills=0;
   this.weapon='fists';this.provoked=false;this.gameOver=false;this.time=0;
-  this.interactionMode=false;this.onInteract=null;
+  this.interactionMode=true;this.onInteract=null;
   this.playerAttack=0;this.playerAttackApplied=false;this.playerCooldown=0;this.attackKeyboard=false;this.attackPointer=null;
   this.wheelOpen=false;this.wheelSelection='up';this.wheelPointer=null;this.wheelTouch=null;
   this.bullets=[];this.seq=1;this.playerShotAt=-100;this.npcFireAt=-100;
@@ -154,9 +158,9 @@ export class CampCombat{
   const root=document.createElement('div');root.id='campCombatUI';root.innerHTML=`
    <div id="campCombatStatus" aria-live="polite"><span id="campHealth">HP 100</span><span id="campKills">擊殺 0</span><span id="campAlert">正常操課</span></div>
    <div class="campCombatButtons">
-    <button id="campAttack" type="button" aria-label="攻擊"><span id="campAttackIcon">✊</span><small id="campAttackText">攻擊</small></button>
+    <button id="campAttack" class="interaction" type="button" aria-label="互動"><span id="campAttackIcon">✋</span><small id="campAttackText">互動</small></button>
     <div class="campCombatTools">
-     <button id="campModeSwitch" type="button" aria-label="切換戰鬥與互動模式" aria-pressed="false"><span>⇄</span><small>切換</small></button>
+     <button id="campModeSwitch" type="button" aria-label="切換戰鬥與互動模式" aria-pressed="true"><span>⇄</span><small>切換</small></button>
      <button id="campWeaponSwitch" type="button" aria-label="選擇武器"><span>◉</span><small>武器</small></button>
     </div>
    </div>

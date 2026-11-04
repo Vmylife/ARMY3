@@ -136,38 +136,57 @@ function updateBreathing(dt){
 function resetSway(){Object.assign(sway,{x:0,y:0,heading:randomBreath()*Math.PI*2,turnRate:0,targetTurn:0,turnCountdown:0});breathX=breathY=0;}
 let muted=false;try{muted=localStorage.getItem('ARMY3_shoot_muted')==='1'}catch{}
 $('muteBtn').textContent=muted?'🔇':'🔊';
-const audio=new Audio('./assets/audio/rifle/npc_rifle_B.mp3');audio.preload='auto';
-let shotAudioContext=null,noiseBuffer=null;
+// Main-camp rifle sample: one decoded AudioBufferSource per fire, no delayed HTMLAudio clone.
+const SHOT_SAMPLE='./assets/audio/rifle/npc_rifle_B.mp3?v=1';
+let shotAudioContext=null,shotBuffer=null,shotPromise=null,shotNoise=null,shotRetry=0;
+function ensureShotAudio(){
+ try{
+  const API=window.AudioContext||window.webkitAudioContext;if(!API)return null;
+  const ctx=shotAudioContext??=new API();
+  if(ctx.state==='suspended')ctx.resume().catch(()=>{});
+  if(!shotBuffer&&!shotPromise&&performance.now()>shotRetry){
+   shotRetry=performance.now()+30000;
+   shotPromise=fetch(SHOT_SAMPLE,{cache:'force-cache'})
+    .then(r=>{if(!r.ok)throw Error('音效 HTTP '+r.status);return r.arrayBuffer()})
+    .then(bytes=>ctx.decodeAudioData(bytes))
+    .then(buffer=>{shotBuffer=buffer})
+    .catch(err=>{console.warn('[打靶音效] 備用槍聲',err)})
+    .finally(()=>{shotPromise=null});
+  }
+  return ctx;
+ }catch(err){console.warn('[打靶音效] 初始化失敗',err);return null}
+}
 function sfx(){
  if(muted)return;
- const a=audio.cloneNode();a.volume=.82;a.play().catch(()=>{});
- a.addEventListener('ended',()=>{a.removeAttribute('src');a.load();},{once:true});
- try{
-  const API=window.AudioContext||window.webkitAudioContext;if(!API)return;
-  if(!shotAudioContext)shotAudioContext=new API();
-  const ac=shotAudioContext;if(ac.state==='suspended')ac.resume().catch(()=>{});
-  const t=ac.currentTime+.003;
-  if(!noiseBuffer){
-   const frames=Math.floor(ac.sampleRate*.19);noiseBuffer=ac.createBuffer(1,frames,ac.sampleRate);
-   const data=noiseBuffer.getChannelData(0);
-   for(let i=0;i<frames;i++)data[i]=(Math.random()*2-1)*(1-i/frames);
-  }
-  const crack=ac.createBufferSource();crack.buffer=noiseBuffer;
-  const filter=ac.createBiquadFilter();filter.type='highpass';filter.frequency.value=900;
-  const crackGain=ac.createGain();crackGain.gain.setValueAtTime(.28,t);
-  crackGain.gain.exponentialRampToValueAtTime(.001,t+.11);
-  crack.connect(filter);filter.connect(crackGain);crackGain.connect(ac.destination);crack.start(t);crack.stop(t+.13);
-  const bass=ac.createOscillator(),bassGain=ac.createGain();bass.type='sine';
-  bass.frequency.setValueAtTime(160,t);bass.frequency.exponentialRampToValueAtTime(57,t+.16);
-  bassGain.gain.setValueAtTime(.26,t);bassGain.gain.exponentialRampToValueAtTime(.001,t+.17);
-  bass.connect(bassGain);bassGain.connect(ac.destination);bass.start(t);bass.stop(t+.18);
-  const click=ac.createOscillator(),clickGain=ac.createGain();click.type='triangle';
-  click.frequency.setValueAtTime(910,t+.025);click.frequency.exponentialRampToValueAtTime(270,t+.075);
-  clickGain.gain.setValueAtTime(.001,t);clickGain.gain.setValueAtTime(.045,t+.025);
-  clickGain.gain.exponentialRampToValueAtTime(.001,t+.082);
-  click.connect(clickGain);clickGain.connect(ac.destination);click.start(t);click.stop(t+.085);
- }catch(err){console.debug('[ARMY rifle] optional audio layer',err);}
+ try{if(localStorage.getItem('ARMY3_sfx_muted_v1')==='1')return}catch{}
+ const ctx=ensureShotAudio();if(!ctx)return;
+ const t=ctx.currentTime;
+ if(shotBuffer){
+  const source=ctx.createBufferSource(),gain=ctx.createGain();
+  source.buffer=shotBuffer;source.playbackRate.value=.95+Math.random()*.07;
+  gain.gain.value=.52;source.connect(gain);gain.connect(ctx.destination);
+  source.start(t);return;
+ }
+ // Immediate fallback only if sample still decoding, matching camp's synthetic shot.
+ if(!shotNoise){
+  shotNoise=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*.35),ctx.sampleRate);
+  const pcm=shotNoise.getChannelData(0);for(let i=0;i<pcm.length;i++)pcm[i]=Math.random()*2-1;
+ }
+ const noise=(duration,volume,cutoff)=>{
+  const source=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),gain=ctx.createGain();
+  source.buffer=shotNoise;filter.type='lowpass';filter.frequency.value=cutoff;
+  gain.gain.setValueAtTime(volume,t);gain.gain.exponentialRampToValueAtTime(.001,t+duration);
+  source.connect(filter);filter.connect(gain);gain.connect(ctx.destination);
+  source.start(t);source.stop(t+duration+.012);
+ };
+ noise(.12,.33,2400);noise(.065,.14,850);
+ const bass=ctx.createOscillator(),gain=ctx.createGain();
+ bass.type='triangle';bass.frequency.setValueAtTime(150,t);bass.frequency.exponentialRampToValueAtTime(55,t+.16);
+ gain.gain.setValueAtTime(.25,t);gain.gain.exponentialRampToValueAtTime(.001,t+.17);
+ bass.connect(gain);gain.connect(ctx.destination);bass.start(t);bass.stop(t+.18);
 }
+// Pre-decode during the range load; Start/Fire user gesture unlocks iOS audio.
+ensureShotAudio();
 function resize(){width=innerWidth;height=innerHeight;dpr=min(devicePixelRatio||1,1.4);canvas.width=Math.ceil(width*dpr);canvas.height=Math.ceil(height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0)}
 addEventListener('resize',resize);resize();
 const focal=()=>height/(2*Math.tan(fovNow()/2));
@@ -303,8 +322,6 @@ function finish(){
 function presentResult(){
  if(state!=='reviewing')return;
  state='result';$('resultScreen').hidden=false;
- const image=paperImage(),dest=$('resultPaper'),q=dest.getContext('2d');
- dest.width=600;dest.height=760;q.clearRect(0,0,600,760);q.drawImage(image,0,0);
  try{
   window.armyPaperReport?.showRun?.({
    startStage:runStartStage,stages:runStages.map(s=>({...s})),
@@ -316,7 +333,6 @@ function presentResult(){
   const totalShots=runStages.reduce((n,s)=>n+s.shots,0);
   $('resultTitle').textContent='實彈射擊總結算';
   $('resultRank').textContent='完成 '+runStages.length+' 個關卡';
-  $('resultStamp').textContent='完成';
   $('resultHits').textContent=totalHits;$('resultShots').textContent=totalShots;
   $('reportText').textContent='本次共上靶 '+totalHits+' 發，累計重考 '+runFailures.length+' 次。';
  }
@@ -373,6 +389,7 @@ function resetStage(){
  yaw=Math.atan2(PAPER.x-FIELD.x,PAPER.z-FIELD.z);pitch=Math.atan2(PAPER.y-FIELD.y,PAPER.z-FIELD.z);resetSway();makeRunners();window.__armyShooting3D?.restartNPCs?.();$('zoomBtn').classList.remove('active');$('zoomBtn').textContent='◎ 開鏡';document.body.classList.remove('scopeActive');setHUD();}
 function start(){
  if(!ready)return;
+ ensureShotAudio();
  currentStage=1; // Every new attempt starts at stage one, regardless of past unlocks.
  runStartStage=1;runStages=[];runFailures=[];pendingStage=1;
  resetStage();

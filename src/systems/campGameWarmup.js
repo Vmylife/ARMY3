@@ -7,7 +7,7 @@ const ROOT = new URL('../../', import.meta.url);
 const urls = {
  blanket:'blanket-stack.html?v=193',
  grenade:'grenade-workshop-test.html?v=193',
- shooting:'shooting-paper-range.html?v=193',
+ shooting:'shooting-paper-range.html?v=194',
  swipe:'/Don-t-like-your-mom/army-test/index.html?v=5',
  weed:'weed-pulling.html?v=195',
  singing:'singing-memory-test.html?v=14'
@@ -23,8 +23,8 @@ const nearbyAssets={
   'src/systems/grenadeEarlyAudio.js?v=190'
  ],
  shooting:[
-  urls.shooting,'shooting-paper.css?v=153','shooting-paper.js?v=154',
-  'shooting-paper-report.js?v=153','shooting-paper-world.js?v=149'
+  urls.shooting,'shooting-paper.css?v=155','shooting-paper.js?v=155',
+  'shooting-paper-report.js?v=155','shooting-paper-world.js?v=149'
  ],
  swipe:[
   urls.swipe,'/Don-t-like-your-mom/army-test/game.js?v=3',
