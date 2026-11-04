@@ -45,7 +45,7 @@ button:focus-visible,a:focus-visible,.pitchRail:focus-visible{outline:2px solid 
 .coachStage{display:grid;grid-template-columns:minmax(0,41fr) minmax(0,59fr);align-items:stretch;padding:8px 10px 0;background:linear-gradient(165deg,#2f523a 0%,#244635 45%,#19382b 100%);position:relative}
 .coachStage:before{content:"";position:absolute;left:0;right:0;bottom:0;height:15%;background:#142c2080;pointer-events:none}
 .coachArt{min-width:0;min-height:0;position:relative;display:flex;align-items:flex-end;justify-content:center;overflow:hidden}
-.coachSvg{width:100%;height:100%;max-height:350px;display:block;overflow:visible;filter:drop-shadow(0 5px 8px #0d20194a);transform-origin:50% 100%}
+.coachSvg{width:145%;min-width:145%;max-width:none;height:100%;max-height:350px;display:block;overflow:visible;filter:drop-shadow(0 5px 8px #0d20194a);transform-origin:50% 100%}
 .coachContent{position:relative;z-index:1;min-width:0;min-height:0;display:flex;flex-direction:column;justify-content:center;padding:9px 4px 13px 8px;gap:7px}
 .coachCaption{align-self:flex-start;border-radius:6px;background:#173426;color:#cfdaa9;padding:5px 9px;font-size:11px;font-weight:900}
 .coachGrade{font-size:clamp(30px,6vw,61px);line-height:1.05;font-weight:1000;letter-spacing:.025em;color:#ffe3a6;text-shadow:0 3px 1px #102f1c80;transform-origin:0 50%}
