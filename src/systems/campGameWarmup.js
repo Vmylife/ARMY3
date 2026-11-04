@@ -15,7 +15,7 @@ const urls = {
 };
 const stage1 = [
  'blanket-stack.html?v=192','grenade-workshop-test.html?v=192','weed-pulling.html?v=194',
- 'singing-memory-test.html?v=13','singing-memory-test.css?v=13','singing-memory-test.js?v=12','singing-settlement.js?v=12',
+ 'singing-memory-test.html?v=13','singing-memory-test.css?v=13','singing-memory-test.js?v=13','singing-settlement.js?v=12','src/systems/singingCampExit.js?v=13',
  'shooting-paper-range.html?v=192','shooting-paper.css?v=153','shooting-paper.js?v=154','shooting-paper-report.js?v=153',
  'shooting-paper-world.js?v=149','shooting-paper-scene.json?v=140',
  'src/systems/minigameQuickExit.js?v=192',
