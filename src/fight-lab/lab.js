@@ -174,10 +174,10 @@ function thump(heavy=false){
 }
 function react(){
  for(const event of e.drain()){
-  if(event.type==='swing'){
+  if(event.kind==='swing'){
    whoosh(event.type==='heavy'||event.type==='counter');
    if(event.who==='enemy')tell('對方準備還手了！按閃避！',950);
-  }else if(event.type==='hit'){
+  }else if(event.kind==='hit'){
    const heavy=event.type==='heavy';
    shake=Math.max(shake,heavy?.20:.11);
    hitBurst(event);thump(heavy);
@@ -188,12 +188,12 @@ function react(){
     $('combo').textContent=event.chain+' HIT COMBO';$('combo').hidden=false;
     clearTimeout(react.comboTimer);react.comboTimer=setTimeout(()=>$('combo').hidden=true,1000);
    }
-  }else if(event.type==='miss'){
+  }else if(event.kind==='miss'){
    if(event.who==='player')tell('揮空了！靠近一點再打。',850);
-  }else if(event.type==='evade'){tell(event.who==='player'?'漂亮！閃過一拳！':'對手閃掉了！',850)}
-  else if(event.type==='dodge'){tell('閃避！等他揮空再反擊。',750)}
-  else if(event.type==='rise'&&event.who==='enemy'){tell('對手站起來了：「幹！還來？」',1200)}
-  else if(event.type==='finished'){
+  }else if(event.kind==='evade'){tell(event.who==='player'?'漂亮！閃過一拳！':'對手閃掉了！',850)}
+  else if(event.kind==='dodge'){tell('閃避！等他揮空再反擊。',750)}
+  else if(event.kind==='rise'&&event.who==='enemy'){tell('對手站起來了：「幹！還來？」',1200)}
+  else if(event.kind==='finished'){
    const serial=roundSerial;
    setTimeout(()=>{if(serial===roundSerial)showEnd(event.winner)},1700);
   }
