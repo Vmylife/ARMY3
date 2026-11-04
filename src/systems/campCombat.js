@@ -34,28 +34,70 @@ export function lineClear(a,b,padding=.11){
 export function chaseRadius(kills){return SENSE_RADIUS(kills)}
 export function weaponForKills(kills){return kills>=5?'rifle':kills>=1?'pistol':'fists'}
 
-function showFlash(container,pt,label){
- const n=document.createElement('span');n.className='campShotHit';n.textContent=label;
- n.style.left=pt.x+'px';n.style.top=pt.y+'px';container.appendChild(n);
- setTimeout(()=>n.remove(),400);
-}
+
+const CAMP_GUN_SAMPLE='./assets/audio/rifle/npc_rifle_B.mp3?v=1';
 function startAudio(){
  try{
-  const Audio=window.AudioContext||window.webkitAudioContext;
-  if(!Audio)return null;
-  startAudio.ctx??=new Audio();
-  if(startAudio.ctx.state==='suspended')startAudio.ctx.resume().catch(()=>{});
-  return startAudio.ctx;
- }catch{return null}
+  const Ctor=window.AudioContext||window.webkitAudioContext;
+  if(!Ctor)return null;
+  const ctx=startAudio.ctx??=new Ctor();
+  if(ctx.state==='suspended')ctx.resume().catch(()=>{});
+  if(!startAudio.pcm){
+   const b=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*.35),ctx.sampleRate),samples=b.getChannelData(0);
+   for(let i=0;i<samples.length;i++)samples[i]=Math.random()*2-1;
+   startAudio.pcm=b;
+  }
+  // Download only after a direct touch/key gesture; use a synthesized fallback
+  // for the very first shot while Safari is decoding the original MP3.
+  if(!startAudio.gunBuffer&&!startAudio.gunPromise&&
+     (!startAudio.retryAt||performance.now()>startAudio.retryAt)){
+   startAudio.gunPromise=fetch(CAMP_GUN_SAMPLE)
+    .then(res=>{if(!res.ok)throw Error('Gun sample '+res.status);return res.arrayBuffer()})
+    .then(bytes=>ctx.decodeAudioData(bytes))
+    .then(b=>{startAudio.gunBuffer=b})
+    .catch(err=>{console.warn('[戰鬥音效] 使用合成備用音效',err);startAudio.retryAt=performance.now()+30000})
+    .finally(()=>{startAudio.gunPromise=null});
+  }
+  return ctx;
+ }catch(err){console.warn('[戰鬥音效] 初始化失敗',err);return null}
 }
-function shotSound(rifle=false){
- const c=startAudio();if(!c)return;
- const t=c.currentTime,osc=c.createOscillator(),gain=c.createGain();
- osc.type='sawtooth';osc.frequency.setValueAtTime(rifle?135:205,t);
- osc.frequency.exponentialRampToValueAtTime(rifle?45:58,t+.10);
- gain.gain.setValueAtTime(rifle?.075:.11,t);
- gain.gain.exponentialRampToValueAtTime(.001,t+.12);
- osc.connect(gain);gain.connect(c.destination);osc.start(t);osc.stop(t+.13);
+function noise(duration,level,frequency,highpass=false){
+ const ctx=startAudio(),pcm=startAudio.pcm;if(!ctx||!pcm)return;
+ const t=ctx.currentTime,source=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),gain=ctx.createGain();
+ source.buffer=pcm;filter.type=highpass?'highpass':'lowpass';filter.frequency.value=frequency;
+ gain.gain.setValueAtTime(Math.max(.001,level),t);
+ gain.gain.exponentialRampToValueAtTime(.001,t+duration);
+ source.connect(filter);filter.connect(gain);gain.connect(ctx.destination);
+ source.start(t);source.stop(t+duration+.012);
+}
+function whooshSound(level=1){noise(.13,.09*level,900,true)}
+function thumpSound(heavy=false,level=1){
+ const ctx=startAudio();if(!ctx)return;
+ noise(heavy?.19:.115,(heavy?.30:.23)*level,heavy?900:1300);
+ const t=ctx.currentTime,osc=ctx.createOscillator(),gain=ctx.createGain();
+ osc.type='triangle';osc.frequency.setValueAtTime(heavy?150:185,t);
+ osc.frequency.exponentialRampToValueAtTime(heavy?52:75,t+(heavy?.19:.12));
+ gain.gain.setValueAtTime((heavy?.42:.27)*level,t);
+ gain.gain.exponentialRampToValueAtTime(.001,t+(heavy?.21:.145));
+ osc.connect(gain);gain.connect(ctx.destination);osc.start(t);osc.stop(t+(heavy?.22:.16));
+}
+function shotSound(rifle=false,level=1){
+ const ctx=startAudio();if(!ctx)return;
+ const buffer=startAudio.gunBuffer,volume=Math.max(.05,Math.min(1,level));
+ if(buffer){
+  const source=ctx.createBufferSource(),gain=ctx.createGain();
+  source.buffer=buffer;source.playbackRate.value=(rifle?.95:1.22)+Math.random()*(rifle?.07:.09);
+  gain.gain.value=.52*volume;source.connect(gain);gain.connect(ctx.destination);source.start(ctx.currentTime);
+ }else{
+  noise(rifle?.12:.17,(rifle?.33:.44)*volume,rifle?2400:2800);
+  noise(rifle?.065:.10,(rifle?.14:.20)*volume,rifle?850:750);
+  const osc=ctx.createOscillator(),gain=ctx.createGain(),t=ctx.currentTime;
+  osc.type='triangle';osc.frequency.setValueAtTime(rifle?150:190,t);
+  osc.frequency.exponentialRampToValueAtTime(rifle?55:58,t+.16);
+  gain.gain.setValueAtTime(.25*volume,t);
+  gain.gain.exponentialRampToValueAtTime(.001,t+.17);
+  osc.connect(gain);gain.connect(ctx.destination);osc.start(t);osc.stop(t+.18);
+ }
 }
 
 export class CampCombat{
@@ -66,6 +108,7 @@ export class CampCombat{
   this.wheelOpen=false;this.wheelSelection='up';this.wheelPointer=null;this.wheelTouch=null;
   this.bullets=[];this.seq=1;this.playerShotAt=-100;this.npcFireAt=-100;
   this.canvas=renderer.canvas;this.lastState='';
+  this.hitStop=0;this.shake=0;this.cameraRecoil=0;this.playerHurt=0;
   this.mountUI();
   this.playerPistol=new PistolRenderer(renderer.gl);
   this.npcPistol=new PistolRenderer(renderer.gl);
@@ -117,7 +160,9 @@ export class CampCombat{
   `;
   document.body.appendChild(root);
   const layer=document.createElement('div');layer.id='campProjectileLayer';document.body.appendChild(layer);
-  this.root=root;
+  const flash=document.createElement('div');flash.id='campCombatFlash';flash.setAttribute('aria-hidden','true');document.body.appendChild(flash);
+  const fx=document.createElement('div');fx.id='campCombatFx';fx.setAttribute('aria-hidden','true');document.body.appendChild(fx);
+  this.root=root;this.fxLayer=fx;this.screenFlash=flash;
   const sw=$('campWeaponSwitch'),attack=$('campAttack'),wheel=$('campCombatWheel'),disc=$('campWheelDisc');
   const dir=(x,y)=>{
    if(Math.hypot(x,y)<22)return null;
@@ -242,10 +287,59 @@ export class CampCombat{
   $('campAttack').disabled=this.gameOver;
   $('campWeaponSwitch').disabled=this.gameOver;
  }
+ scaledDt(realDt){
+  const d=clamp(realDt,0,.05);
+  const locked=Math.min(d,Math.max(0,this.hitStop||0));
+  this.hitStop=Math.max(0,(this.hitStop||0)-d);
+  return (d-locked)*(this.wheelOpen?.12:1);
+ }
+ cameraOffsets(realDt,now){
+  const shake=this.shake||0;
+  this.shake=Math.max(0,shake-realDt*.73);
+  this.cameraRecoil=(this.cameraRecoil||0)*Math.exp(-realDt*13);
+  return {yaw:shake*Math.sin(now*.091)*.075,
+   pitch:shake*Math.cos(now*.11)*.035-this.cameraRecoil};
+ }
+ spawnFx(pos,cls,caption,life=420){
+  if(!this.fxLayer||!this.renderer)return;
+  const pt=this.project(pos.x,pos.y??1.17,pos.z);
+  if(!pt)return;
+  const node=document.createElement('span');
+  node.className=cls;if(caption)node.dataset.text=caption;
+  node.style.left=pt.x+'px';node.style.top=pt.y+'px';
+  this.fxLayer.appendChild(node);
+  setTimeout(()=>node.remove(),life);
+ }
+ flashScreen(hostile=false,strong=false){
+  if(!this.screenFlash)return;
+  const f=this.screenFlash;
+  f.style.background=hostile?'rgba(252,84,67,.37)':'rgba(255,227,165,.33)';
+  f.style.transition='none';f.style.opacity=strong?'.52':'.29';
+  requestAnimationFrame(()=>{f.style.transition='opacity 125ms ease-out';f.style.opacity='0'});
+ }
+ onPlayerShot(pos,rifle=false){
+  this.shake=Math.max(this.shake||0,rifle?.11:.13);
+  this.cameraRecoil=Math.min(.040,(this.cameraRecoil||0)+(rifle?.006:.014));
+  this.spawnFx({...pos,y:1.16},'campMuzzle','',135);
+ }
+ onCombatHit(pos,damage,{kind='bullet',down=false,dead=false,grounded=false,playerTarget=false}={}){
+  const heavy=down||dead,rifle=this.weapon==='rifle';
+  const freeze=kind==='punch'?(heavy?.087:.059):(heavy?.055:rifle?.012:.040);
+  this.hitStop=Math.min(.10,Math.max(this.hitStop||0,freeze));
+  this.shake=Math.max(this.shake||0,heavy?.25:playerTarget?.16:kind==='punch'?.10:.088);
+  if(kind==='punch')thumpSound(heavy,playerTarget?.9:1);
+  else if(heavy)thumpSound(true,.18);
+  if(!playerTarget){
+   this.spawnFx({...pos,y:1.17},'campHitBurst'+(heavy?' heavy':kind==='bullet'?' bullet':''),dead?'擊倒！':down?'擊飛！':grounded?'命中！':kind==='punch'?'啪！':'命中！',420);
+   this.spawnFx({...pos,y:1.43},'campFloatDamage','-'+Math.round(damage),800);
+  }else this.spawnFx({...pos,y:1.9},'campFloatDamage hostile','-'+Math.round(damage),800);
+  this.flashScreen(playerTarget,heavy);
+ }
  get isActive(){return this.provoked}
  get playerAlive(){return !this.gameOver}
  playerPose(normalClip,normalSpeed){
   if(this.gameOver)return {clip:'Idle',speed:1};
+  if(this.playerHurt>0&&this.player.anim.hasClip('Hit_Reaction'))return {clip:'Hit_Reaction',speed:1.55};
   if(this.playerAttack>0&&this.weapon==='fists'&&this.player.anim.hasClip('Punch_Combo_1'))
    return {clip:'Punch_Combo_1',speed:1.5};
   return {clip:normalClip,speed:normalSpeed};
@@ -254,6 +348,7 @@ export class CampCombat{
   if(this.gameOver||this.wheelOpen||window.armyMinigameActive||this.playerCooldown>0)return false;
   if(this.weapon==='fists'){
    this.provoked=true;this.playerAttack=.55;this.playerAttackApplied=false;this.playerCooldown=.72;
+   whooshSound();
    this.refreshHUD(true);return true;
   }
   const p=this.player.pos,forward={x:Math.sin(this.player.angle),z:Math.cos(this.player.angle)};
@@ -276,6 +371,7 @@ export class CampCombat{
   this.playerShotAt=performance.now();
   this.player.shotUntil=this.playerShotAt+(this.weapon==='rifle'?100:115);
   shotSound(this.weapon==='rifle');
+  this.onPlayerShot({x,z},this.weapon==='rifle');
   return true;
  }
  melee(){
@@ -285,20 +381,24 @@ export class CampCombat{
    if(d>1.85)break;
    const vx=(n.pos.x-p.x)/Math.max(.01,d),vz=(n.pos.z-p.z)/Math.max(.01,d);
    if(vx*direction.x+vz*direction.z<.22||!lineClear(p,n.pos,.1))continue;
-   this.damageNPC(n,27);return;
+   this.damageNPC(n,27,'punch');return;
   }
  }
- damageNPC(n,damage){
+ damageNPC(n,damage,kind='bullet'){
   if(n.combatDead||damage<=0)return;
   this.provoked=true;
   if(!n.combatActive)this.engage(n);
   const grounded=n.combatDown>0||n.combatRise>0;
   n.combatHP=Math.max(0,n.combatHP-damage);
+  const dead=n.combatHP<=0;
+  const down=!grounded&&!dead&&n.combatDamageSinceFall+damage>=COMBAT_KNOCKDOWN_DAMAGE;
+  this.onCombatHit(n.pos,damage,{kind,down,dead,grounded});
   // Damage while grounded/getting up never fills the next knockdown meter.
   if(!grounded)n.combatDamageSinceFall+=damage;
   if(n.combatHP<=0){
    n.combatDead=true;n.combatActive=false;n.combatWeapon='fists';
    n.combatDown=0;n.combatRise=0;n.combatFall=0;n.combatPush=null;
+   n.combatHurtFull=0;
    n.combatDamageSinceFall=0;n.combatGoal=null;n.combatHurt=0;n.combatRestLift=undefined;
    n.anim.rifleAim=0;n.anim.setClip('Idle',{restart:true});
    n.anim.transition=0;n.anim.prevClip=null;n.anim.evaluate(0);
@@ -312,6 +412,7 @@ export class CampCombat{
   }
   if(!grounded&&n.combatDamageSinceFall>=COMBAT_KNOCKDOWN_DAMAGE){
    n.combatDamageSinceFall=0;n.combatDown=COMBAT_DOWN_SECONDS;
+   n.combatHurt=0;n.combatHurtFull=0;
    n.combatRise=0;n.combatFall=.42;n.combatRestLift=undefined;
    const dx=n.pos.x-this.player.pos.x,dz=n.pos.z-this.player.pos.z;
    const len=Math.hypot(dx,dz)||1;
@@ -323,7 +424,14 @@ export class CampCombat{
    n.state='combatDown';n.activity='被擊飛';
    return;
   }
-  if(!grounded)n.combatHurt=.24;
+  if(!grounded){
+   n.combatHurt=.25;
+   n.combatHurtFull=.25;
+   if(n.anim.hasClip('Hit_Reaction')){
+    n.anim.setClip('Hit_Reaction',{restart:true});
+    n.anim.transition=0;n.anim.prevClip=null;
+   }
+  }
  }
  engage(n){
   if(n.combatActive||n.combatDead)return;
@@ -334,9 +442,11 @@ export class CampCombat{
   n.renderLift=0;n.anim.rifleAim=0;
   n.home.job='life';n.activity='追擊玩家';
  }
- damagePlayer(amount){
+ damagePlayer(amount,kind='bullet'){
   if(this.gameOver)return;
   this.hp=Math.max(0,this.hp-amount);
+  this.playerHurt=Math.max(this.playerHurt||0,.24);
+  this.onCombatHit(this.player.pos,amount,{kind,playerTarget:true,dead:this.hp<=0});
   if(this.hp<=0){
    this.gameOver=true;this.attackPointer=null;this.attackKeyboard=false;
    $('campCombatFinish').hidden=false;
@@ -370,7 +480,8 @@ export class CampCombat{
    dx:Math.sin(heading),dz:Math.cos(heading),range:25,speed:n.combatWeapon==='rifle'?47:39,
    damage:n.combatWeapon==='rifle'?6:9});
   n.shotUntil=performance.now()+110;
-  if(distance(n.pos,this.player.pos)<14)shotSound(n.combatWeapon==='rifle');
+  const audibility=Math.max(.15,1-distance(n.pos,this.player.pos)/26);
+  shotSound(n.combatWeapon==='rifle',audibility*.72);
  }
  updateBullets(dt){
   if(!this.bullets.length)return;
@@ -386,10 +497,10 @@ export class CampCombat{
     if(b.owner==='player'){
      for(const n of this.npcs){
       if(n.combatDead)continue;
-      if(distance(at,n.pos)<.47){this.damageNPC(n,b.damage);alive=false;break}
+      if(distance(at,n.pos)<.47){this.damageNPC(n,b.damage,'bullet');alive=false;break}
      }
     }else if(distance(at,this.player.pos)<.38){
-     this.damagePlayer(b.damage);alive=false;
+     this.damagePlayer(b.damage,'bullet');alive=false;
     }
    }
    if(alive&&b.range>.01)remaining.push(b);
@@ -398,7 +509,11 @@ export class CampCombat{
  }
  update(dt,now,{blocked=false}={}){
   if(blocked||window.armyMinigameActive)return;
-  dt=clamp(dt,0,.05);this.time+=dt;
+  dt=clamp(dt,0,.05);
+  // Real hit-stop freezes AI, cooldowns and projectiles, not just animation.
+  if(dt<=0)return;
+  this.time+=dt;
+  this.playerHurt=Math.max(0,(this.playerHurt||0)-dt);
   this.playerCooldown=Math.max(0,this.playerCooldown-dt);
   if(this.playerAttack>0){
    this.playerAttack=Math.max(0,this.playerAttack-dt);
@@ -440,6 +555,15 @@ export class CampCombat{
     }
     continue;
    }
+   if(n.combatHurt>0){
+    n.combatHurt=Math.max(0,n.combatHurt-dt);
+    n.state='combatHit';n.activity='受擊';
+    if(n.anim.hasClip('Hit_Reaction')){
+     if(n.anim.clip!=='Hit_Reaction')n.anim.setClip('Hit_Reaction',{restart:true});
+     n.anim.speed=1.5;
+    }else if(n.anim.clip!=='Idle')n.anim.setClip('Idle');
+    if(n.combatHurt>0)continue;
+   }
    n.combatWeapon=stage;
    n.anim.rifleAim=stage==='fists'?0:Math.min(1,(n.anim.rifleAim||0)+dt*7);
    n.renderLift=0;n.home.job='life';n.state='combat';n.activity='追擊玩家';
@@ -449,7 +573,8 @@ export class CampCombat{
     n.anim.rifleAim=0;
     if(n.combatCooldown<=0){
      n.combatCooldown=1.42+n.id%3*.15;
-     this.damagePlayer(8);
+     whooshSound(.25);
+     this.damagePlayer(8,'punch');
      n.combatAttack=.5;
      if(n.anim.hasClip('Punch_Combo_1')){n.anim.setClip('Punch_Combo_1',{restart:true});n.anim.speed=1.4}
     }
@@ -501,7 +626,7 @@ export class CampCombat{
  drawWeapons(now){
   for(const {actor,weapon,npc} of [
     {actor:this.player,weapon:this.weapon,npc:false},
-    ...this.npcs.filter(n=>n.combatActive&&!n.combatDead).map(n=>({actor:n,weapon:n.combatWeapon,npc:true}))
+    ...this.npcs.filter(n=>n.combatActive&&!n.combatDead&&n.combatDown<=0&&n.combatRise<=0&&(n.combatHurt||0)<=0).map(n=>({actor:n,weapon:n.combatWeapon,npc:true}))
   ]){
    if(weapon==='fists'||(npc&&!this.renderer.isActorVisible(actor.pos)))continue;
    actor.anim.rifleAim=Math.max(.01,actor.anim.rifleAim||0);

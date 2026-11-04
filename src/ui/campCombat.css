@@ -61,3 +61,33 @@
 @media(max-height:610px){.campCombatButtons{bottom:calc(56px + env(safe-area-inset-bottom))}
  #campCombatTip{bottom:calc(143px + env(safe-area-inset-bottom))}
  #campWheelDisc{width:min(60vw,63dvh);height:min(60vw,63dvh)}}
+
+/* Camp combat feedback v2 — visible hit flashes, recoil bursts and damage floats.
+   All layers are non-interactive and retain the game's no-zoom/no-selection rules. */
+#campCombatFlash{position:fixed;inset:0;z-index:6;opacity:0;pointer-events:none;transition:opacity 125ms ease-out}
+#campCombatFx{position:fixed;inset:0;z-index:8;pointer-events:none;overflow:hidden;
+ -webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+#campCombatFx>span{position:absolute;pointer-events:none;transform:translate(-50%,-50%)}
+.campHitBurst{display:flex;align-items:center;justify-content:center;width:89px;height:89px;
+ filter:drop-shadow(0 2px 5px #64321d);animation:campImpactBurst 360ms ease-out forwards}
+.campHitBurst::before{content:"";width:86%;height:86%;
+ background:radial-gradient(circle,#fffae7 0 20%,#ffdf81 24% 45%,#e4874d 55%,transparent 70%);
+ clip-path:polygon(50% 0%,59% 34%,84% 13%,72% 43%,100% 50%,72% 57%,84% 88%,58% 67%,50% 100%,43% 67%,16% 88%,30% 58%,0 50%,30% 43%,16% 13%,42% 34%)}
+.campHitBurst::after{content:attr(data-text);position:absolute;top:-18px;left:50%;transform:translateX(-50%);
+ color:#fff6c9;text-shadow:0 2px 3px #632715;font-size:17px;font-weight:1000;white-space:nowrap}
+.campHitBurst.heavy{width:122px;height:122px}
+.campHitBurst.bullet{width:65px;height:65px}
+.campHitBurst.bullet::after{font-size:13px}
+.campFloatDamage{color:#fff6d0;font-weight:1000;font-size:21px;
+ text-shadow:0 3px 5px #4d2619,0 0 6px #79472f;animation:campDamageFloat 770ms ease-out forwards}
+.campFloatDamage::after{content:attr(data-text)}
+.campFloatDamage.hostile{color:#ffb6a7;text-shadow:0 2px 5px #731d12}
+.campMuzzle{width:58px;height:58px;animation:campMuzzleBurst 130ms ease-out forwards;
+ background:radial-gradient(circle,#fffaf0 0 13%,#ffe393 18% 30%,#f7b648 34% 45%,transparent 60%);
+ clip-path:polygon(50% 0%,61% 35%,93% 10%,67% 47%,100% 50%,67% 56%,90% 92%,57% 67%,50% 100%,43% 66%,8% 92%,33% 55%,0 50%,33% 44%,8% 7%,42% 34%)}
+@keyframes campImpactBurst{0%{opacity:1;scale:.38;rotate:-17deg}45%{opacity:1;scale:1.1;rotate:8deg}100%{opacity:0;scale:1.44;rotate:18deg}}
+@keyframes campDamageFloat{0%{opacity:1;translate:0 0}70%{opacity:1}100%{opacity:0;translate:0 -46px}}
+@keyframes campMuzzleBurst{0%{opacity:1;scale:.55}100%{opacity:0;scale:1.6}}
+@media(prefers-reduced-motion:reduce){
+ .campHitBurst,.campFloatDamage,.campMuzzle{animation-duration:140ms}
+}

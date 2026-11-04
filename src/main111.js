@@ -2,7 +2,7 @@
 import {CampBuildings,BUILDING_MODELS} from './buildings/buildingRenderer.js?v=112';
 import {CampProps,PROP_MODELS} from './props/propRenderer.js?v=120';
 import {loadGlb} from './core/glb111.js?v=111';
-import {ArmyRenderer} from './core/renderer.js?v=117';
+import {ArmyRenderer} from './core/renderer.js?v=118';
 import {RigAnimator} from './characters/rigAnimator.js?v=121';
 import {TwoHandBroomRenderer} from './characters/twoHandBroomRenderer119.js?v=119';
 import {RifleRenderer} from './training/rifleRenderer.js?v=117';
@@ -17,7 +17,7 @@ import {initWorldMap} from './ui/worldMap.js?v=093';
 import {setupInput} from './ui/input.js?v=062';
 import {options} from './systems/settings.js?v=060';
 import {createCampNPCs,updateCampNPCs,squadDebug} from './systems/npcSquads113.js?v=127';
-import {createCampCombat} from './systems/campCombat.js?v=2';
+import {createCampCombat} from './systems/campCombat.js?v=3';
 
 const $=id=>document.getElementById(id);
 const debug=new URLSearchParams(location.search).has('debug');
@@ -209,7 +209,7 @@ async function boot(){
     const mapOpen=worldMap.isOpen();
     combat.root.style.visibility=mapOpen?'hidden':'visible';
     const stick=(mapOpen||!combat.playerAlive)?{x:0,y:0,magnitude:0}:input(),m=movement(stick.magnitude);
-    const simDt=dt*(combat.wheelOpen?.12:1);
+    const simDt=combat.scaledDt(dt);
     cameraZoom+=(targetZoom-cameraZoom)*Math.min(1,dt*12);
     if(m.speed>0){
      const dx=stick.x/(stick.magnitude||1),dy=stick.y/(stick.magnitude||1);
@@ -227,7 +227,10 @@ async function boot(){
     player.anim.evaluate(simDt);
     updateCampNPCs(npcs,simDt,now,player.pos);
     combat.update(simDt,now,{blocked:mapOpen});
-    renderer.setCamera({yaw:camYaw,pitch:camPitch,zoom:cameraZoom});renderer.startFrame(player.pos);
+    // Camera feedback is visual only: never mutate the user's saved camera orientation.
+    const kick=combat.cameraOffsets(dt,now);
+    renderer.setCamera({yaw:camYaw+kick.yaw,pitch:Math.max(.32,Math.min(1.12,camPitch+kick.pitch)),zoom:cameraZoom});
+    renderer.startFrame(player.pos);
     buildings.draw(renderer.vp,player.pos);
     props.draw(renderer.vp,player.pos);
     blanketPortal.draw();

@@ -128,6 +128,13 @@ export class ArmyRenderer{
   const lift=corpseLift(a,actor,pivot,!(inFall||inRise));
   const air=inFall?.20*Math.sin(Math.PI*(1-Math.min(1,actor.combatFall/.42))):0;
   model=mul(translation(actor.pos.x,lift+air,actor.pos.z),mul(rotateY(actor.angle),pivot));
+ }else if((actor.combatHurt||0)>0){
+  // Lightweight visual recoil even if the camp's trimmed NPC GLB does not
+  // include Hit_Reaction. The same skinned floor sample keeps boots above ground.
+  const recoil=Math.min(1,actor.combatHurt/(actor.combatHurtFull||.25));
+  const pivot=mul(translation(0,.75,0),mul(rotateX(-.22*recoil),translation(0,-.75,0)));
+  const lift=corpseLift(a,actor,pivot,false);
+  model=mul(translation(actor.pos.x,lift+(actor.renderLift||0),actor.pos.z),mul(rotateY(actor.angle),pivot));
  }else model=mul(translation(actor.pos.x,groundLift(a,actor)+(actor.renderLift||0),actor.pos.z),rotateY(actor.angle));
  gl.uniformMatrix4fv(this.uniforms.model,false,model);
  gl.uniformMatrix4fv(this.uniforms.bones,false,actor.anim.bones);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,a.tex);gl.uniform1i(this.uniforms.tex,0);gl.bindVertexArray(a.vao);gl.drawElements(gl.TRIANGLES,a.count,a.indexType,0);
