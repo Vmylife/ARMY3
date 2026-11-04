@@ -961,6 +961,7 @@ window.armySingingTest={
    flatGuideNotes:guideSegments.length,countdownVisible:!E.countdown.hidden,beatSeconds:BEAT_SECONDS,
    samples:trace.length,liveVoiceGrains:liveVoice?.grains||0,isComparing:E.controls.classList.contains('isComparing'),reviewTraceVisible:(mode==='playback'||mode==='reviewDone')&&E.trace.style.display!=='none',reviewTraceLength:E.trace.getAttribute?.('d')?.length||0,reportOpen:reportPresented,score:lastScore}},
  get refPitch(){return pitch.map(p=>({...p}))},
+ stop:stopAudio, // Stops live voice, original backing, click count-ins before returning to camp.
  analyzePitch:pitchOf,calculate,buildGuideSegments
 };
 E.main.disabled=true;E.repeat.disabled=true;E.preview.disabled=true;
