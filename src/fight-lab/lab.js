@@ -4,7 +4,7 @@ import {ArmyRenderer} from '../core/renderer.js?v=116';
 import {RigAnimator} from '../characters/rigAnimator.js?v=121';
 import {loadGlb} from '../core/glb111.js?v=111';
 import {mul,translation,rotateY} from '../core/math.js?v=060';
-import {FightEngine,ATTACKS,LAUNCH_AFTER_DAMAGE} from './engine.js?v=4';
+import {FightEngine,ATTACKS,LAUNCH_AFTER_DAMAGE} from './engine.js?v=5';
 import {installUserCombatClips} from './uploadedHitAnimations.js?v=1';
 import {setupInput} from '../ui/input.js?v=062';
 
@@ -91,7 +91,7 @@ function drawFighter(f,actor){
  // Additive torso recoil around the waist, ON TOP of the original punch/knockdown animation.
  const lean=clamp(f.lean,-.65,.30);
  const pivot=mul(translation(0,.77,0),mul(rotateX(lean),translation(0,-.77,0)));
- const model=mul(translation(f.x,lowFootLift(a,anim)+.095,f.z),mul(rotateY(f.angle),pivot));
+ const model=mul(translation(f.x,lowFootLift(a,anim)+.095+(f.airHeight||0),f.z),mul(rotateY(f.angle),pivot));
  gl.useProgram(r.p);
  gl.uniformMatrix4fv(r.uniforms.vp,false,r.vp);
  gl.uniformMatrix4fv(r.uniforms.model,false,model);
