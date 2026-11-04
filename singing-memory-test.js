@@ -12,7 +12,7 @@ const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const sleep=()=>new Promise(r=>setTimeout(r,0));
 const E={
  main:$('mainButton'),repeat:$('skipButton'),stage:$('stageTag'),words:$('words'),
- board:$('board'),overlay:$('boardOverlay'),guide:$('guideLine'),trace:$('yourLine'),
+ board:$('board'),controls:$('controlsPanel'),overlay:$('boardOverlay'),guide:$('guideLine'),trace:$('yourLine'),
  head:$('playhead'),dot:$('controlDot'),mouth:$('mouth'),speech:$('speech'),
  feedback:$('feedback'),rank:$('finalRank'),points:$('finalScore'),comment:$('comment'),
  replay:$('replayButton'),compare:$('compareButton'),hint:$('hint'),count:$('takeCount'),
@@ -690,6 +690,7 @@ function tracePathFor(take){
 }
 async function replay(){
  if(takes.length!==PHRASES.length||!lastScore)return;
+ E.controls.classList.remove('isComparing');
  stopAudio();const id=session;
  try{
   await getAudio().resume();
@@ -754,12 +755,14 @@ async function showComparedPhrase(index){
  }
  tracePathFor(takes[index]);
  comparison=true;
+ E.controls.classList.add('isComparing');
  E.guide.style.display='inline';E.guide.setAttribute('visibility','visible');
  E.trace.style.display='';
  E.compare.textContent='收起音準線';
 }
 async function startChallenge(){
  const unlockAudio=getAudio().resume(); // Keep user gesture for mobile Web Audio.
+ E.controls.classList.remove('isComparing');
  takes=[];lastScore=null;comparison=false;
  await unlockAudio;
  await applyPhrase(0);
@@ -784,6 +787,7 @@ E.replay.addEventListener('click',()=>{if(mode==='done')replay()});
 E.compare.addEventListener('click',()=>{
  if(mode!=='done')return;
  comparison=!comparison;
+ E.controls.classList.toggle('isComparing',comparison);
  E.guide.style.display=comparison?'inline':'none';E.guide.setAttribute('visibility',comparison?'visible':'hidden');
  E.trace.style.display=comparison?'':'none';
  E.compare.textContent=comparison?'收起音準線':'📈 查看音準差距';
@@ -798,7 +802,7 @@ window.armySingingTest={
    phraseSeconds:CLIP,referenceFrames:pitch.length,voicedPercent:Math.round(validPitch*100),
    referenceVisible:E.guide.style.display!=='none',guidePathPoints:sourcePitch.filter(Number.isFinite).length,
    flatGuideNotes:guideSegments.length,countdownVisible:!E.countdown.hidden,beatSeconds:BEAT_SECONDS,
-   samples:trace.length,liveVoiceGrains:liveVoice?.grains||0,score:lastScore}},
+   samples:trace.length,liveVoiceGrains:liveVoice?.grains||0,isComparing:E.controls.classList.contains('isComparing'),score:lastScore}},
  get refPitch(){return pitch.map(p=>({...p}))},
  analyzePitch:pitchOf,calculate,buildGuideSegments
 };
