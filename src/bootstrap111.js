@@ -1,5 +1,5 @@
 import {getReturningCampSession} from './systems/campSession.js?v=144';
-// ARMY3 v1.90: same camp boot; only suspend the expensive camp WebGL loop
+// ARMY3 v1.95: progressive camp boot; suspend the expensive camp WebGL loop
 // while a prewarmed minigame iframe covers the screen.
 const $=id=>document.getElementById(id);
 const button=$('armyStart'),loading=$('armyLoading'),bar=$('armyBar');
@@ -18,7 +18,7 @@ window.armyLoadFailure=err=>{
  $('armyMessage').style.color='#a52c27';button.hidden=false;button.disabled=false;button.textContent='重新載入';button.onclick=()=>location.reload();
 };
 async function loadCampWithPause(){
- const sourceURL=new URL('./src/main111.js?v=144',location.href);
+ const sourceURL=new URL('./src/main111.js?v=145',location.href);
  const response=await fetch(sourceURL,{cache:'default'});
  if(!response.ok)throw Error('軍營程式 HTTP '+response.status);
  let source=await response.text();
