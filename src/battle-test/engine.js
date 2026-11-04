@@ -9,10 +9,10 @@ const $=id=>document.getElementById(id);
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 export const BATTLE_SPAWN={player:{x:22.4,z:13.2},allies:[
- {x:17.6,z:13.8},{x:22.0,z:11.0},{x:26.0,z:13.4}
+ {x:16.6,z:14.1},{x:19.3,z:13.5},{x:22.0,z:11.0},{x:24.9,z:13.6},{x:27.1,z:11.7}
 ]};
-// First wave doubled from 6 to 12; later waves continue increasing.
-export const WAVE_SIZE=wave=>Math.min(24,12+Math.ceil(Math.max(0,wave-1)*2.5));
+// First wave has 10 enemies; later waves continue increasing.
+export const WAVE_SIZE=wave=>Math.min(24,10+Math.ceil(Math.max(0,wave-1)*2.5));
 export class ArmyBattleCombat extends CampCombat{
  constructor({player,enemies,allies,renderer,rifleGlb,npcGlb}){
   super({player,npcs:enemies,renderer,rifleGlb,npcGlb});

@@ -12,7 +12,7 @@ import {initWorldMap} from '../ui/worldMap.js?v=093';
 import {setupInput} from '../ui/input.js?v=062';
 import {options} from '../systems/settings.js?v=060';
 import {createCampNPCs,updateCampNPCs} from '../systems/npcLife113.js?v=128';
-import {createArmyBattle,BATTLE_SPAWN} from './engine.js?v=6';
+import {createArmyBattle,BATTLE_SPAWN} from './engine.js?v=7';
 
 const $=id=>document.getElementById(id);
 const debug=new URLSearchParams(location.search).has('debug');
@@ -99,16 +99,16 @@ async function boot(){
   await Promise.all(Array.from({length:Math.min(2,jobs.length)},worker));
   progress('模型完成，正在準備第一個畫面…');
 
-  // Independent battle pool: 3 green defenders and 32 reusable red soldiers.
+  // Independent battle pool: 5 green defenders and 30 reusable red soldiers.
   const player={pos:{...BATTLE_SPAWN.player},angle:0,anim:new RigAnimator(heroGlb)};
   delete player.anim.clips.Jump_Over_Obstacle_2;
   installUserCombatClips(player.anim);
   player.anim.setClip('Idle');player.anim.evaluate(0);
   const npcs=createCampNPCs(npcGlb,player.anim);
-  const allies=npcs.slice(0,3),enemies=npcs.slice(3);
+  const allies=npcs.slice(0,5),enemies=npcs.slice(5);
   const combat=createArmyBattle({player,allies,enemies,renderer,rifleGlb:combatRifleGlb,npcGlb});
   window.armyBattleTest=combat;
-  progress('玩家、3 名友軍、紅軍波次已就位');
+  progress('玩家、5 名友軍、紅軍波次已就位');
   // The new cross-legged clip drops the hips below the original standing root.
   // Lift only the cross-legged skin pose to ground contact; the existing
   // renderer already floor-corrects push-ups/sit-ups independently.
