@@ -226,3 +226,15 @@ button:focus-visible,a:focus-visible,.pitchRail:focus-visible{outline:2px solid 
  .sgr-actions a,.sgr-actions button{min-height:40px}
 }
 @media(max-height:620px){.sgr-subtitle{margin-bottom:6px}.sgr-report{padding-top:8px}.sgr-scorebox{padding:6px 10px}.sgr-big strong{font-size:37px}.sgr-actions a,.sgr-actions button{min-height:37px}.sgr-scroll{padding-top:6px}}
+
+/* Camp integration: the shared ←退出 stays visible at top-left at every stage.
+   Keep the compact song title unobstructed on narrow phones. */
+body[data-army-minigame="singing"] .top{
+  justify-content:flex-end;
+  padding-left:clamp(98px,29vw,125px);
+  padding-right:3px;
+}
+body[data-army-minigame="singing"] .top .brand{white-space:nowrap}
+@media(max-width:360px){
+ body[data-army-minigame="singing"] .top .brand{font-size:15px}
+}
