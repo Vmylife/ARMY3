@@ -1,0 +1,41 @@
+/* Compact home upgrade + result reward. Display only: no gameplay changes. */
+.army-home__wallet{margin:-10px 0 16px;color:#4b6650;font-size:13px;font-weight:800}
+.army-home__upgrade{width:100%;appearance:none;border:1px solid #92a997;background:#ffffffc0;color:#315341;
+ border-radius:11px;min-height:44px;margin:10px 0 0;font-size:14px;font-weight:800;cursor:pointer;touch-action:manipulation}
+.army-upgrade-dialog[hidden]{display:none!important}
+.army-upgrade-dialog{position:fixed;inset:0;z-index:1300;background:#0d251bc4;display:flex;
+ align-items:center;justify-content:center;padding:calc(12px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));
+ box-sizing:border-box;font-family:system-ui,-apple-system,'Noto Sans TC',sans-serif}
+.army-upgrade-panel{box-sizing:border-box;width:min(480px,100%);max-height:100%;display:flex;flex-direction:column;
+ border-radius:20px;overflow:hidden;background:#f6f5e9;color:#274232;box-shadow:0 20px 70px #101f17aa}
+.army-upgrade-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:17px 17px 12px}
+.army-upgrade-header h2{font-size:19px;line-height:1.2;margin:0;font-weight:900}
+.army-upgrade-header small{display:block;font-size:12px;color:#637465;margin-top:5px}
+.army-upgrade-close{appearance:none;border:0;border-radius:9px;background:#e8ebde;color:#315542;font-size:24px;width:36px;height:36px;cursor:pointer}
+.army-upgrade-wallet{font-size:13px;font-weight:850;margin:0 17px 12px}
+.army-upgrade-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0 15px 8px}
+.army-upgrade-tabs button{appearance:none;border:0;border-radius:10px;background:#e4e7dc;padding:11px 6px;
+ font-weight:800;font-size:13px;color:#516b56;cursor:pointer}
+.army-upgrade-tabs button.selected{background:#315c44;color:#fff}
+.army-upgrade-view{min-height:100px;overflow:auto;overscroll-behavior:contain;padding:4px 15px 12px;flex:1;touch-action:pan-y}
+.army-upgrade-group{font-size:12px;letter-spacing:.04em;margin:15px 3px 8px;color:#607663}
+.army-upgrade-card{border:1px solid #d9dfd1;border-radius:11px;background:#fffef8;margin:0 0 8px;overflow:hidden}
+.army-upgrade-card__summary{display:flex;align-items:center;justify-content:space-between;gap:6px;cursor:pointer;padding:11px 12px;list-style:none}
+.army-upgrade-card__summary::-webkit-details-marker{display:none}
+.army-upgrade-card__summary strong{display:block;font-size:13px;font-weight:900}
+.army-upgrade-card__summary small{font-size:11px;color:#718373;display:block;margin-top:4px}
+.army-upgrade-card__chevron{font-size:22px;color:#879783}
+.army-upgrade-card[open] .army-upgrade-card__chevron{transform:rotate(90deg)}
+.army-upgrade-card__body{border-top:1px solid #eaede3;padding:11px 12px 12px;font-size:12px;line-height:1.65;color:#536955}
+.army-upgrade-card__body p{margin:0 0 10px}
+.army-upgrade-buy{background:#3e6d51;border:0;color:#fff;border-radius:9px;padding:10px 13px;font-size:13px;font-weight:800;cursor:pointer}
+.army-upgrade-buy:disabled{background:#b4c0b2;cursor:default}
+.army-upgrade-footer{border-top:1px solid #dfe6d9;padding:10px 17px 13px;font-size:11px;color:#67806c}
+.army-reward{color:inherit;background:rgba(121,145,100,.13);border:1px solid rgba(153,164,117,.45);border-radius:12px;
+ margin:11px auto 13px;width:100%;max-width:430px;box-sizing:border-box;font-family:system-ui,-apple-system,'Noto Sans TC',sans-serif}
+.army-reward__summary{list-style:none;cursor:pointer;font-size:13px;font-weight:850;line-height:1.45;padding:12px 13px;touch-action:manipulation}
+.army-reward__summary::-webkit-details-marker{display:none}
+.army-reward__desc{padding:0 13px 8px;font-size:12px;line-height:1.6;font-weight:650}
+.army-reward__foot{padding:0 13px 12px;font-size:10px;opacity:.69}
+.army-battle-summary{font-size:12px;line-height:1.6;margin:7px auto 14px;max-width:95%;text-align:center;color:#f0da9a}
+@media(max-width:390px){.army-upgrade-header{padding:13px 14px 9px}.army-upgrade-tabs{margin:0 12px 7px}.army-upgrade-view{padding:4px 12px 10px}}

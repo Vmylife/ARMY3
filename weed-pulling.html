@@ -162,6 +162,8 @@ body[data-army-minigame="weed"] #bossStats{
  }
 }
 </style>
+<link rel="stylesheet" href="./src/ui/armyProgression.css?v=1">
+<script src="./src/systems/armyProgression.js?v=1" defer></script>
 </head>
 <body data-army-minigame="weed">
 <canvas id="scene" aria-label="2.5D 拔草遊戲，按住雜草往畫面上方拉"></canvas>
@@ -392,6 +394,7 @@ function showResults(won){
  for(const a of ACHIEVEMENTS)gallery.append(drawAchievement(a,fresh.includes(a),!ids.includes(a.id)));
  document.getElementById('achGallery').open=false;
  UI.finish.classList.add('show');
+  window.armyProgression?.rewardPanel('weed',score,document.querySelector('.reportScore'));
 }
 stageUI.start.addEventListener('click',startGame);
 document.getElementById('again').addEventListener('click',startGame);

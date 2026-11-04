@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="./src/ui/playtest.css?v=077">
 <link rel="stylesheet" href="./src/ui/campCombat.css?v=8">
 <link rel="stylesheet" href="./src/ui/home105.css?v=105">
+<link rel="stylesheet" href="./src/ui/armyProgression.css?v=1">
 <style>
 /* Global game UI behavior */
 
@@ -102,13 +103,28 @@ input[type="range"]{-webkit-user-select:none;user-select:none;-webkit-touch-call
     <div class="army-home__emblem" aria-hidden="true">🪖</div>
     <h1>國軍模擬器</h1>
     <p class="army-home__tagline">新兵訓練營 · 六分鐘軍旅生活</p>
+    <div id="armyHomeMedals" class="army-home__wallet">🎖 0 · 新兵</div>
     <button id="armyStart" class="army-home__start" type="button">開始遊戲</button>
+    <button id="armyUpgradeOpen" class="army-home__upgrade" type="button">士兵升級</button>
     <div id="armyLoading" class="army-home__load" role="status" aria-live="polite" hidden>
       <p class="army-home__message" id="armyMessage">準備載入…</p>
       <div class="army-home__progress" role="progressbar" aria-label="軍營載入進度"><div id="armyBar" class="army-home__bar"></div></div>
       <div id="armyCount" class="army-home__count">0%</div>
     </div>
     <div class="army-home__foot">地圖及模型載入完成後才會進入軍營</div>
+  </div>
+  <div class="army-upgrade-dialog" id="armyUpgradeDialog" hidden role="dialog" aria-modal="true" aria-label="士兵升級">
+   <div class="army-upgrade-panel">
+    <header class="army-upgrade-header"><div><h2>士兵升級</h2><small>點選項目查看說明</small></div><button type="button" class="army-upgrade-close" id="armyUpgradeClose" aria-label="關閉">×</button></header>
+    <div class="army-upgrade-wallet" id="armyUpgradeMedals">🎖 0 枚</div>
+    <nav class="army-upgrade-tabs" aria-label="升級類別">
+     <button type="button" data-tab="rank" class="selected">軍階</button>
+     <button type="button" data-tab="weapon">武器</button>
+     <button type="button" data-tab="training">訓練天賦</button>
+    </nav>
+    <div id="armyUpgradeView" class="army-upgrade-view"></div>
+    <footer id="armyUpgradeToast" class="army-upgrade-footer">所有能力目前僅供展示，不影響遊戲</footer>
+   </div>
   </div>
 </section>
 <div id="fatal" role="alert" hidden><strong>遊戲無法啟動</strong><p id="errorText"></p><button type="button" id="retry">重新載入</button></div>
@@ -117,8 +133,9 @@ input[type="range"]{-webkit-user-select:none;user-select:none;-webkit-touch-call
 <script type="importmap">
 {"imports":{"./src/map/campGeometry.js?v=092":"./src/map/ground103.js?v=124","./src/map/mapDrawing.js?v=093":"./src/map/drawMap95.js?v=095","./src/map/roadMesh.js?v=071":"./src/map/roadMesh104.js?v=125","./src/ui/blanketPortal128.js?v=128":"./src/ui/blanketPortal128.js?v=202","./src/systems/campSession.js?v=144":"./src/systems/campSession.js?v=190","./src/ui/worldMap.js?v=093":"./src/ui/worldMap.js?v=180","./src/training/rangeTraining.js?v=111":"./src/training/rangeTraining.js?v=209"}}
 </script>
+<script src="./src/systems/armyProgression.js?v=1" defer></script>
 <script type="module" src="./src/systems/campBgm.js?v=191"></script>
-<script type="module" src="./src/systems/campGameWarmup.js?v=203"></script>
-<script type="module" src="./src/bootstrap111.js?v=206"></script>
+<script type="module" src="./src/systems/campGameWarmup.js?v=204"></script>
+<script type="module" src="./src/bootstrap111.js?v=208"></script>
 </body>
 </html>

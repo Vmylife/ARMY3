@@ -114,6 +114,7 @@
    btn.addEventListener('click',()=>choosePhrase(Number(btn.dataset.index)));
   }
   $('singResultOverlay').hidden=false;
+   window.armyProgression?.rewardPanel('singing',s.total,$('singReportPoints').closest('.sgr-scorebox')||$('singReportPoints'));
   $('singResultOverlay').querySelector('.sgr-scroll').scrollTop=0;
   choosePhrase(6);
  }

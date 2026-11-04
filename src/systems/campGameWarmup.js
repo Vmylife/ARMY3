@@ -5,12 +5,12 @@ import './shootingRangeLauncher.js?v=100';
 import {clearCampSession} from './campSession.js?v=144';
 const ROOT = new URL('../../', import.meta.url);
 const urls = {
- blanket:'blanket-stack.html?v=192',
- grenade:'grenade-workshop-test.html?v=192',
- shooting:'shooting-paper-range.html?v=192',
- swipe:'/Don-t-like-your-mom/army-test/index.html?v=4',
- weed:'weed-pulling.html?v=194',
- singing:'singing-memory-test.html?v=13'
+ blanket:'blanket-stack.html?v=193',
+ grenade:'grenade-workshop-test.html?v=193',
+ shooting:'shooting-paper-range.html?v=193',
+ swipe:'/Don-t-like-your-mom/army-test/index.html?v=5',
+ weed:'weed-pulling.html?v=195',
+ singing:'singing-memory-test.html?v=14'
 };
 const nearbyAssets={
  blanket:[
@@ -18,7 +18,7 @@ const nearbyAssets={
   'assets/audio/minigames/blanket-parade-loop.mp3','src/systems/blanketSfx.js?v=170'
  ],
  grenade:[
-  urls.grenade,'grenade-user-play.html?embedded=1&v=192',
+  urls.grenade,'grenade-user-play.html?embedded=1&v=193',
   'grenade-user-scene.json?v=130','grenade-user-play-3d.js?v=138',
   'src/systems/grenadeEarlyAudio.js?v=190'
  ],
@@ -33,7 +33,7 @@ const nearbyAssets={
  weed:[urls.weed],
  singing:[
   urls.singing,'singing-memory-test.css?v=13','singing-memory-test.js?v=13',
-  'singing-settlement.js?v=12','singing-samples/junji-backing-from-start-v10.mp3'
+  'singing-settlement.js?v=13','singing-samples/junji-backing-from-start-v10.mp3'
  ]
 };
 const status = {blanket:{},grenade:{},shooting:{},swipe:{},weed:{},singing:{}};

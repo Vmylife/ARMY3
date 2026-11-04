@@ -18,7 +18,7 @@ window.armyLoadFailure=err=>{
  $('armyMessage').style.color='#a52c27';button.hidden=false;button.disabled=false;button.textContent='重新載入';button.onclick=()=>location.reload();
 };
 async function loadCampWithPause(){
- const sourceURL=new URL('./src/main111.js?v=156',location.href);
+ const sourceURL=new URL('./src/main111.js?v=158',location.href);
  const response=await fetch(sourceURL,{cache:'default'});
  if(!response.ok)throw Error('軍營程式 HTTP '+response.status);
  let source=await response.text();
@@ -35,6 +35,7 @@ async function loadCampWithPause(){
  try{await import(blob)}finally{URL.revokeObjectURL(blob)}
 }
 button.addEventListener('click',async()=>{
+ if(!getReturningCampSession())window.armyProgression?.beginRun();
  button.disabled=true;button.hidden=true;
  window.armySetLoading(0,1,getReturningCampSession()?'正在恢復軍營進度…':'建立軍營場景…');
  try{
@@ -43,6 +44,20 @@ button.addEventListener('click',async()=>{
   await loadCampWithPause();
  }catch(error){console.error('軍營載入錯誤',error);window.armyLoadFailure(error)}
 },{once:true});
+if(!getReturningCampSession()){
+ const prefetch=async()=>{
+  for(const path of ['./src/main111.js?v=158','./assets/characters/cadet/cadet-life-lite.glb?v=119']){
+   if(document.body.classList.contains('army-ready'))break;
+   try{
+    if(navigator.connection?.saveData)break;
+    const response=await fetch(new URL(path,location.href),{cache:'default'});
+    if(response.ok)await response.arrayBuffer(); // finish download for HTTP cache
+   }catch{}
+  }
+ };
+ if('requestIdleCallback'in window)requestIdleCallback(prefetch,{timeout:1800});
+ else setTimeout(prefetch,650);
+}
 if(getReturningCampSession()){
  $('armyHome').querySelector('h1').textContent='返回軍營';
  $('armyHome').querySelector('.army-home__tagline').textContent='正在恢復你剛剛的位置';

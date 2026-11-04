@@ -543,6 +543,9 @@ export class CampCombat{
    n.anim.evaluate(0);
    n.renderLift=0;n.shotPending=false;n.home.job='life';n.activity='倒地';
    this.kills++;
+   // Friendly camp NPCs never grant medals: only future marked enemy-wave actors.
+   if(n.isEnemy===true||n.faction==='enemy'||n.team==='enemy')
+    window.armyProgression?.enemyKill(n.id);
    this.notice(this.kills===10?'全營警報！所有存活阿兵哥開始追擊！':
     this.kills===5?'步槍警戒！':this.kills===1?'手槍警戒！':'擊殺 '+this.kills);
    if(this.kills>=10)for(const alive of this.npcs)if(!alive.combatDead)this.engage(alive);
@@ -618,7 +621,10 @@ export class CampCombat{
     {restart:!grounded||this.player.anim.clip!=='falling_down'});
    // Keep the final fall visible instead of instantly covering it with a menu.
    clearTimeout(this.endTimer);
-   this.endTimer=setTimeout(()=>{$('campCombatFinish').hidden=false},2100);
+   this.endTimer=setTimeout(()=>{
+    window.armyProgression?.renderBattleSummary();
+    $('campCombatFinish').hidden=false;
+   },2100);
    this.notice('你被全營阿兵哥制伏了');
   }else if(down){
    this.playerDown=COMBAT_DOWN_SECONDS;this.player.combatDown=this.playerDown;

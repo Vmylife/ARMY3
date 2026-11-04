@@ -9,14 +9,14 @@ import {TwoHandBroomRenderer} from './characters/twoHandBroomRenderer119.js?v=11
 import {CAMP} from './map/camp.js?v=093';
 import {movePlayer} from './map/navCollision109.js?v=124';
 import {createNavDebugger} from './ui/navDebug109.js?v=109';
-import {createBlanketPortal} from './ui/blanketPortal128.js?v=130';
+import {createBlanketPortal} from './ui/blanketPortal128.js?v=131';
 import {saveCampSession,getReturningCampSession,clearCampSession} from './systems/campSession.js?v=144';
 import {drawMinimap} from './ui/minimap.js?v=093';
 import {initWorldMap} from './ui/worldMap.js?v=093';
 import {setupInput} from './ui/input.js?v=062';
 import {options} from './systems/settings.js?v=060';
 import {createCampNPCs,updateCampNPCs,squadDebug} from './systems/npcSquads113.js?v=128';
-import {createCampCombat} from './systems/campCombat.js?v=10';
+import {createCampCombat} from './systems/campCombat.js?v=11';
 
 const $=id=>document.getElementById(id);
 const debug=new URLSearchParams(location.search).has('debug');

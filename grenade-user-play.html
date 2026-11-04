@@ -278,7 +278,9 @@ body[data-phase="aimZ"] #aimInstruction{bottom:calc(22px + env(safe-area-inset-b
 #result #resultBtns button:active{transform:translateY(2px);filter:brightness(.92)}
 @media(orientation:landscape) and (max-height:530px){#aimInstruction{bottom:calc(76px + env(safe-area-inset-bottom));font-size:10px}body[data-phase="aimZ"] #aimInstruction{bottom:calc(8px + env(safe-area-inset-bottom))}}
 @media(prefers-reduced-motion:reduce){#badge{transition:opacity .15s}}
-</style></head><body data-army-minigame="grenade-arena">
+</style><link rel="stylesheet" href="./src/ui/armyProgression.css?v=1">
+<script src="./src/systems/armyProgression.js?v=1" defer></script>
+</head><body data-army-minigame="grenade-arena">
 <script type="module" src="./src/systems/minigameQuickExit.js?v=192"></script>
 <canvas id="world3d"></canvas>
 <header id="top"><div id="titlebar"><div id="logo">💣</div><div id="ttl"><h1>手榴彈｜你的場景 3D 試炸 <span id="version">v1.40 啟動修復</span></h1><div id="caption">你製作的場景 · 投擲動畫 · 跟拍鏡頭 · 爆炸測試</div></div></div><div id="counters"><div><span>摧毀建築</span><strong id="buildings">0</strong></div><div><span>擊殺人數</span><strong id="kills">0</strong></div></div><div id="msg">載入 3D 模型中…</div></header>
@@ -512,6 +514,7 @@ function result(){
  }
  if(!report.achievements.length){const empty=document.createElement('div');empty.className='report-no-achievement';empty.textContent='本次沒有達成特殊成就。下次試著換個威力和落點！';list.append(empty);}
  $('result').classList.add('show');$('result').setAttribute('aria-hidden','false');
+  window.armyProgression?.rewardPanel('grenade',report.score,document.querySelector('.report-score'));
  $('result').querySelector('.resultCard').scrollTop=0;
 }
 
