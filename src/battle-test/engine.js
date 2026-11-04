@@ -27,7 +27,8 @@ export class ArmyBattleCombat extends CampCombat{
   $('campCombatRestart').textContent='重新挑戰';
   $('campCombatRestart').addEventListener('click',()=>location.reload());
   for(const [i,a]of allies.entries()){
-   a.pos={...BATTLE_SPAWN.allies[i]};a.angle=0;a.isEnemy=false;
+   a.pos={...BATTLE_SPAWN.allies[i]};a.angle=Math.PI;a.isEnemy=false;
+   a.battleTarget=null;a.battleSwitchAt=-10;a.battleScanAt=0;a.battleStall=0;a.battleAimPause=0;
    a.combatDead=false;a.combatActive=true;a.combatHP=100;
    a.combatDown=0;a.combatRise=0;a.combatFall=0;a.combatDeathClip=false;
    a.combatHurt=0;a.combatHurtFull=0;a.combatWeapon='rifle';
@@ -112,55 +113,124 @@ export class ArmyBattleCombat extends CampCombat{
   }
  }
 
+
+ // Stable target lock: don't switch direction every time another red runs by.
+ chooseAllyTarget(a,reds){
+  const current=a.battleTarget;
+  let currentDist=Infinity;
+  if(current&&!current.combatDead&&!current.incoming&&insidePerimeter(current.pos)){
+   currentDist=dist(a.pos,current.pos);
+   if(currentDist>24||!lineClear(a.pos,current.pos,.12))currentDist=Infinity;
+  }
+  const scanDue=this.time>=(a.battleScanAt||0)||!Number.isFinite(currentDist);
+  if(!scanDue)return Number.isFinite(currentDist)?current:null;
+  a.battleScanAt=this.time+.19+(a.id%3)*.045;
+  let nearest=null,nearestDist=Infinity;
+  for(const n of reds){
+   if(n.combatDead||n.incoming||!insidePerimeter(n.pos))continue;
+   const d=dist(a.pos,n.pos);
+   if(d>=24||d>=nearestDist)continue;
+   if(!lineClear(a.pos,n.pos,.12))continue;
+   nearest=n;nearestDist=d;
+  }
+  const keepCurrent=Number.isFinite(currentDist)&&
+   (nearest===current||!nearest||
+     (nearestDist>currentDist*.56&&this.time-(a.battleSwitchAt||0)<1.1)||
+     nearestDist>currentDist*.78);
+  const target=keepCurrent?current:nearest;
+  if(target!==current){
+   a.battleTarget=target;
+   a.battleSwitchAt=this.time;
+   a.battleAimPause=this.time+.12;
+  }
+  return target;
+ }
+ turnAlly(a,heading,dt){
+  const delta=Math.atan2(Math.sin(heading-a.angle),Math.cos(heading-a.angle));
+  const step=clamp(delta,-dt*6.8,dt*6.8);
+  a.angle+=step;
+  return Math.abs(delta-step);
+ }
  updateAllies(dt){
-  if(!this.running||this.gameOver)return;
+  if(!this.running||this.gameOver||dt<=0)return;
   const reds=this.liveEnemies;
-  for(const a of this.allies){
+  for(let i=0;i<this.allies.length;i++){
+   const a=this.allies[i];
    if(a.combatDead){
     if(a.combatDeathClip&&this.time-(a.combatDeathAt||0)>2.3){
      a.combatDeathClip=false;a.anim.setClip('Idle',{restart:true});a.anim.speed=1;
     }
     continue;
    }
-   if(a.combatHurt>0){a.combatHurt=Math.max(0,a.combatHurt-dt);a.anim.rifleAim=0;if(a.combatHurt>0)continue}
-   let target=null,best=Infinity;
-   for(const n of reds){
-    if(n.incoming||!insidePerimeter(n.pos))continue;
-    const d=dist(a.pos,n.pos);
-    if(d<best&&d<24&&lineClear(a.pos,n.pos,.12)){target=n;best=d}
+   if(a.combatHurt>0){
+    a.combatHurt=Math.max(0,a.combatHurt-dt);
+    a.anim.rifleAim=0;
+    if(a.combatHurt>0)continue;
+    a.anim.setClip('Idle');a.anim.speed=1;
    }
-   if(target){
-    const home=BATTLE_SPAWN.allies[this.allies.indexOf(a)];
-    if(best>12.5&&dist(a.pos,home)<8.5){
-     const dx=(target.pos.x-a.pos.x)/best,dz=(target.pos.z-a.pos.z)/best;
-     const next=moveNpc(a,dx*dt*2.1,dz*dt*2.1,[...this.allies,...this.enemies],this.player.pos);
-     if(dist(next,a.pos)>.008){a.pos=next;a.anim.setClip('Running');a.anim.speed=1.05}
+   const target=this.chooseAllyTarget(a,reds);
+   const home=BATTLE_SPAWN.allies[i];
+   let moving=false,moved=0;
+   const targetDistance=target?dist(a.pos,target.pos):Infinity;
+   let goal=null,desiredSpeed=0;
+   if(target&&targetDistance>16&&dist(a.pos,home)<6.7){
+    goal=target.pos;desiredSpeed=2.1;
+   }else if(!target&&dist(a.pos,home)>1.20){
+    goal=home;desiredSpeed=1.65;
+   }
+   if(goal){
+    const dx=goal.x-a.pos.x,dz=goal.z-a.pos.z,d=Math.hypot(dx,dz);
+    if(d>.2){
+     const intended=Math.min(d,desiredSpeed*dt);
+     const old=a.pos;
+     const next=moveNpc(a,dx/d*intended,dz/d*intended,[...this.allies,...this.enemies],this.player.pos);
+     const actual=dist(old,next);
+     // Ignore collision detours moving backwards away from the battle goal.
+     const progress=actual>.0001?((next.x-old.x)*dx+(next.z-old.z)*dz)/(actual*d):0;
+     if(actual>Math.max(.002,intended*.22)&&progress>.06){
+      a.pos=next;moved=actual;moving=true;a.battleStall=0;
+      this.turnAlly(a,Math.atan2(next.x-old.x,next.z-old.z),dt);
+     }else{
+      a.battleStall=(a.battleStall||0)+dt;
+     }
     }
-    const heading=Math.atan2(target.pos.x-a.pos.x,target.pos.z-a.pos.z);
-    const delta=Math.atan2(Math.sin(heading-a.angle),Math.cos(heading-a.angle));
-    a.angle+=delta*Math.min(1,dt*8);
-    a.anim.rifleAim=Math.min(1,(a.anim.rifleAim||0)+dt*6);
-    if(this.time>=a.shotAt&&a.anim.rifleAim>.55){
-     const spread=(Math.random()-.5)*.10,aim=heading+spread;
-     this.bullets.push({id:this.seq++,owner:'ally',x:a.pos.x+Math.sin(heading)*.74,z:a.pos.z+Math.cos(heading)*.74,
-      dx:Math.sin(aim),dz:Math.cos(aim),range:27,speed:46,damage:18});
-     a.shotUntil=performance.now()+110;
-     a.shotAt=this.time+1.03+((a.id||0)%3)*.14+Math.random()*.18;
-     this.playRangeShot(dist(a.pos,this.player.pos),performance.now());
-    }
-    if(best<=12.5&&a.anim.clip!=='Idle'){a.anim.setClip('Idle');a.anim.speed=1}
-   }else{
-    // Stay in the ammunition depot defense area; avoid the "five stationary turrets" look.
-    const home=BATTLE_SPAWN.allies[this.allies.indexOf(a)];
-    if(dist(a.pos,home)>1.25){
-     const d=dist(a.pos,home),nx=(home.x-a.pos.x)/d,nz=(home.z-a.pos.z)/d;
-     const next=moveNpc(a,nx*dt*2.0,nz*dt*2.0,[...this.allies,...this.enemies],this.player.pos);
-     if(dist(next,a.pos)>.01){a.pos=next;a.angle=Math.atan2(nx,nz);a.anim.setClip('Walking');a.anim.speed=1.2}
-    }else if(a.anim.clip!=='Idle'){a.anim.setClip('Idle');a.anim.speed=1}
-    a.anim.rifleAim=Math.min(1,(a.anim.rifleAim||0)+dt*4);
+   }else a.battleStall=0;
+   // Actual displacement determines animation, not an attempted command.
+   if(moving){
+    const ratio=clamp(moved/Math.max(dt,.001)/desiredSpeed,.6,1.3);
+    const clip=desiredSpeed>1.9?'Running':'Walking';
+    if(a.anim.clip!==clip)a.anim.setClip(clip);
+    a.anim.speed=clamp(ratio*(clip==='Running'?1.05:1.10),.65,1.35);
+    a.anim.rifleAim=Math.max(0,(a.anim.rifleAim||0)-dt*8);
+    continue;
+   }
+   if(a.anim.clip!=='Idle')a.anim.setClip('Idle');
+   a.anim.speed=1;
+   if(!target){
+    a.anim.rifleAim=Math.max(0,(a.anim.rifleAim||0)-dt*3);
+    continue;
+   }
+   const dx=target.pos.x-a.pos.x,dz=target.pos.z-a.pos.z;
+   const aimHeading=Math.atan2(dx,dz);
+   const leftToTurn=this.turnAlly(a,aimHeading,dt);
+   const aligned=leftToTurn<.22;
+   const wantAim=aligned?1:0;
+   a.anim.rifleAim+=(wantAim-(a.anim.rifleAim||0))*Math.min(1,dt*9);
+   // Require an Idle stance and the correct facing before firing.
+   if(aligned&&a.anim.rifleAim>.77&&this.time>=(a.battleAimPause||0)&&
+      this.time>=a.shotAt){
+    const spread=(Math.random()-.5)*.10,bulletHeading=aimHeading+spread;
+    this.bullets.push({id:this.seq++,owner:'ally',
+     x:a.pos.x+Math.sin(aimHeading)*.74,z:a.pos.z+Math.cos(aimHeading)*.74,
+     dx:Math.sin(bulletHeading),dz:Math.cos(bulletHeading),
+     range:27,speed:46,damage:18});
+    a.shotUntil=performance.now()+110;
+    a.shotAt=this.time+1.03+((a.id||0)%3)*.14+Math.random()*.18;
+    this.playRangeShot(targetDistance,performance.now());
    }
   }
  }
+
  damageAlly(a,damage){
   if(a.combatDead||damage<=0)return;
   a.combatHP=Math.max(0,a.combatHP-damage);
