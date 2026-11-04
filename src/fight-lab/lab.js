@@ -4,13 +4,16 @@ import {ArmyRenderer} from '../core/renderer.js?v=116';
 import {RigAnimator} from '../characters/rigAnimator.js?v=121';
 import {loadGlb} from '../core/glb111.js?v=111';
 import {mul,translation,rotateY} from '../core/math.js?v=060';
-import {FightEngine,ATTACKS} from './engine.js?v=1';
+import {FightEngine,ATTACKS} from './engine.js?v=2';
+import {setupInput} from '../ui/input.js?v=062';
 
 const $=id=>document.getElementById(id);
 const e=new FightEngine();
 let renderer=null,ground=null,actors=null,ready=false,last=0,shake=0,noticeUntil=0,roundSerial=0,audio=null,sample=null;
-const keys=new Set(),stick={pointer:null,x:0,z:0};
+let input=()=>({x:0,y:0,magnitude:0});
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp=(a,b,t)=>a+(b-a)*clamp(t,0,1);
+let cameraYaw=.66,cameraPitch=.72,cameraZoom=8.8,targetZoom=8.8;
 const rotateX=rad=>{const c=Math.cos(rad),s=Math.sin(rad);return new Float32Array([1,0,0,0,0,c,s,0,0,-s,c,0,0,0,0,1])};
 function tell(text,ms=1700){
  $('callout').textContent=text;
@@ -97,10 +100,13 @@ function drawFighter(f,actor){
  gl.bindVertexArray(a.vao);gl.drawElements(gl.TRIANGLES,a.count,a.indexType,0);
  gl.bindVertexArray(null);
 }
-const CLIP={idle:'Idle',walk:'Walking',attack:'Punch_Combo_1',hit:'Idle',down:'Knock_Down',rise:'Arise',dodge:'Running'};
+const CLIP={idle:'Idle',walk:'Walking',attack:'Punch_Combo_1',hit:'Idle',down:'Knock_Down',rise:'Arise'};
 function syncActor(f,actor,dt){
  const anim=actor.anim;
  let clip=CLIP[f.state]||'Idle';
+ if(f.state==='walk'&&f.id==='player'){
+  clip=f.moveSpeed>=7?'RunFast':f.moveSpeed>=4.2?'Running':'Walking';
+ }
  if(!anim.hasClip(clip))clip=anim.hasClip('Walking')?'Walking':Object.keys(anim.clips)[0];
  if(clip!==actor.clip){
   anim.setClip(clip,{restart:true});
@@ -112,7 +118,8 @@ function syncActor(f,actor,dt){
   anim.speed=clamp(duration/(ATTACKS[f.attack.type].length*1.45),.85,2.5);
  }else if(f.state==='down'){
   anim.speed=clamp((anim.clips[clip]?.duration||1.2)/.8,.75,1.75);
- }else anim.speed=1;
+ }else if(f.state==='walk'&&f.id==='player')anim.speed=clamp((f.moveSpeed||3)/4,.86,1.55);
+ else anim.speed=1;
  anim.evaluate(dt);
 }
 function project(x,y,z){
@@ -176,7 +183,7 @@ function react(){
  for(const event of e.drain()){
   if(event.kind==='swing'){
    whoosh(event.type==='heavy'||event.type==='counter');
-   if(event.who==='enemy')tell('對方準備還手了！按閃避！',950);
+   if(event.who==='enemy')tell('對方準備還手了！快走位！',950);
   }else if(event.kind==='hit'){
    const heavy=event.type==='heavy';
    shake=Math.max(shake,heavy?.20:.11);
@@ -190,9 +197,7 @@ function react(){
    }
   }else if(event.kind==='miss'){
    if(event.who==='player')tell('揮空了！靠近一點再打。',850);
-  }else if(event.kind==='evade'){tell(event.who==='player'?'漂亮！閃過一拳！':'對手閃掉了！',850)}
-  else if(event.kind==='dodge'){tell('閃避！等他揮空再反擊。',750)}
-  else if(event.kind==='rise'&&event.who==='enemy'){tell('對手站起來了：「幹！還來？」',1200)}
+  }else if(event.kind==='rise'&&event.who==='enemy'){tell('對手站起來了：「幹！還來？」',1200)}
   else if(event.kind==='finished'){
    const serial=roundSerial;
    setTimeout(()=>{if(serial===roundSerial)showEnd(event.winner)},1700);
@@ -205,7 +210,6 @@ function updateHUD(){
   const display=Math.ceil(hp);
   if(fill.dataset.hp!==String(display)){fill.style.width=hp+'%';fill.dataset.hp=String(display);text.textContent=display+' / 100'}
  }
- $('dodge').disabled=e.player.dodgeCD>.01||Boolean(e.winner)||!ready;
  $('light').disabled=!ready||Boolean(e.winner);
  $('heavy').disabled=!ready||Boolean(e.winner);
  const title=e.winner?'本回合已結束':e.aggressive?(e.aiEnabled?'AI 已進入反擊模式':'AI 反擊已關閉'):'對手等待你先出拳';
@@ -224,59 +228,47 @@ function reset(){
  const settings={ai:$('counter').checked,difficulty:$('difficulty').value};
  e.reset();e.enableAI(settings.ai);e.difficulty=settings.difficulty;
  $('endScreen').hidden=true;$('burstLayer').replaceChildren();$('combo').hidden=true;
- shake=0;last=0;tell('先靠近對手，再出拳！',1700);updateHUD();
+ shake=0;last=0;if(renderer)renderer.cameraReady=false;
+ tell('像在軍營一樣自由移動，面向對手再揮拳！',1700);updateHUD();
  if(actors){for(const a of Object.values(actors)){a.clip='';a.anim.setClip('Idle',{restart:true});a.anim.evaluate(0)}}
 }
 function controls(){
- const s=$('stick');
- const move=event=>{
-  if(stick.pointer!==event.pointerId)return;
-  const rect=s.getBoundingClientRect(),x=event.clientX-(rect.left+rect.width/2),z=event.clientY-(rect.top+rect.height/2);
-  const r=rect.width*.32,d=Math.hypot(x,z),ratio=Math.min(1,r/Math.max(d,.001));
-  stick.x=clamp(x*ratio/r,-1,1);stick.z=clamp(-z*ratio/r,-1,1);
-  $('stickThumb').style.transform='translate('+(stick.x*40)+'px,'+(-stick.z*40)+'px)';
- };
- s.addEventListener('pointerdown',event=>{event.preventDefault();stick.pointer=event.pointerId;s.setPointerCapture?.(event.pointerId);move(event)});
- s.addEventListener('pointermove',move);
- const stop=()=>{stick.pointer=null;stick.x=stick.z=0;$('stickThumb').style.transform='translate(0,0)'};
- s.addEventListener('pointerup',stop);s.addEventListener('pointercancel',stop);window.addEventListener('blur',stop);
+ // Reuse the EXACT same floating joystick / camera-look / pinch-zoom module
+ // that operates the real army camp. It captures canvas touches, not attack buttons.
+ input=setupInput($('arena'),
+  (dx,dy)=>{cameraYaw+=dx;cameraPitch=clamp(cameraPitch+dy,.32,1.12);},
+  ratio=>{if(Number.isFinite(ratio)&&ratio>0)targetZoom=clamp(targetZoom*ratio,6.5,17.6)}
+ );
  function playAction(type){
   if(!ready)return;
   unlockAudio();
-  if(type==='dodge'){e.dodge()}else e.attack(type);
+  e.attack(type);
   react();updateHUD();
  }
  $('light').addEventListener('click',()=>playAction('jab'));
  $('heavy').addEventListener('click',()=>playAction('heavy'));
- $('dodge').addEventListener('click',()=>playAction('dodge'));
  $('reset').addEventListener('click',reset);$('again').addEventListener('click',reset);
- $('counter').addEventListener('change',event=>{e.enableAI(event.target.checked);tell(event.target.checked?'反擊模式開啟，對手會還手。':'反擊模式關閉，練習出拳手感。',1150)});
+ $('counter').addEventListener('change',event=>{
+  e.enableAI(event.target.checked);
+  tell(event.target.checked?'反擊模式開啟，對手會還手。':'反擊模式關閉，練習出拳手感。',1150);
+ });
  $('difficulty').addEventListener('change',event=>{e.difficulty=event.target.value});
  window.addEventListener('keydown',event=>{
-  if(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','KeyJ','KeyK'].includes(event.code))event.preventDefault();
-  if(event.repeat)return;
-  keys.add(event.code);
-  if(event.code==='KeyJ')playAction('jab');
-  if(event.code==='KeyK')playAction('heavy');
-  if(event.code==='Space')playAction('dodge');
+  if(!['KeyJ','KeyK'].includes(event.code)||event.repeat)return;
+  event.preventDefault();
+  playAction(event.code==='KeyJ'?'jab':'heavy');
  });
- window.addEventListener('keyup',event=>keys.delete(event.code));
- window.addEventListener('blur',()=>keys.clear());
- let drag=null;
- $('arena').addEventListener('pointerdown',event=>{drag={id:event.pointerId,x:event.clientX};$('arena').setPointerCapture?.(event.pointerId)});
- $('arena').addEventListener('pointermove',event=>{
-  if(!drag||drag.id!==event.pointerId)return;
-  cameraYaw=clamp(cameraYaw+(event.clientX-drag.x)*.004,-.55,.75);drag.x=event.clientX;
- });
- $('arena').addEventListener('pointerup',()=>drag=null);
- $('arena').addEventListener('pointercancel',()=>drag=null);
 }
-let cameraYaw=.04;
+// Identical 3D directional basis as src/main111.js: camera-relative movement.
 function direction(){
- const x=Number(keys.has('KeyD')||keys.has('ArrowRight'))-Number(keys.has('KeyA')||keys.has('ArrowLeft'));
- const z=Number(keys.has('KeyW')||keys.has('ArrowUp'))-Number(keys.has('KeyS')||keys.has('ArrowDown'));
- if(x||z){const len=Math.hypot(x,z);return{x:x/len,z:z/len}}
- return{x:stick.x,z:stick.z};
+ const stick=input(),mag=stick.magnitude;
+ if(!Number.isFinite(mag)||mag<.09)return{x:0,z:0,speed:0};
+ const speed=mag<.42?lerp(1.8,4.2,(mag-.09)/(.42-.09))
+  :mag<.75?lerp(4.2,6.6,(mag-.42)/(.75-.42))
+  :lerp(6.6,8.3,(mag-.75)/(.25));
+ const dx=stick.x/mag,dy=stick.y/mag;
+ const c=Math.cos(cameraYaw),s=Math.sin(cameraYaw);
+ return{x:dx*c-dy*s,z:-dx*s-dy*c,speed};
 }
 function frame(now){
  requestAnimationFrame(frame);
@@ -285,17 +277,18 @@ function frame(now){
  last=now;
  if(document.hidden){last=0;return}
  e.step(dt,direction());
+ cameraZoom+=(targetZoom-cameraZoom)*Math.min(1,dt*12);
  react();
  const frozen=e.freeze>0;
  if(!frozen){syncActor(e.player,actors.player,dt);syncActor(e.enemy,actors.enemy,dt)}
  shake=Math.max(0,shake-dt*.73);
  const cameraJitter=shake*Math.sin(now*.091)*.075;
- renderer.setCamera({yaw:cameraYaw+cameraJitter,pitch:.47+shake*Math.cos(now*.11)*.035,zoom:7.3});
- renderer.startFrame({x:(e.player.x+e.enemy.x)/2,z:(e.player.z+e.enemy.z)/2});
+ renderer.setCamera({yaw:cameraYaw+cameraJitter,pitch:cameraPitch+shake*Math.cos(now*.11)*.035,zoom:cameraZoom});
+ renderer.startFrame(e.player);
  renderFloor();drawFighter(e.player,actors.player);drawFighter(e.enemy,actors.enemy);
  followLabel('playerLabel',e.player);followLabel('enemyLabel',e.enemy);
  if(now>noticeUntil&&e.aggressive&&!e.winner){
-  $('callout').textContent=e.aiEnabled?'NPC 會還手，注意閃避時機！':'練習模式：NPC 暫不還手';
+  $('callout').textContent=e.aiEnabled?'NPC 會還手，靠移動走位！':'練習模式：NPC 暫不還手';
  }
  updateHUD();
 }
@@ -332,5 +325,7 @@ window.armyFightLab={
   hasPunch:!!actors?.player.anim.hasClip('Punch_Combo_1'),
   hasKnockdown:!!actors?.player.anim.hasClip('Knock_Down')}},
  attack:type=>{const ok=e.attack(type||'jab');react();return ok},
- dodge:()=>e.dodge(),reset,engine:e
+ reset,engine:e,
+ get camera(){return {yaw:cameraYaw,pitch:cameraPitch,zoom:cameraZoom,targetZoom}},
+ get movement(){return direction()}
 };
