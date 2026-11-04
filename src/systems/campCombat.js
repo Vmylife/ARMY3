@@ -424,10 +424,12 @@ export class CampCombat{
    if(d<min){min=d;target=n}
   }
   if(target)aim=Math.atan2(target.pos.x-p.x,target.pos.z-p.z);
-  const speed=this.weapon==='rifle'?58:48,scatter=0;
-  const x=p.x+Math.sin(this.player.angle)*.75,z=p.z+Math.cos(this.player.angle)*.75;
-  this.bullets.push({id:this.seq++,owner:'player',x,z,dx:Math.sin(aim+scatter),dz:Math.cos(aim+scatter),
-   range:27,speed,damage:this.weapon==='rifle'?40:25});
+  const muzzle=this.weapon==='rifle'?1.00:.73;
+  const x=p.x+forward.x*muzzle-Math.cos(this.player.angle)*.085;
+  const z=p.z+forward.z*muzzle+Math.sin(this.player.angle)*.085;
+  this.bullets.push({id:this.seq++,owner:'player',x,z,dx:Math.sin(aim),dz:Math.cos(aim),
+   angle:aim,targetId:target?.id??null,
+   range:28,speed:49,damage:this.weapon==='rifle'?40:25});
   this.playerCooldown=this.weapon==='rifle'?.125:.25;
   this.playerShotAt=performance.now();
   this.player.shotUntil=this.playerShotAt+(this.weapon==='rifle'?100:115);
@@ -442,7 +444,7 @@ export class CampCombat{
    if(d>1.85)break;
    const vx=(n.pos.x-p.x)/Math.max(.01,d),vz=(n.pos.z-p.z)/Math.max(.01,d);
    if(vx*direction.x+vz*direction.z<.22||!lineClear(p,n.pos,.1))continue;
-   this.damageNPC(n,27,'punch');return;
+   this.damageNPC(n,10,'punch');return;
   }
  }
  damageNPC(n,damage,kind='bullet'){
@@ -590,6 +592,18 @@ export class CampCombat{
   if(!this.bullets.length)return;
   const remaining=[];
   for(const b of this.bullets){
+   // The lab's gentle 15-degree target tracking also works while opponents
+   // run across the camp. Locks stop when a building blocks the view.
+   if(b.owner==='player'&&b.targetId!=null){
+    const tracked=this.npcs.find(n=>n.id===b.targetId&&!n.combatDead);
+    if(tracked&&lineClear({x:b.x,z:b.z},tracked.pos,.10)){
+     const desired=Math.atan2(tracked.pos.x-b.x,tracked.pos.z-b.z);
+     const current=Math.atan2(b.dx,b.dz);
+     const delta=Math.atan2(Math.sin(desired-current),Math.cos(desired-current));
+     const angle=current+clamp(delta,-4.5*dt,4.5*dt);
+     b.dx=Math.sin(angle);b.dz=Math.cos(angle);b.angle=angle;
+    }else b.targetId=null;
+   }
    let travel=Math.min(b.range,b.speed*dt),alive=true;
    while(travel>0&&alive){
     const segment=Math.min(travel,.095);
@@ -673,7 +687,7 @@ export class CampCombat{
      // Mid-swing hit frame: moving out of range makes the punch miss.
      if(!this.playerDown&&!this.playerRise&&!this.gameOver&&
          distance(n.pos,this.player.pos)<1.93&&this.canSeeNPC(n))
-      this.damagePlayer(8,'punch');
+      this.damagePlayer(9,'punch');
     }
    }
    if(n.combatDown>0){
