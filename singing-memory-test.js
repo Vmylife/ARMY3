@@ -76,7 +76,7 @@ function setMode(next){
  const showReference=next==='countinTeacher'||next==='listen'||(next==='done'&&comparison);
  E.guide.style.display=showReference?'inline':'none';
  E.guide.setAttribute('visibility',showReference?'visible':'hidden');
- E.trace.style.display=next==='done'&&comparison?'':'none';
+ E.trace.style.display=(next==='playback'||(next==='done'&&comparison))?'inline':'none';
  E.dot.setAttribute('visibility',(next==='imitate'||next==='countinPlayer')?'visible':'hidden');
  E.overlay.hidden=playing||next==='done';
  E.main.textContent=next==='empty'?'載入中':next==='error'?'重新載入':next==='ready'?'開始':
@@ -746,10 +746,13 @@ function calculate(){
   good:precise
  };
 }
-function tracePathFor(take){
+function tracePathFor(take,until=Infinity){
  let path='',drawing=false;
  const records=take?.trace||trace;
- for(let i=0;i<records.length;i++){
+ const end=Number.isFinite(until)
+  ?Math.min(records.length,Math.max(0,Math.floor(until/STEP)+1))
+  :records.length;
+ for(let i=0;i<end;i++){
   if(!records[i].on){drawing=false;continue}
   path+=(drawing?' L':' M')+plotX(i*STEP).toFixed(1)+' '+toY(records[i].m).toFixed(1);
   drawing=true;
@@ -766,7 +769,8 @@ async function replay(){
   E.feedback.hidden=true;
   setMode('playback');
   E.guide.style.display='none';
-  E.trace.style.display='none';
+  E.trace.style.display='inline';
+  E.trace.setAttribute('d',''); // The intro has no player vocals yet.
   E.words.textContent='♪ 前奏';
   E.count.textContent='總回顧';
   E.speech.textContent='先聽原版前奏，接著就是你的七句成果！';
@@ -789,16 +793,30 @@ async function replay(){
      if(t>=BACKING_PHRASE_STARTS[i])next=i;
     }
     if(next!==current&&next>=0){
-     current=next;activePhrase=next;
-     CLIP=PHRASES[next].duration;
+     current=next;
+     // Switch the coordinate scale to this actual verse before displaying the
+     // stored player gesture. The accompaniment remains completely untouched.
+     applyPhrase(next).then(()=>{
+      if(id!==session||mode!=='playback')return;
+      E.trace.style.display='inline';
+      E.guide.style.display='none';
+     }).catch(err=>console.warn('[軍歌鑑測] 無法載入回顧音準',err));
      E.words.textContent=PHRASES[next].text;
      E.count.textContent=(next+1)+' / '+PHRASES.length;
      E.speech.textContent='這句你唱了 '+takes[next].score.points+' 分，自己聽聽看！';
      E.coachScore.textContent='第 '+(next+1)+' 句回放';
      for(let i=0;i<PHRASES.length;i++)$('phraseStep'+(i+1))?.classList.toggle('active',i===next);
     }
-    if(current>=0)headAt(Math.max(0,t-BACKING_PHRASE_STARTS[current]));
-    else headAtPre(Math.max(0,t)*4*BEAT_SECONDS/BACKING_PHRASE_STARTS[0]);
+    if(current>=0){
+     const elapsed=t-BACKING_PHRASE_STARTS[current];
+     headAt(Math.max(0,elapsed));
+     // Render the player's red pitch trace progressively, synchronized with the
+     // single continuous original backing, not the hidden sergeant answer.
+     tracePathFor(takes[current],Math.max(0,elapsed));
+    }else{
+     E.trace.setAttribute('d','');
+     headAtPre(Math.max(0,t)*4*BEAT_SECONDS/BACKING_PHRASE_STARTS[0]);
+    }
     frame=requestAnimationFrame(tick);
    };
    frame=requestAnimationFrame(tick);
@@ -905,7 +923,7 @@ window.armySingingTest={
    phraseSeconds:CLIP,referenceFrames:pitch.length,voicedPercent:Math.round(validPitch*100),
    referenceVisible:E.guide.style.display!=='none',guidePathPoints:sourcePitch.filter(Number.isFinite).length,
    flatGuideNotes:guideSegments.length,countdownVisible:!E.countdown.hidden,beatSeconds:BEAT_SECONDS,
-   samples:trace.length,liveVoiceGrains:liveVoice?.grains||0,isComparing:E.controls.classList.contains('isComparing'),score:lastScore}},
+   samples:trace.length,liveVoiceGrains:liveVoice?.grains||0,isComparing:E.controls.classList.contains('isComparing'),reviewTraceVisible:mode==='playback'&&E.trace.style.display!=='none',reviewTraceLength:E.trace.getAttribute?.('d')?.length||0,score:lastScore}},
  get refPitch(){return pitch.map(p=>({...p}))},
  analyzePitch:pitchOf,calculate,buildGuideSegments
 };
