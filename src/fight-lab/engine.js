@@ -8,7 +8,7 @@ const minmax=(n,lo,hi)=>Math.max(lo,Math.min(hi,n));
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 function fighter(id,x){
  return{id,x,z:0,angle:id==='player'?Math.PI/2:-Math.PI/2,hp:100,
- state:'idle',attack:null,stun:0,down:0,rise:0,cd:0,
+ state:'idle',attack:null,stun:0,down:0,rise:0,cd:0,moveSpeed:0,
  pushX:0,pushZ:0,lean:0,chain:0,chainAt:-99};
 }
 export class FightEngine{
@@ -103,8 +103,8 @@ export class FightEngine{
     const desired=Math.atan2(mx,mz);
     const delta=Math.atan2(Math.sin(desired-p.angle),Math.cos(desired-p.angle));
     p.angle+=delta*Math.min(1,dt*13.2);
-    p.state='walk';
-   }else if(p.state==='walk')p.state='idle';
+    p.moveSpeed=speed;p.state='walk';
+   }else if(p.state==='walk'){p.state='idle';p.moveSpeed=0}
   }
   this.think(dt);
   for(const a of [p,e]){a.x=minmax(a.x,-5.6,5.6);a.z=minmax(a.z,-3.8,3.8)}
