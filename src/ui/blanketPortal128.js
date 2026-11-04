@@ -79,7 +79,7 @@ export function createBlanketPortal(renderer,{onTrainingStart=()=>{},resuming=fa
  const weed=createPortalMenu({position:WEED_PORTAL,kind:'weed',panelId:'weedPortalMenu',startId:'weedPortalStart',cancelId:'weedPortalCancel',
   destination:'./weed-pulling.html?v=196',onStart:()=>onTrainingStart('weed'),initialDismissed:resuming,isAlerted});
  const singing=createPortalMenu({position:SINGING_PORTAL,kind:'singing',panelId:'singingPortalMenu',startId:'singingPortalStart',cancelId:'singingPortalCancel',
-  destination:'./singing-memory-test.html?v=15',onStart:()=>onTrainingStart('singing'),initialDismissed:resuming,isAlerted});
+  destination:'./singing-memory-test.html?v=16',onStart:()=>onTrainingStart('singing'),initialDismissed:resuming,isAlerted});
  const portals=[
   {position:BLANKET_PORTAL,menu:blanket},
   {position:GRENADE_PORTAL,menu:grenade},

@@ -10,7 +10,7 @@ const urls = {
  shooting:'shooting-paper-range.html?v=195',
  swipe:'/Don-t-like-your-mom/army-test/index.html?v=6',
  weed:'weed-pulling.html?v=196',
- singing:'singing-memory-test.html?v=15'
+ singing:'singing-memory-test.html?v=16'
 };
 const nearbyAssets={
  blanket:[
@@ -32,8 +32,8 @@ const nearbyAssets={
  ],
  weed:[urls.weed],
  singing:[
-  urls.singing,'singing-memory-test.css?v=14','singing-memory-test.js?v=14',
-  'singing-settlement.js?v=14','singing-samples/junji-backing-from-start-v10.mp3'
+  urls.singing,'singing-memory-test.css?v=15','singing-memory-test.js?v=14',
+  'singing-settlement.js?v=15','singing-samples/junji-backing-from-start-v10.mp3'
  ]
 };
 const status = {blanket:{},grenade:{},shooting:{},swipe:{},weed:{},singing:{}};

@@ -238,3 +238,64 @@ body[data-army-minigame="singing"] .top .brand{white-space:nowrap}
 @media(max-width:360px){
  body[data-army-minigame="singing"] .top .brand{font-size:15px}
 }
+
+
+/* v1.4: Restore the hidden report content on mobile.
+   flex-basis:0 in an auto-height card previously collapsed the entire report body.
+   This remains a compact card; only short screens need inner scrolling. */
+.sgr-report{
+ width:min(490px,100%);
+ height:auto;
+ max-height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 22px);
+}
+.sgr-scroll{
+ flex:0 1 auto;
+ min-height:0;
+ overflow-y:auto;
+ -webkit-overflow-scrolling:touch;
+ overscroll-behavior:contain;
+ touch-action:pan-y;
+}
+.sgr-report .army-reward{margin:7px 0 0;border-radius:9px}
+.sgr-report .army-reward__summary{font-size:11px;padding:7px 10px;line-height:1.4}
+.sgr-report .army-reward__desc{font-size:11px;padding:0 10px 5px}
+.sgr-report .army-reward__foot{font-size:9px;padding:0 10px 6px}
+.sgr-section{margin-bottom:9px}
+.sgr-rounds{gap:5px}
+.sgr-round{padding:7px 3px}
+.sgr-round strong{font-size:23px}
+.sgr-achcard{appearance:none;-webkit-appearance:none;font:inherit;cursor:pointer;color:inherit;width:100%;border-radius:10px;touch-action:manipulation}
+.sgr-achcard:active{transform:scale(.98)}
+.sgr-achcard:focus-visible{outline:2px solid #f4dca3;outline-offset:2px}
+.sgr-achdetail{margin-top:7px;padding:8px 10px;border:1px solid #cdb67a7c;background:#1a3929;border-radius:9px;color:#e5e8ce;font-size:11px;line-height:1.5}
+.sgr-achdetail strong{display:block;color:#f8dfaa;margin-bottom:2px;font-size:12px}
+.sgr-achdetail[hidden]{display:none!important}
+.sgr-compare-details{margin:0 0 3px;border:1px solid #a5b48a5c;background:#213e2d;border-radius:10px;overflow:hidden}
+.sgr-compare-details summary{min-height:35px;display:flex;justify-content:space-between;gap:8px;align-items:center;padding:7px 10px;font-size:12px;font-weight:900;color:#ead9a8;cursor:pointer;touch-action:manipulation}
+.sgr-compare-details summary::-webkit-details-marker{display:none}
+.sgr-compare-details summary span{font-size:10px;font-weight:650;color:#b5c9b2}
+.sgr-compare-details summary::before{content:'▸';margin-right:3px;font-size:12px}
+.sgr-compare-details[open] summary::before{content:'▾'}
+.sgr-compare-content{padding:0 9px 9px}
+.sgr-compare-details .sgr-comparebox{height:95px}
+.sgr-officer{padding:9px 10px;font-size:12px;line-height:1.5}
+.sgr-actions{padding-top:8px}
+@media(max-width:420px){
+ .sgr-report{padding:10px 11px 8px}
+ .sgr-scroll{padding-top:7px}
+ .sgr-section{margin-bottom:8px}
+ .sgr-scorebox{padding:7px 10px}
+ .sgr-round{padding:5px 2px}
+ .sgr-round strong{font-size:20px}
+ .sgr-achcard{min-height:59px}
+ .sgr-officer{padding:8px 10px}
+ .sgr-compare-details summary{font-size:11px}
+ .sgr-compare-details summary span{font-size:9px}
+}
+@media(max-height:690px){
+ .sgr-report{padding-top:8px}
+ .sgr-subtitle{margin-bottom:6px}
+ .sgr-section{margin-bottom:6px}
+ .sgr-achcard{min-height:52px}
+ .sgr-actions a,.sgr-actions button{min-height:37px}
+}
