@@ -1,4 +1,4 @@
-/* ARMY3 singing memory v1.2 — seven-line coach mode and continuous original backing review.
+/* ARMY3 singing memory v1.2 — four-line coach mode and continuous original backing review.
    Original vocals play during drills; original uninterrupted instrumental plays only during the final full-song review.
    Correct pitch is derived from the selected vocal waveform (no invented tune).
    Browser-only processing: Web Audio + short-time pitch detection + OLA pitch warp.
@@ -38,28 +38,23 @@ const SOURCE_PITCH_50MS=[null,null,null,null,null,null,null,null,null,66.7,66.7,
 //  國家有綱常／軍隊有軍紀: 8.35–12.37s (4.02s)
 //  軍紀是軍隊的命脈:     12.45–16.27s (3.82s)
 // Existing spectral pitch analysis of source 8.0–16.0s is sliced to match.
+// The first 4.02s clip contains TWO lyrics. Split at the musical phrase boundary.
+const FIRST_LINE_PITCH=SOURCE_PITCH_50MS.slice(7,88);
+const FIRST_LINE_URL='./singing-samples/junji-vocals-line1-v7.mp3';
 const PHRASES=[
- {text:'國家有綱常　／　軍隊有軍紀',duration:4.02,
-  audioUrl:'./singing-samples/junji-vocals-line1-v7.mp3',pitch:SOURCE_PITCH_50MS.slice(7,88)},
+ {text:'國家有綱常',duration:2.00,
+  audioUrl:FIRST_LINE_URL,clipOffset:0,pitch:FIRST_LINE_PITCH.slice(0,41)},
+ {text:'軍隊有軍紀',duration:2.02,
+  audioUrl:FIRST_LINE_URL,clipOffset:2.00,pitch:FIRST_LINE_PITCH.slice(40,81)},
  {text:'軍紀是軍隊的命脈',duration:3.82,
   audioUrl:'./singing-samples/junji-vocals-line2-v7.mp3',
   pitch:SOURCE_PITCH_50MS.slice(89,161).concat([null,null,null,null,null])},
  {text:'以三民主義為根基',duration:3.80,
-  audioUrl:'./singing-samples/junji-line3-v8.mp3',pitch:null},
- {text:'三信心，堅如鐵',duration:3.85,
-  audioUrl:'./singing-samples/junji-line4-v8.mp3',pitch:null},
- {text:'上下團結成一體',duration:3.80,
-  audioUrl:'./singing-samples/junji-line5-v8.mp3',pitch:null},
- {text:'號令嚴明，服從第一',duration:4.00,
-  audioUrl:'./singing-samples/junji-line6-v8.mp3',pitch:null},
- {text:'革命軍人要牢記',duration:3.65,
-  audioUrl:'./singing-samples/junji-line7-v8.mp3',pitch:null}
+  audioUrl:'./singing-samples/junji-line3-v8.mp3',pitch:null}
 ];
 const PITCH_URL='./singing-samples/junji-pitches-v8.json?v=8';
 const BACKING_URL='./singing-samples/junji-backing-from-start-v10.mp3?v=10';
-// The instrumental begins at the actual song's 0:00. Each warped vocal part is
-// inserted at its original song timestamp; the backing buffer is never split.
-const BACKING_PHRASE_STARTS=[8.35,12.45,16.28,20.62,24.72,28.82,32.98];
+const BACKING_PHRASE_STARTS=[8.35,10.35,12.45,16.28];
 const MIDI=f=>69+12*Math.log2(f/440);
 function getAudio(){if(!ctx){const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)throw Error('此裝置不支援 Web Audio');ctx=new Audio()}return ctx}
 function setText(s){E.info.textContent=s}
@@ -73,7 +68,7 @@ function setMode(next){
  if(!next.startsWith('countin'))E.countdown.hidden=true;
  E.board.style.cursor='default';
  E.rail.style.cursor=(next==='imitate'||next==='countinPlayer')?'ns-resize':'default';
- const showReference=next==='countinTeacher'||next==='listen'||next==='reviewDone'||(next==='done'&&comparison);
+ const showReference=next==='countinTeacher'||next==='listen'||next==='playback'||next==='reviewDone'||(next==='done'&&comparison);
  E.guide.style.display=showReference?'inline':'none';
  E.guide.setAttribute('visibility',showReference?'visible':'hidden');
  E.trace.style.display=(next==='playback'||next==='reviewDone'||(next==='done'&&comparison))?'inline':'none';
@@ -100,7 +95,7 @@ function setMode(next){
  if(next==='countinPlayer')setCoach('先把音高拉準，數完四拍換你唱！','READY');
  if(next==='imitate')setCoach('來！讓我聽聽你的實力。','GO!');
  if(next==='playback')setCoach('全連注意！來聽他的成果！','REPLAY');
- if(next==='done')setCoach('七句都唱完了，這是你的成績。','DONE');
+ if(next==='done')setCoach('四句都唱完了，這是你的成績。','DONE');
 }
 function setCoach(message,grade='READY',mood=''){
  E.speech.textContent=message;
@@ -262,7 +257,7 @@ function stopAudio(){
 }
 
 // Final montage uses ONE uninterrupted instrumental from the original song's 0:00.
-// All seven out-of-tune vocal tracks are placed at their original absolute times.
+// All four player vocal tracks are placed at their original absolute times.
 function stopBacking(){
  for(const node of reviewNodes){
   try{node.stop()}catch{}
@@ -277,7 +272,7 @@ function scheduleContinuousReview(c,startAt){
   music.buffer=backingBuffer;
   mix.gain.value=.58;
   music.connect(mix);mix.connect(c.destination);
-  music.start(startAt,0); // no duration: the original backing plays start to finish
+  music.start(startAt,0,BACKING_PHRASE_STARTS.at(-1)+PHRASES.at(-1).duration+.3);
   backingSource=music;reviewNodes.push(music);
   music.onended=()=>{if(backingSource===music)backingSource=null;try{mix.disconnect()}catch{}};
  }
@@ -291,7 +286,7 @@ function scheduleContinuousReview(c,startAt){
   reviewNodes.push(voice);
   voice.onended=()=>{try{gain.disconnect()}catch{}};
  }
- return backingBuffer?.duration||BACKING_PHRASE_STARTS.at(-1)+PHRASES.at(-1).duration+.5;
+ return BACKING_PHRASE_STARTS.at(-1)+PHRASES.at(-1).duration+.35;
 }
 
 function playBuffer(buffer,offset=0,duration=CLIP,when=null){
@@ -544,7 +539,7 @@ async function applyPhrase(index){
  CLIP=part.duration;
  sourcePitch=part.pitch;
  vocals=audioBuffers[index];
- clipStart=0;
+ clipStart=part.clipOffset||0;
  E.words.textContent=part.text;
  E.count.textContent=(index+1)+' / '+PHRASES.length;
  for(let i=0;i<PHRASES.length;i++){
@@ -562,26 +557,34 @@ async function autoLoadVocal(){
  if(['listen','imitate','playback','countinTeacher','countinPlayer'].includes(mode))return;
  audioBuffers=[];vocals=null;takes=[];lastScore=null;activePhrase=0;backingBuffer=null;
  setMode('empty');updateModeText();
- setText('正在自動載入七段原版人聲（無伴奏），以及對應的原唱音高…');
+ setText('正在載入四句原唱與音準…');
  try{
   const c=getAudio();
-  // Precomputed source-derived pitch tracks for the five added verses.
+  // Source-derived pitch track for the fourth lyric.
   const pitchResponse=await fetch(PITCH_URL,{cache:'force-cache'});
-  if(!pitchResponse.ok)throw Error('七句原唱音準資料 HTTP '+pitchResponse.status);
+  if(!pitchResponse.ok)throw Error('原唱音準資料 HTTP '+pitchResponse.status);
   const extra=await pitchResponse.json();
-  for(let index=2;index<PHRASES.length;index++){
-   const line=extra['line'+(index+1)];
+  for(let index=3;index<PHRASES.length;index++){
+   const line=extra['line3']; // The fourth lyric uses the original third recording.
    if(!Array.isArray(line)||line.length!==Math.round(PHRASES[index].duration/STEP)+1)
     throw Error('第 '+(index+1)+' 句原唱音高資料不完整');
    PHRASES[index].pitch=line;
   }
+  // Decode each unique clip once; the first two lyrics use distinct offsets.
+  const decodedCache=new Map();
   const decoded=await Promise.all(PHRASES.map(async part=>{
-   const response=await fetch(part.audioUrl,{cache:'force-cache'});
-   if(!response.ok)throw Error('音檔 HTTP '+response.status);
-   const bytes=await response.arrayBuffer();
-   if(bytes.byteLength<1000)throw Error('內建原版人聲不完整');
-   const audio=await c.decodeAudioData(bytes.slice(0));
-   if(audio.duration<part.duration-.06)throw Error('原版音檔片段太短');
+   if(!decodedCache.has(part.audioUrl)){
+    decodedCache.set(part.audioUrl,(async()=>{
+     const response=await fetch(part.audioUrl,{cache:'force-cache'});
+     if(!response.ok)throw Error('音檔 HTTP '+response.status);
+     const bytes=await response.arrayBuffer();
+     if(bytes.byteLength<1000)throw Error('內建原版人聲不完整');
+     return c.decodeAudioData(bytes.slice(0));
+    })());
+   }
+   const audio=await decodedCache.get(part.audioUrl);
+   if(audio.duration<(part.clipOffset||0)+part.duration-.06)
+    throw Error('第 '+(PHRASES.indexOf(part)+1)+' 句原版音檔太短');
    return audio;
   }));
   audioBuffers=decoded;
@@ -768,12 +771,12 @@ async function replay(){
   if(id!==session)return;
   E.feedback.hidden=true;
   setMode('playback');
-  E.guide.style.display='none';
-  E.trace.style.display='inline';
-  E.trace.setAttribute('d',''); // The intro has no player vocals yet.
+  E.guide.style.display='none'; // Instrumental intro, no verse yet.
+  E.trace.style.display='none';
+  E.trace.setAttribute('d','');
   E.words.textContent='♪ 前奏';
   E.count.textContent='總回顧';
-  E.speech.textContent='先聽原版前奏，接著就是你的七句成果！';
+  E.speech.textContent='原曲與你的四句成果，即將開始回顧！';
   E.coachScore.textContent='原曲伴奏從 0:00 不間斷播放';
   E.reaction.textContent='♫';
   for(let i=0;i<PHRASES.length;i++)$('phraseStep'+(i+1))?.classList.remove('active');
@@ -794,29 +797,19 @@ async function replay(){
     }
     if(next!==current&&next>=0){
      current=next;
-     // Switch the coordinate scale to this actual verse before displaying the
-     // stored player gesture. The accompaniment remains completely untouched.
-     applyPhrase(next).then(()=>{
-      if(id!==session||mode!=='playback')return;
-      E.trace.style.display='inline';
-      E.guide.style.display='none';
-     }).catch(err=>console.warn('[軍歌鑑測] 無法載入回顧音準',err));
+     // Both curves appear COMPLETELY on verse entry; only the playhead moves.
+     applyPhrase(next).catch(err=>console.warn('[軍歌鑑測] 回顧音準載入失敗',err));
+     tracePathFor(takes[next]);
+     E.guide.style.display='inline';E.guide.setAttribute('visibility','visible');
+     E.trace.style.display='inline';
      E.words.textContent=PHRASES[next].text;
      E.count.textContent=(next+1)+' / '+PHRASES.length;
-     E.speech.textContent='這句你唱了 '+takes[next].score.points+' 分，自己聽聽看！';
-     E.coachScore.textContent='第 '+(next+1)+' 句回放';
+     E.speech.textContent='原曲（金色）／你的音準（紅色） · '+takes[next].score.points+' 分';
+     E.coachScore.textContent='第 '+(next+1)+' 句回顧';
      for(let i=0;i<PHRASES.length;i++)$('phraseStep'+(i+1))?.classList.toggle('active',i===next);
     }
-    if(current>=0){
-     const elapsed=t-BACKING_PHRASE_STARTS[current];
-     headAt(Math.max(0,elapsed));
-     // Render the player's red pitch trace progressively, synchronized with the
-     // single continuous original backing, not the hidden sergeant answer.
-     tracePathFor(takes[current],Math.max(0,elapsed));
-    }else{
-     E.trace.setAttribute('d','');
-     headAtPre(Math.max(0,t)*4*BEAT_SECONDS/BACKING_PHRASE_STARTS[0]);
-    }
+    if(current>=0)headAt(Math.max(0,t-BACKING_PHRASE_STARTS[current]));
+    else headAtPre(Math.max(0,t)*4*BEAT_SECONDS/BACKING_PHRASE_STARTS[0]);
     frame=requestAnimationFrame(tick);
    };
    frame=requestAnimationFrame(tick);
@@ -835,8 +828,8 @@ async function replay(){
   E.guide.setAttribute('visibility','visible');
   E.trace.style.display='inline';
   E.words.textContent=PHRASES.at(-1).text;
-  E.count.textContent='7 / 7';
-  setCoach('整首聽完了！金色是原唱、紅色是你唱的，全部音準都貼好了。按「結算」領戰報。','DONE');
+  E.count.textContent=PHRASES.length+' / '+PHRASES.length;
+  setCoach('回顧完成！金色是原曲、紅色是你的音準。按「結算」查看成績。','DONE');
   E.coachScore.textContent='完整音準比較 · 準備結算';
  }catch(err){
   stopBacking();
@@ -871,10 +864,10 @@ async function finishImitate(){
  lastScore={
   points,grade:grade(points),coverage:Math.round(averaged('coverage')),
   error:+averaged('error').toFixed(1),
-  comment:points>=90?'班長：七句居然都唱得像樣？檢討報告白印了。':
+  comment:points>=90?'班長：四句居然都唱得像樣？檢討報告白印了。':
    points>=75?'班長：還可以，隔壁連沒有以為是空襲警報。':
-   points>=50?'班長：七句唱完了，音準還有幾個在逃兵。':
-   '班長：七句軍歌唱成七種求救訊號，回去加強練習！'
+   points>=50?'班長：四句唱完了，音準還有幾個在逃兵。':
+   '班長：四句軍歌唱成四種求救訊號，回去加強練習！'
  };
  if(id===session)await replay();
 }

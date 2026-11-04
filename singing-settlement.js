@@ -13,18 +13,18 @@
  ];
  const rank=points=>TIERS.find(t=>points>=t.min)||TIERS.at(-1);
  const A=[
-  {id:'first',icon:'📋',name:'軍歌鑑測報到',desc:'完整唱完七句軍紀歌',rarity:'普通',test:s=>s.scores.length===7},
-  {id:'loud',icon:'🎤',name:'很敢唱喔',desc:'七句平均跟唱率至少85%',rarity:'普通',test:s=>s.coverage>=85},
+  {id:'first',icon:'📋',name:'軍歌鑑測報到',desc:'完整唱完四句軍紀歌',rarity:'普通',test:s=>s.scores.length===4},
+  {id:'loud',icon:'🎤',name:'很敢唱喔',desc:'四句平均跟唱率至少85%',rarity:'普通',test:s=>s.coverage>=85},
   {id:'earplugs',icon:'🎧',name:'全連集體靜音',desc:'總分低於30分，班長耳朵申請公傷假',rarity:'普通',test:s=>s.total<30},
   {id:'one_good',icon:'🪖',name:'終於像在唱歌',desc:'任一句得分至少55分',rarity:'普通',test:s=>s.best>=55},
   {id:'one_great',icon:'🎖️',name:'音準順利歸隊',desc:'任一句得分至少75分',rarity:'稀有',test:s=>s.best>=75},
   {id:'one_perfect',icon:'🌟',name:'班長想放假',desc:'任一句得分至少90分',rarity:'史詩',test:s=>s.best>=90},
-  {id:'steady',icon:'📏',name:'七句都能交差',desc:'七句全部達到GOOD等級',rarity:'稀有',test:s=>s.scores.every(v=>v>=55)},
-  {id:'top',icon:'🏅',name:'司令台領唱員',desc:'七句平均分數至少75分',rarity:'史詩',test:s=>s.total>=75},
+  {id:'steady',icon:'📏',name:'四句都能交差',desc:'四句全部達到GOOD等級',rarity:'稀有',test:s=>s.scores.every(v=>v>=55)},
+  {id:'top',icon:'🏅',name:'司令台領唱員',desc:'四句平均分數至少75分',rarity:'史詩',test:s=>s.total>=75},
   {id:'improving',icon:'📈',name:'後段班逆襲',desc:'最後一句比第一句高20分以上',rarity:'稀有',test:s=>s.scores.at(-1)-s.scores[0]>=20},
-  {id:'all_bad',icon:'🚑',name:'七連慘案',desc:'七句全都BAD，連醫護所都聽到了',rarity:'稀有',secret:true,test:s=>s.scores.every(v=>v<30)},
-  {id:'monotone',icon:'📉',name:'一個音唱天下',desc:'七句音高都幾乎不變，堅持唱到底',rarity:'史詩',secret:true,test:s=>s.allFlat},
-  {id:'all_perfect',icon:'👑',name:'軍歌本尊',desc:'七句全部PERFECT',rarity:'傳說',test:s=>s.scores.every(v=>v>=90)}
+  {id:'all_bad',icon:'🚑',name:'七連慘案',desc:'四句全都BAD，連醫護所都聽到了',rarity:'稀有',secret:true,test:s=>s.scores.every(v=>v<30)},
+  {id:'monotone',icon:'📉',name:'一個音唱天下',desc:'四句音高都幾乎不變，堅持唱到底',rarity:'史詩',secret:true,test:s=>s.allFlat},
+  {id:'all_perfect',icon:'👑',name:'軍歌本尊',desc:'四句全部PERFECT',rarity:'傳說',test:s=>s.scores.every(v=>v>=90)}
  ];
  let progress=readProgress(),current=null,comparisonToken=0;
  function readProgress(){
@@ -37,7 +37,7 @@
   try{localStorage.setItem(KEY,JSON.stringify(progress))}catch{}
  }
  function reportQuote(s){
-  if(s.scores.every(x=>x<30))return '班長：七句都在走音，你這不是唱軍紀歌，是讓全連體驗聲波攻擊。';
+  if(s.scores.every(x=>x<30))return '班長：四句都在走音，你這不是唱軍紀歌，是讓全連體驗聲波攻擊。';
   if(s.total<20)return '班長：原曲唱的是軍紀，你唱的是國軍耳鼻喉科的業務成長計畫。';
   if(s.allFlat)return '班長：你是打算一個音唱到退伍？這種堅持應該用在站哨。';
   if(s.total>=93)return '班長：這不是你第一次來唱吧？音準準成這樣，我還能找什麼理由叫你加練？';
@@ -45,7 +45,7 @@
   if(s.total>=60)return '班長：有像樣了！至少唱完不需要讓救護車來載我的耳朵。';
   if(s.total>=40)return '班長：有幾句唱得不錯，其餘幾句可能被友軍拿去當空襲警報。';
   if(s.scores.at(-1)-s.scores[0]>=20)return '班長：前面像在求救，後面倒是有進步。早點清醒不行嗎？';
-  return '班長：七句唱完，音準大概有一半還在營區外面找集合場。';
+  return '班長：四句唱完，音準大概有一半還在營區外面找集合場。';
  }
  function createStats(data){
   const scores=data.takes.map(t=>Math.round(t.score.points));
@@ -97,7 +97,7 @@
   }
  }
  function open(data){
-  if(!data||!data.score||data.takes.length!==7)return;
+  if(!data||!data.score||data.takes.length!==4)return;
   current=data;
   const s=createStats(data),grade=rank(s.total);
   $('singReportPoints').textContent=String(s.total);
@@ -108,7 +108,7 @@
   $('singReportQuote').textContent='「'+reportQuote(s)+'」';
   paintRounds(s);
   renderAchievements(s);
-  $('singReportCompareChoices').innerHTML=Array.from({length:7},(_,i)=>
+  $('singReportCompareChoices').innerHTML=Array.from({length:4},(_,i)=>
    '<button type="button" data-index="'+i+'">'+(i+1)+'</button>').join('');
   for(const btn of $('singReportCompareChoices').querySelectorAll('button')){
    btn.addEventListener('click',()=>choosePhrase(Number(btn.dataset.index)));
@@ -116,7 +116,7 @@
   $('singResultOverlay').hidden=false;
    window.armyProgression?.rewardPanel('singing',s.total,$('singReportPoints').closest('.sgr-scorebox')||$('singReportPoints'));
   $('singResultOverlay').querySelector('.sgr-scroll').scrollTop=0;
-  choosePhrase(6);
+  choosePhrase(3);
  }
  $('singReportAgain').addEventListener('click',()=>{
   if(!current)return;

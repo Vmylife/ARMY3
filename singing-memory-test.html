@@ -4,29 +4,28 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#17372a">
 <title>軍歌鑑測｜跟著班長唱</title>
-<link rel="stylesheet" href="./singing-memory-test.css?v=13">
+<link rel="stylesheet" href="./singing-memory-test.css?v=14">
 <link rel="stylesheet" href="./src/ui/armyProgression.css?v=2">
 <script src="./src/systems/armyProgression.js?v=2" defer></script>
+<link rel="stylesheet" href="./src/ui/gameTouchGuard.css?v=1">
+<script src="./src/ui/gameTouchGuard.js?v=1" defer></script>
 </head><body data-army-minigame="singing">
 <main class="app">
  <header class="top">
-  <span class="brand">軍歌鑑測 <small>v1.2</small></span>
+  <span class="brand">軍歌鑑測 <small>v1.3</small></span>
  </header>
  <section class="controls" id="controlsPanel">
   <section class="singStage" aria-label="音準挑戰">
    <div class="stageMeta">
     <span class="tag" id="stageTag">載入中</span>
-    <span id="takeCount" class="count">1 / 7</span>
+    <span id="takeCount" class="count">1 / 4</span>
    </div>
-   <div class="words" id="words">國家有綱常，軍隊有軍紀</div>
-   <div class="phraseProgress" aria-label="七句進度">
+   <div class="words" id="words">國家有綱常</div>
+   <div class="phraseProgress" aria-label="四句進度">
     <span id="phraseStep1" class="active">1</span>
     <span id="phraseStep2">2</span>
     <span id="phraseStep3">3</span>
     <span id="phraseStep4">4</span>
-    <span id="phraseStep5">5</span>
-    <span id="phraseStep6">6</span>
-    <span id="phraseStep7">7</span>
    </div>
    <div class="boardShell">
     <div class="board" id="board" aria-label="音準與時間軸">
@@ -128,9 +127,6 @@
       <button id="comparePhrase2" type="button">2</button>
       <button id="comparePhrase3" type="button">3</button>
       <button id="comparePhrase4" type="button">4</button>
-      <button id="comparePhrase5" type="button">5</button>
-      <button id="comparePhrase6" type="button">6</button>
-      <button id="comparePhrase7" type="button">7</button>
      </div>
     </div>
    </div>
@@ -144,7 +140,7 @@
 <div id="singResultOverlay" class="sgr-layer" hidden role="dialog" aria-modal="true" aria-labelledby="singResultTitle">
  <div class="sgr-report">
   <div class="sgr-head">
-   <div class="sgr-kicker"><span>國軍軍歌鑑測　/　結算報告</span><span>NO. M-007</span></div>
+   <div class="sgr-kicker"><span>國軍軍歌鑑測　/　結算報告</span><span>NO. M-004</span></div>
    <h1 id="singResultTitle">軍歌鑑測結算</h1>
    <div class="sgr-subtitle">報告班長！我真的有在唱。</div>
    <div class="sgr-scorebox">
@@ -154,7 +150,7 @@
   </div>
   <div class="sgr-scroll">
    <section class="sgr-section">
-    <div class="sgr-sectionhead"><strong>七句鑑測戰報</strong><small id="singReportStats"></small></div>
+    <div class="sgr-sectionhead"><strong>四句鑑測戰報</strong><small id="singReportStats"></small></div>
     <div class="sgr-rounds" id="singReportRounds"></div>
    </section>
    <section class="sgr-section">
@@ -186,6 +182,6 @@
 </div>
 <script type="module" src="./src/systems/minigameQuickExit.js?v=192"></script>
 <script type="module" src="./src/systems/singingCampExit.js?v=13"></script>
-<script src="./singing-settlement.js?v=13" defer></script>
-<script src="./singing-memory-test.js?v=13" defer></script>
+<script src="./singing-settlement.js?v=14" defer></script>
+<script src="./singing-memory-test.js?v=14" defer></script>
 </body></html>

@@ -1,0 +1,17 @@
+/* Shared game interaction policy: no blue text selection or iOS long-press menu.
+   Actual text fields remain editable and selectable. */
+html,body,body *,body *::before,body *::after {
+ -webkit-user-select:none!important;
+ user-select:none!important;
+ -webkit-touch-callout:none!important;
+ -webkit-user-drag:none!important;
+ -webkit-tap-highlight-color:transparent;
+}
+input:not([type="range"]),textarea,[contenteditable=""],[contenteditable="true"],
+[contenteditable=""] *,[contenteditable="true"] * {
+ -webkit-user-select:text!important;
+ user-select:text!important;
+ -webkit-touch-callout:default!important;
+}
+::selection { background:transparent!important;color:inherit!important }
+::-moz-selection { background:transparent!important;color:inherit!important }

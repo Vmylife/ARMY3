@@ -17,7 +17,7 @@ button:focus-visible,a:focus-visible,.pitchRail:focus-visible{outline:2px solid 
 .tag{font-size:11px;padding:4px 9px;border-radius:20px;background:#345c40;color:#f2dca5;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .count{font-size:12px;white-space:nowrap;color:#f6d99a;font-weight:850}
 .words{text-align:center;font-size:clamp(17px,3.5vw,25px);font-weight:900;letter-spacing:.065em;color:#ffebbd;min-height:0;line-height:1.35;padding:1px 0}
-.phraseProgress{flex:0 0 auto;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.phraseProgress{flex:0 0 auto;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
 .phraseProgress span{height:25px;min-width:0;display:grid;place-items:center;border:1px solid #54735b6b;border-radius:7px;background:#1a3829;font-size:11px;color:#bbc9b3;font-weight:850}
 .phraseProgress span.completed{background:#254937;border-color:#648767;color:#d2e0c4}
 .phraseProgress span.active{background:#f0d496;border-color:#f6dba5;color:#25442f;box-shadow:0 0 0 1px #f8d79a40}
@@ -73,7 +73,7 @@ button:focus-visible,a:focus-visible,.pitchRail:focus-visible{outline:2px solid 
 .feedbackActions{display:flex;gap:5px}
 .feedbackActions button,.phraseCompare button{background:#355843;color:#f2e5c2;font-weight:850;border:1px solid #9aaa7a9a;border-radius:7px;min-height:31px;font-size:10px;padding:5px 4px}
 .feedbackActions button{flex:1 1 0}
-.phraseCompare{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+.phraseCompare{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px}
 .phraseCompare button{min-width:0;min-height:25px;font-size:10px;padding:3px}
 .phraseCompare button.selected{background:#e7d39c;color:#1e3b2a}
 .coachStage:has(.feedback:not([hidden])){grid-template-columns:minmax(0,34fr) minmax(0,66fr)}
@@ -190,7 +190,7 @@ button:focus-visible,a:focus-visible,.pitchRail:focus-visible{outline:2px solid 
 .sgr-round em{font-style:normal;font-size:9px;font-weight:800;color:#cfe1bc;white-space:nowrap}
 .sgr-comparebox{width:100%;height:105px;border:1px solid #7294786b;border-radius:9px;background:repeating-linear-gradient(to bottom,#10291f 0,#10291f 25%,#78977b35 calc(25% + 1px),#10291f calc(25% + 2px));overflow:hidden}
 .sgr-comparebox svg{width:100%;height:100%;display:block}
-.sgr-comparepick{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;margin-top:6px}
+.sgr-comparepick{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-top:6px}
 .sgr-comparepick button{min-width:0;height:27px;border:1px solid #bdc49a6f;border-radius:7px;background:#31533d;color:#d4ddc5;font-size:11px;font-weight:900;padding:0}
 .sgr-comparepick button.active{background:#e9d19b;color:#213b2b}
 .sgr-achgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}

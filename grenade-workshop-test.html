@@ -105,6 +105,8 @@ body.workmode #toast[data-grade="PERFECT"],body.workmode #toast[data-grade="GREA
 body.workmode #toast[data-grade="GOOD"]{border-color:#aabc90;background:#2b4030;color:#e9edcf}
 body.workmode #toast[data-grade="BAD"],body.workmode #toast[data-grade="MISS"]{border-color:#c99a76;background:#493b2c;color:#f6d4ae}
 </style>
+<link rel="stylesheet" href="./src/ui/gameTouchGuard.css?v=1">
+<script src="./src/ui/gameTouchGuard.js?v=1" defer></script>
 </head>
 <body data-army-minigame="grenade">
 <script type="module" src="./src/systems/minigameQuickExit.js?v=192"></script>
@@ -264,7 +266,7 @@ function makeArenaFrame(){
  arenaFrame.title='手榴彈三投鑑測';arenaFrame.setAttribute('loading','eager');
  arenaFrame.setAttribute('aria-hidden','true');
  // No top-level navigation: keeps iOS Add-to-Home-Screen standalone mode intact.
- arenaFrame.src='./grenade-user-play.html?embedded=1&v=193';
+ arenaFrame.src='./grenade-user-play.html?embedded=1&v=194';
  arenaFrame.addEventListener('error',()=>{
   arenaFailure='無法載入 3D 投擲場頁面。';
   if(pendingCraft)arenaNotice('投擲場載入失敗',arenaFailure,true);
