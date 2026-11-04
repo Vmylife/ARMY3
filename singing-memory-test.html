@@ -4,11 +4,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#17372a">
 <title>軍歌鑑測｜跟著班長唱</title>
-<link rel="stylesheet" href="./singing-memory-test.css?v=10">
+<link rel="stylesheet" href="./singing-memory-test.css?v=11">
 </head><body>
 <main class="app">
  <header class="top">
-  <span class="brand">軍歌鑑測 <small>v1.0</small></span>
+  <span class="brand">軍歌鑑測 <small>v1.1</small></span>
   <a class="back" href="./index.html">退出</a>
  </header>
  <section class="controls" id="controlsPanel">
@@ -76,11 +76,32 @@
      <ellipse cx="73" cy="126" rx="11" ry="19" fill="#cf9474" stroke="#805443" stroke-width="3"/>
      <ellipse cx="177" cy="126" rx="11" ry="19" fill="#cf9474" stroke="#805443" stroke-width="3"/>
      <path d="M74 92 Q76 55 125 54 Q171 56 176 96 L176 130 Q173 171 126 179 Q80 173 74 134Z" fill="#dba783" stroke="#8b614c" stroke-width="4"/>
-     <path d="M82 108 Q97 100 111 107" stroke="#533f32" stroke-width="6" stroke-linecap="round"/>
-     <path d="M141 107 Q155 100 169 108" stroke="#533f32" stroke-width="6" stroke-linecap="round"/>
+     <g class="coachNormalBrows">
+      <path d="M82 108 Q97 100 111 107" stroke="#533f32" stroke-width="6" stroke-linecap="round" fill="none"/>
+      <path d="M141 107 Q155 100 169 108" stroke="#533f32" stroke-width="6" stroke-linecap="round" fill="none"/>
+     </g>
+     <g class="coachAngryBrows" fill="none" stroke="#513b31" stroke-width="7" stroke-linecap="round">
+      <path d="M81 105 L112 115"/><path d="M141 115 L171 105"/>
+     </g>
      <g class="coachEyes"><ellipse cx="102" cy="119" rx="4.5" ry="5.5" fill="#26342c"/><ellipse cx="153" cy="119" rx="4.5" ry="5.5" fill="#26342c"/></g>
+     <g class="coachAngryEyes" fill="#243128">
+      <ellipse cx="102" cy="120" rx="3.5" ry="4"/><ellipse cx="153" cy="120" rx="3.5" ry="4"/>
+     </g>
+     <g class="coachHappyEyes" fill="none" stroke="#48382d" stroke-width="4.5" stroke-linecap="round">
+      <path d="M91 122 Q102 109 112 122"/><path d="M143 122 Q153 109 164 122"/>
+     </g>
      <path d="M126 125 L121 145 Q127 149 133 145" fill="none" stroke="#ad7458" stroke-width="3" stroke-linecap="round"/>
      <path class="coachSmile" d="M109 158 Q126 171 144 158" fill="none" stroke="#713e38" stroke-width="4" stroke-linecap="round"/>
+     <path class="coachFrown" d="M109 167 Q125 149 144 167" fill="none" stroke="#723c38" stroke-width="5" stroke-linecap="round"/>
+     <path class="coachWorry" d="M113 163 Q126 155 140 164" fill="none" stroke="#74443b" stroke-width="4" stroke-linecap="round"/>
+     <path class="coachBigSmile" d="M103 154 Q124 187 149 154 Q125 167 103 154Z" fill="#843e3a" stroke="#773c39" stroke-width="3"/>
+     <path class="coachTeeth" d="M107 157 Q125 169 145 157 L143 165 Q126 173 109 164Z" fill="#fff0d2"/>
+     <g class="coachBlush" fill="#cf7867" opacity=".55"><ellipse cx="88" cy="145" rx="10" ry="5"/><ellipse cx="164" cy="145" rx="10" ry="5"/></g>
+     <path class="coachSweat" d="M184 105 Q203 123 187 135 Q174 124 184 105Z" fill="#b8e6d8" stroke="#477773" stroke-width="2"/>
+     <g class="coachSparkles" fill="#fbe4a1" stroke="#f7edc5" stroke-width="1.5">
+      <path d="M62 85 L66 98 L80 102 L66 106 L62 119 L58 106 L46 102 L58 98Z"/>
+      <path d="M192 63 L197 77 L210 82 L197 87 L192 102 L187 87 L174 82 L187 77Z"/>
+     </g>
      <ellipse id="mouth" class="coachMouth" cx="126" cy="159" rx="10" ry="6" fill="#743c37"/>
      <path d="M77 93 Q69 68 87 47 Q110 26 150 41 Q180 49 183 83 L174 93 Q127 85 77 93Z" fill="#1b3e2e" stroke="#102b20" stroke-width="5"/>
      <path d="M74 88 Q110 81 178 87 Q161 100 103 98 Q80 96 74 88Z" fill="#173527" stroke="#0a2119" stroke-width="3"/>
@@ -119,5 +140,5 @@
   <button id="previewClip" type="button" disabled>試聽</button>
  </div>
 </main>
-<script src="./singing-memory-test.js?v=10" defer></script>
+<script src="./singing-memory-test.js?v=11" defer></script>
 </body></html>
