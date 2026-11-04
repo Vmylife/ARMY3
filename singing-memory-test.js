@@ -1,4 +1,4 @@
-/* ARMY3 singing memory v0.8 — ORIGINAL VOICE STEM ONLY.
+/* ARMY3 singing memory v0.9 — ORIGINAL VOICE STEM ONLY.
    Original isolated vocal MP3 is bundled with ARMY3; users never upload files. Music stem is NEVER played.
    Correct pitch is derived from the selected vocal waveform (no invented tune).
    Browser-only processing: Web Audio + short-time pitch detection + OLA pitch warp.
@@ -24,7 +24,7 @@ const E={
 let ctx=null,vocals=null,clipStart=0,activePhrase=0,audioBuffers=[],sourcePitch=[];
 let pitch=[],refBase=62,validPitch=0,mode='empty',session=0,frame=0,playerHeld=false;
 let midiValue=refBase,pointerId=null,trace=[],lastScore=null,playSource=null,playPromise=null,comparison=false;
-let ownActionCount=0,analysisToken=0,guideSegments=[],metronomeNodes=[],cancelCountIn=null,takes=[],liveVoice=null;
+let ownActionCount=0,analysisToken=0,guideSegments=[],metronomeNodes=[],cancelCountIn=null,takes=[],liveVoice=null,backingBuffer=null,backingSource=null;
 const AUDIO_URL='./singing-samples/junji-original-vocals-intro.mp3?v=3';
 // Extracted offline from the same original vocal MP3 with spectral tracking.
 // A sung chorus has harmonics/overlapping voices; the old browser autocorrelation
@@ -55,6 +55,10 @@ const PHRASES=[
   audioUrl:'./singing-samples/junji-line7-v8.mp3',pitch:null}
 ];
 const PITCH_URL='./singing-samples/junji-pitches-v8.json?v=8';
+const BACKING_URL='./singing-samples/junji-backing-review-v9.mp3?v=9';
+// This accompaniment was extracted from the user's original music stem at 8.35s.
+const BACKING_FIRST_ORIGINAL_SECOND=8.35;
+const BACKING_PHRASE_STARTS=[8.35,12.45,16.28,20.62,24.72,28.82,32.98];
 const MIDI=f=>69+12*Math.log2(f/440);
 function getAudio(){if(!ctx){const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)throw Error('此裝置不支援 Web Audio');ctx=new Audio()}return ctx}
 function setText(s){E.info.textContent=s}
@@ -67,12 +71,12 @@ function setMode(next){
  E.mouth.classList.toggle('singing',next==='listen'||next==='playback'||(next==='imitate'&&playerHeld));
  if(!next.startsWith('countin'))E.countdown.hidden=true;
  E.board.style.cursor='default';
- E.rail.style.cursor=next==='imitate'?'ns-resize':'default';
+ E.rail.style.cursor=(next==='imitate'||next==='countinPlayer')?'ns-resize':'default';
  const showReference=next==='countinTeacher'||next==='listen'||(next==='done'&&comparison);
  E.guide.style.display=showReference?'inline':'none';
  E.guide.setAttribute('visibility',showReference?'visible':'hidden');
  E.trace.style.display=next==='done'&&comparison?'':'none';
- E.dot.setAttribute('visibility',next==='imitate'?'visible':'hidden');
+ E.dot.setAttribute('visibility',(next==='imitate'||next==='countinPlayer')?'visible':'hidden');
  E.overlay.hidden=playing||next==='done';
  E.main.textContent=next==='empty'?'原版人聲載入中…':
   next==='error'?'↻ 重新載入原版人聲':
@@ -91,7 +95,7 @@ function setMode(next){
   next==='playback'?'③ 公開播放玩家走音':'④ 鑑測報告';
  E.stage.textContent='第 '+(activePhrase+1)+'/'+PHRASES.length+' 句 · '+E.stage.textContent;
  E.overlay.textContent=next==='empty'?'正在載入內建原版人聲…':next==='error'?'載入失敗，點擊重新載入':vocals?'按「班長先唱」開始':'正在載入內建原版人聲…';
- if(next==='countinTeacher')E.speech.textContent='「聽好！先數四拍，第五拍開始！」';
+ if(next==='countinTeacher')E.speech.textContent='「聽好！我直接唱，不用等！」';
  if(next==='countinPlayer')E.speech.textContent='「3、2、1、唱！第五拍才開始！」';
  if(next==='listen')E.speech.textContent='「聽好！原唱只播人聲，不放伴奏！」';
  if(next==='imitate')E.speech.textContent='「換你！我把音準答案收起來了！」';
@@ -105,6 +109,7 @@ function headAt(t){const x=plotX(t).toFixed(1);E.head.setAttribute('x1',x);E.hea
 function headAtPre(t){
  const x=(VIEW_W*PRE_ROLL*clamp(t/(4*BEAT_SECONDS),0,1)).toFixed(1);
  E.head.setAttribute('x1',x);E.head.setAttribute('x2',x);
+ if(mode==='countinPlayer')E.dot.setAttribute('cx',x);
 }
 function toY(m){return clamp(216-(m-(refBase-9.5))/19*191,12,226)}
 function toMidi(e){
@@ -196,6 +201,7 @@ function pumpLiveVoice(){
 
 function stopAudio(){
  session++;
+ stopBacking();
  stopLiveVoice();
  if(cancelCountIn){const cancel=cancelCountIn;cancelCountIn=null;cancel()}
  for(const node of metronomeNodes){try{node.stop()}catch{}}
@@ -206,6 +212,29 @@ function stopAudio(){
  if(playPromise){playPromise();playPromise=null}
  E.mouth.classList.remove('singing');
 }
+
+function stopBacking(){
+ if(backingSource){
+  try{backingSource.stop()}catch{}
+  backingSource=null;
+ }
+}
+function playReviewBacking(index,when){
+ if(!backingBuffer)return null;
+ stopBacking();
+ const c=getAudio(),node=c.createBufferSource(),gain=c.createGain();
+ const offset=BACKING_PHRASE_STARTS[index]-BACKING_FIRST_ORIGINAL_SECOND;
+ const duration=Math.min(PHRASES[index].duration,backingBuffer.duration-offset-.004);
+ if(duration<=0)return null;
+ node.buffer=backingBuffer;
+ gain.gain.value=.53; // lower than voice, so the out-of-tune singing stays audible
+ node.connect(gain);gain.connect(c.destination);
+ backingSource=node;
+ node.onended=()=>{if(backingSource===node)backingSource=null;try{gain.disconnect()}catch{}};
+ node.start(when,offset,duration);
+ return node;
+}
+
 function playBuffer(buffer,offset=0,duration=CLIP,when=null){
  const c=getAudio(),node=c.createBufferSource(),g=c.createGain();
  node.buffer=buffer;g.gain.value=.94;
@@ -255,6 +284,14 @@ function scheduleFourBeats(c,firstBeat){
 // The fourth click says「唱」; the following fifth beat is the FIRST moment
 // when vocals or mouse pitch recording may begin.
 function countIn(which,c,firstBeat){
+ // The player is allowed to preselect and hold a pitch from beat one.
+ // Do not allow the gesture to play the vocal before the fifth beat.
+ if(which==='countinPlayer'){
+  pointerId=null;playerHeld=false;midiValue=refBase;
+  E.thumb.style.top='50%';
+  E.dot.setAttribute('cy',String(toY(midiValue)));
+  E.rail.classList.remove('active');
+ }
  setMode(which);
  E.countdown.hidden=false;
  E.countdownLabel.textContent=which==='countinTeacher'?'班長準備開唱':'換你唱，記住旋律！';
@@ -464,7 +501,7 @@ async function applyPhrase(index){
 }
 async function autoLoadVocal(){
  if(['listen','imitate','playback','countinTeacher','countinPlayer'].includes(mode))return;
- audioBuffers=[];vocals=null;takes=[];lastScore=null;activePhrase=0;
+ audioBuffers=[];vocals=null;takes=[];lastScore=null;activePhrase=0;backingBuffer=null;
  setMode('empty');updateModeText();
  setText('正在自動載入七段原版人聲（無伴奏），以及對應的原唱音高…');
  try{
@@ -489,6 +526,16 @@ async function autoLoadVocal(){
    return audio;
   }));
   audioBuffers=decoded;
+  // Accompaniment is a separate original stem. It is NEVER connected during
+  // teacher demonstrations or the player's live performance.
+  try{
+   const response=await fetch(BACKING_URL,{cache:'force-cache'});
+   if(!response.ok)throw Error('伴奏 HTTP '+response.status);
+   backingBuffer=await c.decodeAudioData((await response.arrayBuffer()).slice(0));
+  }catch(err){
+   backingBuffer=null;
+   console.warn('[軍歌鑑測] 回顧伴奏無法載入',err);
+  }
   await applyPhrase(0);
   setMode('ready');updateModeText();
  }catch(err){
