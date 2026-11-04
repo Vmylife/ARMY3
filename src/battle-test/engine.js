@@ -1,7 +1,9 @@
 // ARMY3 enemy-wave sandbox, intentionally NOT imported by the main camp.
 // Uses the approved punch, gun, knockdown and stand-up combat mechanics.
-import {CampCombat,lineClear} from '../systems/campCombat.js?v=12';
+import {CampCombat,lineClear,COMBAT_RISE_SECONDS,COMBAT_DOWN_SECONDS} from '../systems/campCombat.js?v=12';
 import {moveNpc,staticClearance} from '../map/navCollision109.js?v=124';
+import {moveSquadMember} from '../systems/npcLife113.js?v=128';
+import {waveEntry} from './breaches.js?v=1';
 import {insidePerimeter} from '../map/camp.js?v=093';
 const $=id=>document.getElementById(id);
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
@@ -17,7 +19,8 @@ export class ArmyBattleCombat extends CampCombat{
   this.wave=0;this.waveActive=false;this.waveDelay=1.8;this.running=false;
   this.totalSpawns=0;this.defenderKills=0;this.enemies=enemies;
   this.nameplateState='';this.lastWaveCount=-1;
-  this.interactionMode=false;this.weapon='rifle';this.provoked=true;
+  this.interactionMode=false;this.weapon='rifle';this.provoked=false;
+  this.invincible=false;this.maxShooters=7;
   this.refreshHUD(true);
   this.root.querySelector('#campModeSwitch').hidden=true;
   $('campFinishTitle').textContent='你已陣亡';
@@ -36,7 +39,9 @@ export class ArmyBattleCombat extends CampCombat{
    n.combatDead=true;n.combatActive=false;
    n.pos={x:200+n.id,z:200};n.home.job='life';
   }
-  this.showIntroBanner('敵軍突破北側圍欄！',1700);
+  this.showIntroBanner('南側哨口、西側營舍圍欄遭突破！',1700);
+  const god=$('battleGodToggle');
+  if(god){god.addEventListener('click',()=>this.setInvincible(!this.invincible));this.setInvincible(false)}
  }
  get liveEnemies(){return this.enemies.filter(n=>n.assaultVisible&&!n.combatDead)}
  get liveAllies(){return this.allies.filter(a=>!a.combatDead)}
@@ -53,46 +58,60 @@ export class ArmyBattleCombat extends CampCombat{
   clearTimeout(this.bannerTimer);
   this.bannerTimer=setTimeout(()=>{el.hidden=true},ms);
  }
+ setInvincible(on){
+  this.invincible=!!on;
+  const toggle=$('battleGodToggle');
+  if(toggle){toggle.textContent='無敵：'+(this.invincible?'開':'關');
+   toggle.setAttribute('aria-pressed',String(this.invincible));toggle.classList.toggle('active',this.invincible)}
+  if(this.invincible)this.hp=Math.max(1,this.hp);
+  this.refreshHUD(true);
+ }
+ // Run the established player's combat engine but keep its training-camp
+ // "all NPCs must chase the player" code disabled in this battle sandbox.
+ tryAttack(){const result=super.tryAttack();this.provoked=false;return result}
+ damageNPC(n,damage,kind='bullet'){super.damageNPC(n,damage,kind);this.provoked=false}
  spawnWave(){
   this.wave++;
   const count=WAVE_SIZE(this.wave),pool=this.enemies.slice(0,count);
   this.waveDelay=0;this.waveActive=true;
-  // A 24m missing stretch of north fencing: rows appear OUTSIDE the breached section.
-  const cols=Math.min(6,Math.max(3,Math.ceil(Math.sqrt(count*1.6))));
   for(let i=0;i<pool.length;i++){
-   const n=pool[i],col=i%cols,row=Math.floor(i/cols);
-   const x=6.6+col*2.55+(row%2)*.3,z=27.7+row*1.03;
-   n.pos={x,z};n.angle=Math.PI;n.assaultVisible=true;n.incoming=true;
+   const n=pool[i],entry=waveEntry(i,count);
+   n.pos={...entry.start};n.entryTarget={...entry.entry};n.entrySide=entry.side;
+   n.angle=entry.side==='gate'?0:Math.PI/2;
+   n.assaultVisible=true;n.incoming=true;
    n.combatDead=false;n.combatActive=false;n.combatHP=100;n.combatDamageSinceFall=0;
    n.combatDown=0;n.combatRise=0;n.combatFall=0;n.combatDeathClip=false;n.combatRestLift=undefined;
-   n.combatHurt=0;n.combatHurtFull=0;n.combatCooldown=.35+(i%4)*.22;
-   n.combatAttack=0;n.combatGoal=null;n.combatNextMove=0;n.combatLastMove=-100;
+   n.combatHurt=0;n.combatHurtFull=0;n.combatCooldown=.45+(i%4)*.18;
+   n.combatAttack=0;n.combatStrikeApplied=true;n.combatGoal=null;n.combatNextMove=0;n.combatLastMove=-100;
    n.combatPush=null;n.combatWeapon=this.wave>=3?'rifle':this.wave>=2?'pistol':'fists';
-   n.anim.setClip('Running',{restart:true});n.anim.speed=1.15;
-   n.anim.rifleAim=0;
+   n.battleSight=null;n.assaultTarget=null;n.assaultGoalTarget=null;
    n.route=null;n.routeGoal=null;n.routeIndex=0;n.replanAt=0;n.squadEscape=null;
+   n.anim.setClip('Running',{restart:true});n.anim.speed=1.15;n.anim.rifleAim=0;
   }
-  for(const n of this.enemies.slice(count)){n.assaultVisible=false;n.combatDead=true;n.combatActive=false;n.incoming=false;n.pos={x:200+n.id,z:200}}
+  for(const n of this.enemies.slice(count)){
+   n.assaultVisible=false;n.combatDead=true;n.combatActive=false;n.incoming=false;n.pos={x:200+n.id,z:200}
+  }
   this.totalSpawns+=count;
-  this.showIntroBanner('第 '+this.wave+' 波 · '+count+' 名紅軍',2200);
+  this.showIntroBanner('第 '+this.wave+' 波 · '+count+' 名紅軍（哨口＋營舍）',2200);
   this.updateBattleHUD();
  }
  updateIncoming(dt){
   for(const n of this.enemies){
    if(!n.incoming||n.combatDead)continue;
-   // Actors stream from z > 26, across the opened fence, into the camp.
-   const targetZ=25.15,nz=Math.max(targetZ,n.pos.z-dt*(5.1+(n.id%3)*.35));
-   n.pos={x:n.pos.x,z:nz};
-   n.angle=Math.PI;
-   n.anim.setClip('Running');n.anim.speed=1.1;
-   n.anim.rifleAim=0;
-   if(nz<=targetZ+.001){
-    n.incoming=false;n.combatActive=true;n.state='combat';
-    n.combatGoal={x:22,z:14};n.combatNextMove=this.time+.06;
-    n.anim.setClip('Idle');n.anim.speed=1;
+   const goal=n.entryTarget,dx=goal.x-n.pos.x,dz=goal.z-n.pos.z,d=Math.hypot(dx,dz);
+   const step=Math.min(d,dt*(5+(n.id%3)*.25));
+   if(d>.005){
+    n.pos={x:n.pos.x+dx/d*step,z:n.pos.z+dz/d*step};
+    n.angle=Math.atan2(dx,dz);
+    n.anim.setClip('Running');n.anim.speed=1.1;n.anim.rifleAim=0;
+   }
+   if(d<=step+.01){
+    n.pos={...goal};n.incoming=false;n.combatActive=true;n.state='combat';
+    n.combatGoal=null;n.combatNextMove=0;n.anim.setClip('Idle');n.anim.speed=1;
    }
   }
  }
+
  updateAllies(dt){
   if(!this.running||this.gameOver)return;
   const reds=this.liveEnemies;
@@ -158,20 +177,147 @@ export class ArmyBattleCombat extends CampCombat{
   }
   this.updateBattleHUD();
  }
- fireNPC(n){
-  // Red soldiers also target the five green defenders instead of mindlessly beelining the player.
-  const allies=this.liveAllies.filter(a=>dist(a.pos,n.pos)<21&&lineClear(n.pos,a.pos,.13));
-  if(allies.length&&Math.random()<.68){
-   const a=allies[Math.floor(Math.random()*allies.length)];
-   const d=dist(n.pos,a.pos),base=Math.atan2(a.pos.x-n.pos.x,a.pos.z-n.pos.z);
-   const scatter=(Math.random()-.5)*(this.wave>=4?.13:.18),angle=base+scatter;
-   this.bullets.push({id:this.seq++,owner:'enemyAlly',target:a,
-    x:n.pos.x+Math.sin(base)*.62,z:n.pos.z+Math.cos(base)*.62,
-    dx:Math.sin(angle),dz:Math.cos(angle),range:25,speed:44,damage:8});
-   n.shotUntil=performance.now()+110;
-   this.playRangeShot(dist(n.pos,this.player.pos),performance.now());
-  }else super.fireNPC(n);
+ // Choose the closest LIVING defender for ALL red attacks and movement.
+ nearestTarget(n){
+  let target=this.playerAlive&&this.playerDown<=0&&this.playerRise<=0?this.player:null;
+  let best=target?dist(n.pos,target.pos):Infinity;
+  for(const a of this.allies){
+   if(a.combatDead)continue;
+   const d=dist(n.pos,a.pos);
+   if(d<best){best=d;target=a}
+  }
+  return target;
  }
+ seesTarget(n,target){
+  if(!target)return false;
+  const cached=n.battleSight;
+  if(cached&&cached.target===target&&this.time-cached.at<.19&&
+     dist(cached.npos,n.pos)<.5&&dist(cached.tpos,target.pos)<.5)return cached.visible;
+  const visible=lineClear(n.pos,target.pos,.13);
+  n.battleSight={target,at:this.time,npos:{...n.pos},tpos:{...target.pos},visible};
+  return visible;
+ }
+ fireNPC(n,target=this.nearestTarget(n)){
+  if(!target||!this.seesTarget(n,target))return;
+  if(target===this.player){super.fireNPC(n);return}
+  const dx=target.pos.x-n.pos.x,dz=target.pos.z-n.pos.z,d=Math.hypot(dx,dz);
+  if(d<.01)return;
+  const precision=n.combatWeapon==='rifle'?.095:.13;
+  const spread=(Math.random()*2-1)*precision*(d>9?1.65:1);
+  const heading=Math.atan2(dx,dz)+spread;
+  this.bullets.push({id:this.seq++,owner:'enemyAlly',target,
+   x:n.pos.x+dx/d*.62,z:n.pos.z+dz/d*.62,
+   dx:Math.sin(heading),dz:Math.cos(heading),range:25,
+   speed:n.combatWeapon==='rifle'?47:39,damage:n.combatWeapon==='rifle'?6:9});
+  n.shotUntil=performance.now()+110;
+  this.playRangeShot(dist(n.pos,this.player.pos),performance.now());
+ }
+ updateEnemyAI(dt,now){
+  if(!this.running||this.gameOver)return;
+  const ready=this.enemies.filter(n=>n.combatActive&&!n.combatDead&&!n.incoming);
+  // Mobile safety: up to seven red guns may shoot at a time.
+  const shooterSet=new Set(ready.filter(n=>n.combatWeapon!=='fists')
+   .map(n=>({n,target:this.nearestTarget(n)}))
+   .filter(o=>o.target&&dist(o.n.pos,o.target.pos)<20&&this.seesTarget(o.n,o.target))
+   .sort((a,b)=>dist(a.n.pos,a.target.pos)-dist(b.n.pos,b.target.pos))
+   .slice(0,this.maxShooters).map(o=>o.n));
+  for(const n of ready){
+   n.clock=(n.clock||0)+dt;
+   n.combatCooldown=Math.max(0,(n.combatCooldown||0)-dt);
+   if(n.combatAttack>0){
+    n.combatAttack=Math.max(0,n.combatAttack-dt);
+    if(!n.combatStrikeApplied&&n.combatAttack<=.41){
+     n.combatStrikeApplied=true;
+     const victim=this.nearestTarget(n);
+     if(victim&&dist(n.pos,victim.pos)<1.93&&this.seesTarget(n,victim)){
+      if(victim===this.player)this.damagePlayer(9,'punch');
+      else this.damageAlly(victim,9);
+     }
+    }
+   }
+   if(n.combatDown>0){
+    n.combatDown=Math.max(0,n.combatDown-dt);
+    if(n.combatFall>0&&n.combatPush){
+     const k=Math.min(dt,n.combatFall);
+     n.pos=moveNpc(n,n.combatPush.x*7*k,n.combatPush.z*7*k,
+      [...this.enemies,...this.allies],this.player.pos);
+     n.combatFall=Math.max(0,n.combatFall-dt);
+    }
+    n.anim.rifleAim=0;n.state='combatDown';
+    if(n.combatDown===0){
+     n.combatRise=COMBAT_RISE_SECONDS;n.combatRestLift=undefined;
+     this.playCombatClip(n,'Arise',COMBAT_RISE_SECONDS);
+    }
+    continue;
+   }
+   if(n.combatRise>0){
+    n.combatRise=Math.max(0,n.combatRise-dt);
+    n.anim.rifleAim=0;n.state='combatRise';
+    if(n.combatRise===0){
+     n.combatDamageSinceFall=0;n.combatRestLift=undefined;
+     n.route=null;n.routeGoal=null;n.routeIndex=0;n.replanAt=0;
+    }
+    continue;
+   }
+   if(n.combatHurt>0){
+    n.combatHurt=Math.max(0,n.combatHurt-dt);
+    n.anim.rifleAim=0;
+    if(n.anim.hasClip('Hit_Reaction')){
+     if(n.anim.clip!=='Hit_Reaction')this.playCombatClip(n,'Hit_Reaction',.64);
+     n.anim.speed=n.anim.clips.Hit_Reaction.duration/.64;
+    }
+    if(n.combatHurt>0)continue;
+   }
+   const target=this.nearestTarget(n);
+   if(!target){n.anim.setClip('Idle');n.anim.rifleAim=0;continue}
+   n.assaultTarget=target;n.activity='攻擊最近目標';n.home.job='life';n.state='combat';
+   const d=dist(n.pos,target.pos),visible=d<21&&this.seesTarget(n,target);
+   const fist=n.combatWeapon==='fists';
+   n.anim.rifleAim=fist?0:Math.min(1,(n.anim.rifleAim||0)+dt*7);
+   if(fist&&d<=1.64&&visible){
+    if(n.combatCooldown<=0&&n.combatAttack<=0){
+     n.combatCooldown=1.35+(n.id%3)*.12;n.combatAttack=.72;n.combatStrikeApplied=false;
+     if(n.anim.hasClip('Punch_Combo_1'))this.playCombatClip(n,'Punch_Combo_1',.70);
+    }
+   }else if(!fist&&d<20&&visible&&shooterSet.has(n)){
+    if(n.combatCooldown<=0&&n.anim.rifleAim>.55){
+     this.fireNPC(n,target);n.combatCooldown=n.combatWeapon==='rifle'?.75:1.05;
+    }
+   }
+   const ranged=!fist&&d<20&&visible&&shooterSet.has(n);
+   const chase=n.combatAttack<=0&&(!ranged||d>9)&&d>(fist?1.4:5);
+   if(chase){
+    if(n.assaultGoalTarget!==target||!n.combatGoal||
+       dist(n.combatGoal,target.pos)>1.8||this.time-n.combatLastMove>1.5){
+     n.assaultGoalTarget=target;n.combatGoal={...target.pos};n.combatLastMove=this.time;
+     n.route=null;n.routeGoal=null;n.routeIndex=0;n.replanAt=0;
+    }
+    const before={...n.pos};
+    moveSquadMember(n,n.combatGoal,dt,true,false);
+    if(dist(before,n.pos)>.008)n.combatStall=0;
+    else n.combatStall=(n.combatStall||0)+dt;
+    if(n.combatStall>1.4){
+     n.route=null;n.routeGoal=null;n.routeIndex=0;n.replanAt=0;
+     n.combatStall=0;n.combatGoal={...target.pos};
+    }
+   }else if(n.combatAttack>0&&n.anim.hasClip('Punch_Combo_1')){
+    if(n.anim.clip!=='Punch_Combo_1')this.playCombatClip(n,'Punch_Combo_1',.70);
+    n.anim.speed=(n.anim.clips.Punch_Combo_1.duration||1.4)/.70;
+   }else{n.anim.setClip('Idle');n.anim.speed=1}
+   const dx=target.pos.x-n.pos.x,dz=target.pos.z-n.pos.z;
+   if(Math.hypot(dx,dz)>.08){
+    const desired=Math.atan2(dx,dz),delta=Math.atan2(Math.sin(desired-n.angle),Math.cos(desired-n.angle));
+    n.angle+=delta*Math.min(1,dt*8);
+   }
+  }
+  // Parent AI is suppressed; finish the usual death/fall cleanup here.
+  for(const n of this.enemies){
+   if(n.combatDead&&n.combatDeathClip&&this.time-n.combatDeathAt>=COMBAT_DOWN_SECONDS){
+    n.combatDeathClip=false;n.anim.setClip('Idle',{restart:true});n.combatRestLift=undefined;
+   }
+  }
+ }
+
  // Player bullets still use CampCombat's hit tracking and powerful fall / recovery FX.
  updateBullets(dt){
   const specials=this.bullets.filter(b=>b.owner==='ally'||b.owner==='enemyAlly');
@@ -220,26 +366,27 @@ export class ArmyBattleCombat extends CampCombat{
  }
  update(dt,now,{blocked=false}={}){
   if(blocked||window.armyMinigameActive)return;
-  if(this.gameOver){
-   super.update(dt,now,{blocked});
-   return;
-  }
+  if(this.gameOver){super.update(dt,now,{blocked});return}
   dt=clamp(dt,0,.05);
-  
   if(!this.waveActive){
    this.waveDelay-=dt;
    if(this.waveDelay<=0){this.spawnWave();this.running=true}
   }
   this.updateIncoming(dt);
-  this.updateAllies(dt);
+  // Normal shooting/knockdown/recoil still run, without player-only camp aggro.
+  this.provoked=false;
   super.update(dt,now,{blocked});
+  this.updateEnemyAI(dt,now);
+  this.updateAllies(dt);
   if(this.running&&this.waveActive&&this.liveEnemies.length===0){
    this.waveActive=false;this.waveDelay=3.4;
    this.showIntroBanner('第 '+this.wave+' 波守住了！',2000);
   }
   this.updateBattleHUD();
  }
+
  damagePlayer(amount,kind='bullet'){
+  if(this.invincible)return;
   const wasAlive=this.playerAlive;
   super.damagePlayer(amount,kind);
   if(wasAlive&&!this.playerAlive){

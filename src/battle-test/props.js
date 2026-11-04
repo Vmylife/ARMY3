@@ -1,5 +1,6 @@
 // Army v0.9.9 — adds custom basketball hoop and grenade crate prop models.
 import {PROPS} from '../map/camp.js?v=092';
+import {removedFence} from './breaches.js?v=1';
 import {mul,translation,rotateY} from '../core/math.js?v=060';
 
 export const PROP_MODELS=[
@@ -76,9 +77,8 @@ export class CampProps{
   this.models.set(id,{dimensions,meshes,materials});this.buildInstances();
  }
  buildInstances(){this.instances=[];for(const p of PROPS){
-   // Battle-only breach: remove a continuous 23m stretch of north-side fence.
-   // The normal camp map, collision data and Props remain completely unchanged.
-   if(p.type==='fence'&&p.x>=3&&p.x<=27&&p.z>=23)continue;
+   // Gate and barracks gaps only. The northern perimeter remains intact.
+   if(removedFence(p))continue;
    const modelInfo=this.models.get(p.type);if(!modelInfo)continue;const d=modelInfo.dimensions;const yaw=p.yaw||0;const sx=p.sx??p.scale??1,sy=p.sy??p.scale??1,sz=p.sz??p.scale??1;const y=p.y||0;
    const model=mul(translation(p.x-d.mid[0]*sx*Math.cos(yaw)-d.mid[2]*sz*Math.sin(yaw),y-d.min[1]*sy,p.z+d.mid[0]*sx*Math.sin(yaw)-d.mid[2]*sz*Math.cos(yaw)),mul(rotateY(yaw),matScale(sx,sy,sz)));
    this.instances.push({type:p.type,model,x:p.x,z:p.z,cull:p.cull||52});
