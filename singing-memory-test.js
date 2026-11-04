@@ -1,4 +1,4 @@
-/* ARMY3 singing memory v1.1 — seven-line coach mode and continuous original backing review.
+/* ARMY3 singing memory v1.2 — seven-line coach mode and continuous original backing review.
    Original vocals play during drills; original uninterrupted instrumental plays only during the final full-song review.
    Correct pitch is derived from the selected vocal waveform (no invented tune).
    Browser-only processing: Web Audio + short-time pitch detection + OLA pitch warp.
@@ -25,7 +25,7 @@ const E={
 let ctx=null,vocals=null,clipStart=0,activePhrase=0,audioBuffers=[],sourcePitch=[];
 let pitch=[],refBase=62,validPitch=0,mode='empty',session=0,frame=0,playerHeld=false;
 let midiValue=refBase,pointerId=null,trace=[],lastScore=null,playSource=null,playPromise=null,comparison=false;
-let ownActionCount=0,analysisToken=0,guideSegments=[],metronomeNodes=[],cancelCountIn=null,takes=[],liveVoice=null,backingBuffer=null,backingSource=null,reviewNodes=[];
+let ownActionCount=0,analysisToken=0,guideSegments=[],metronomeNodes=[],cancelCountIn=null,takes=[],liveVoice=null,backingBuffer=null,backingSource=null,reviewNodes=[],reportPresented=false;
 const AUDIO_URL='./singing-samples/junji-original-vocals-intro.mp3?v=3';
 // Extracted offline from the same original vocal MP3 with spectral tracking.
 // A sung chorus has harmonics/overlapping voices; the old browser autocorrelation
@@ -73,19 +73,19 @@ function setMode(next){
  if(!next.startsWith('countin'))E.countdown.hidden=true;
  E.board.style.cursor='default';
  E.rail.style.cursor=(next==='imitate'||next==='countinPlayer')?'ns-resize':'default';
- const showReference=next==='countinTeacher'||next==='listen'||(next==='done'&&comparison);
+ const showReference=next==='countinTeacher'||next==='listen'||next==='reviewDone'||(next==='done'&&comparison);
  E.guide.style.display=showReference?'inline':'none';
  E.guide.setAttribute('visibility',showReference?'visible':'hidden');
- E.trace.style.display=(next==='playback'||(next==='done'&&comparison))?'inline':'none';
+ E.trace.style.display=(next==='playback'||next==='reviewDone'||(next==='done'&&comparison))?'inline':'none';
  E.dot.setAttribute('visibility',(next==='imitate'||next==='countinPlayer')?'visible':'hidden');
- E.overlay.hidden=playing||next==='done';
+ E.overlay.hidden=playing||next==='reviewDone'||next==='done';
  E.main.textContent=next==='empty'?'載入中':next==='error'?'重新載入':next==='ready'?'開始':
   next==='countinPlayer'||next==='countinTeacher'?'準備開唱':
   next==='listen'?'班長演唱中':next==='imitate'?'玩家演唱中':
-  next==='playback'?'總回顧播放中':next==='react'?'班長講評中':'重新挑戰';
+  next==='playback'?'總回顧播放中':next==='react'?'班長講評中':next==='reviewDone'?'結算':'重新挑戰';
  E.stage.textContent=next==='empty'?'載入中':next==='error'?'載入失敗':next==='ready'?'準備好了':
   next==='countinPlayer'||next==='countinTeacher'?'3 · 2 · 1 · 唱':
-  next==='listen'?'班長示範':next==='imitate'?'換你唱':next==='react'?'班長評語':next==='playback'?'總回顧':'完成';
+  next==='listen'?'班長示範':next==='imitate'?'換你唱':next==='react'?'班長評語':next==='playback'?'總回顧':next==='reviewDone'?'回顧完成':'完成';
  E.overlay.textContent=next==='empty'?'正在載入內建原版人聲…':next==='error'?'載入失敗，點擊重新載入':vocals?'按「班長先唱」開始':'正在載入內建原版人聲…';
  if(next==='countinTeacher')E.speech.textContent='「聽好！我直接唱，不用等！」';
  if(next==='countinPlayer')E.speech.textContent='「3、2、1、唱！第五拍才開始！」';
@@ -823,20 +823,31 @@ async function replay(){
   });
   if(!finished||id!==session)return;
   stopBacking();
+  // The entire gold reference and red user pitch appear instantly after playback.
   await applyPhrase(PHRASES.length-1);
-  setMode('done');comparison=false;E.feedback.hidden=false;
-  E.rank.textContent=ratingFor(lastScore.points).english;
-  E.points.textContent=lastScore.points+' / 100';
-  E.comment.textContent=lastScore.comment;
-  E.phraseScores.textContent=takes.map((take,index)=>'第'+(index+1)+'句 '+take.score.points+'分').join(' · ');
-  E.hint.textContent='完整原版伴奏已從頭連續播放，七段玩家人聲照原曲時間加入。';
+  if(id!==session)return;
+  comparison=true;
+  E.feedback.hidden=true;
+  setMode('reviewDone');
   tracePathFor(takes[PHRASES.length-1]);
+  headAt(CLIP);
+  E.guide.style.display='inline';
+  E.guide.setAttribute('visibility','visible');
+  E.trace.style.display='inline';
+  E.words.textContent=PHRASES.at(-1).text;
+  E.count.textContent='7 / 7';
+  setCoach('整首聽完了！金色是原唱、紅色是你唱的，全部音準都貼好了。按「結算」領戰報。','DONE');
+  E.coachScore.textContent='完整音準比較 · 準備結算';
  }catch(err){
   stopBacking();
   console.error('[軍歌鑑測] 總回顧播放失敗',err);
   setText('總回顧播放失敗：'+err.message);
-  setMode('done');
-  E.feedback.hidden=false;
+  setMode('reviewDone');
+  E.feedback.hidden=true;
+  comparison=true;
+  E.guide.style.display='inline';
+  E.trace.style.display='inline';
+  tracePathFor(takes[PHRASES.length-1]);
  }
 }
 async function finishImitate(){
@@ -881,15 +892,40 @@ async function showComparedPhrase(index){
  E.trace.style.display='';
  E.compare.textContent='收起音準線';
 }
+function openSettlement(){
+ if(mode!=='reviewDone'||reportPresented||!lastScore||takes.length!==PHRASES.length)return;
+ const report=window.armySingingSettlement;
+ if(!report){console.error('[軍歌鑑測] 結算模組未載入');setText('結算報告載入失敗，請重新整理頁面');return}
+ reportPresented=true;
+ report.open({
+  score:lastScore,
+  takes,
+  renderPhrase:async index=>{
+   await applyPhrase(index);
+   tracePathFor(takes[index]);
+   E.guide.style.display='inline';E.guide.setAttribute('visibility','visible');
+   E.trace.style.display='inline';
+   return{gold:E.guide.getAttribute('d')||'',red:E.trace.getAttribute('d')||''};
+  },
+  restart:()=>{
+   reportPresented=false;
+   E.controls.classList.remove('isComparing');
+   setMode('ready');
+   startChallenge();
+  }
+ });
+}
 async function startChallenge(){
  const unlockAudio=getAudio().resume(); // Keep user gesture for mobile Web Audio.
  E.controls.classList.remove('isComparing');
+ reportPresented=false;
  takes=[];lastScore=null;comparison=false;
+ E.feedback.hidden=true;
  await unlockAudio;
  await applyPhrase(0);
  if(mode==='ready'||mode==='done')await listen();
 }
-E.main.addEventListener('click',()=>{if(mode==='error')autoLoadVocal();else if(mode==='ready'||mode==='done')startChallenge()});
+E.main.addEventListener('click',()=>{if(mode==='error')autoLoadVocal();else if(mode==='reviewDone')openSettlement();else if(mode==='ready'||mode==='done')startChallenge()});
 E.repeat.addEventListener('click',()=>{if(mode==='ready'||mode==='done')startChallenge()});
 E.preview.addEventListener('click',async()=>{
  if(!vocals)return;
@@ -923,7 +959,7 @@ window.armySingingTest={
    phraseSeconds:CLIP,referenceFrames:pitch.length,voicedPercent:Math.round(validPitch*100),
    referenceVisible:E.guide.style.display!=='none',guidePathPoints:sourcePitch.filter(Number.isFinite).length,
    flatGuideNotes:guideSegments.length,countdownVisible:!E.countdown.hidden,beatSeconds:BEAT_SECONDS,
-   samples:trace.length,liveVoiceGrains:liveVoice?.grains||0,isComparing:E.controls.classList.contains('isComparing'),reviewTraceVisible:mode==='playback'&&E.trace.style.display!=='none',reviewTraceLength:E.trace.getAttribute?.('d')?.length||0,score:lastScore}},
+   samples:trace.length,liveVoiceGrains:liveVoice?.grains||0,isComparing:E.controls.classList.contains('isComparing'),reviewTraceVisible:(mode==='playback'||mode==='reviewDone')&&E.trace.style.display!=='none',reviewTraceLength:E.trace.getAttribute?.('d')?.length||0,reportOpen:reportPresented,score:lastScore}},
  get refPitch(){return pitch.map(p=>({...p}))},
  analyzePitch:pitchOf,calculate,buildGuideSegments
 };
