@@ -107,6 +107,7 @@ export class CampCombat{
  constructor({player,npcs,renderer,rifleGlb,npcGlb}){
   this.player=player;this.npcs=npcs;this.renderer=renderer;this.hp=100;this.kills=0;
   this.weapon='fists';this.provoked=false;this.gameOver=false;this.time=0;
+  this.interactionMode=false;this.onInteract=null;
   this.playerAttack=0;this.playerAttackApplied=false;this.playerCooldown=0;this.attackKeyboard=false;this.attackPointer=null;
   this.wheelOpen=false;this.wheelSelection='up';this.wheelPointer=null;this.wheelTouch=null;
   this.bullets=[];this.seq=1;this.playerShotAt=-100;this.npcFireAt=-100;
@@ -154,7 +155,10 @@ export class CampCombat{
    <div id="campCombatStatus" aria-live="polite"><span id="campHealth">HP 100</span><span id="campKills">擊殺 0</span><span id="campAlert">正常操課</span></div>
    <div class="campCombatButtons">
     <button id="campAttack" type="button" aria-label="攻擊"><span id="campAttackIcon">✊</span><small id="campAttackText">攻擊</small></button>
-    <button id="campWeaponSwitch" type="button" aria-label="選擇武器"><span>◉</span><small>武器</small></button>
+    <div class="campCombatTools">
+     <button id="campModeSwitch" type="button" aria-label="切換戰鬥與互動模式" aria-pressed="false"><span>⇄</span><small>切換</small></button>
+     <button id="campWeaponSwitch" type="button" aria-label="選擇武器"><span>◉</span><small>武器</small></button>
+    </div>
    </div>
    <div id="campCombatTip" hidden></div>
    <div id="campCombatCombo" hidden></div>
@@ -175,7 +179,15 @@ export class CampCombat{
   const flash=document.createElement('div');flash.id='campCombatFlash';flash.setAttribute('aria-hidden','true');document.body.appendChild(flash);
   const fx=document.createElement('div');fx.id='campCombatFx';fx.setAttribute('aria-hidden','true');document.body.appendChild(fx);
   this.root=root;this.fxLayer=fx;this.screenFlash=flash;
-  const sw=$('campWeaponSwitch'),attack=$('campAttack'),wheel=$('campCombatWheel'),disc=$('campWheelDisc');
+  const sw=$('campWeaponSwitch'),attack=$('campAttack'),mode=$('campModeSwitch'),
+   wheel=$('campCombatWheel'),disc=$('campWheelDisc');
+  mode.addEventListener('click',()=>{
+   if(this.gameOver||window.armyMinigameActive)return;
+   this.interactionMode=!this.interactionMode;
+   this.attackKeyboard=false;this.attackPointer=null;
+   if(this.wheelOpen)this.closeWheel(false);
+   this.refreshHUD(true);
+  });
   const dir=(x,y)=>{
    if(Math.hypot(x,y)<22)return null;
    return Math.abs(x)>Math.abs(y)?x>0?'right':'left':y>0?'bottom':'up';
@@ -253,6 +265,11 @@ export class CampCombat{
   attack.addEventListener('pointerdown',event=>{
    if(event.pointerType==='mouse'&&event.button!==0)return;
    if(this.gameOver||this.wheelOpen)return;
+   if(this.interactionMode){
+    this.tryInteract();
+    event.preventDefault();
+    return;
+   }
    startAudio();
    this.attackPointer=event.pointerId;
    this.tryAttack();
@@ -274,7 +291,11 @@ export class CampCombat{
    }
    if(event.code==='KeyJ'){
     event.preventDefault();
-    if(!this.attackKeyboard&&!event.repeat){this.attackKeyboard=true;startAudio();this.tryAttack()}
+    if(this.interactionMode){
+     if(!event.repeat)this.tryInteract();
+    }else if(!this.attackKeyboard&&!event.repeat){
+     this.attackKeyboard=true;startAudio();this.tryAttack();
+    }
    }
   });
   window.addEventListener('keyup',event=>{
@@ -288,17 +309,40 @@ export class CampCombat{
   const n=$('campCombatTip');n.textContent=msg;n.hidden=false;
   clearTimeout(this.tipTimer);this.tipTimer=setTimeout(()=>n.hidden=true,1700);
  }
+ setInteractionHandler(handler){this.onInteract=handler}
+ tryInteract(){
+  if(!this.interactionMode||this.gameOver||this.wheelOpen||
+     this.playerDown>0||this.playerRise>0||this.playerHurt>0||
+     window.armyMinigameActive)return false;
+  if(this.provoked){
+   this.notice('警戒中無法進行訓練');
+   return false;
+  }
+  const result=this.onInteract?.();
+  if(!result)this.notice('附近沒有可互動的項目');
+  return !!result;
+ }
  refreshHUD(force=false){
-  const cur=[this.hp,this.kills,this.weapon,this.gameOver].join('/');
+  const cur=[this.hp,this.kills,this.weapon,this.interactionMode,this.gameOver].join('/');
   if(!force&&this.lastState===cur)return;
   this.lastState=cur;
   $('campHealth').textContent='HP '+Math.ceil(this.hp);
   $('campKills').textContent='擊殺 '+this.kills;
   $('campAlert').textContent=this.kills>=10?'全營追擊':this.kills>=5?'步槍警戒':this.kills>=1?'手槍警戒':this.provoked?'徒手警戒':'正常操課';
-  if(this.weapon==='rifle')$('campAttackIcon').innerHTML=RIFLE_ICON;
-  else $('campAttackIcon').textContent=this.weapon==='fists'?'✊':'🔫';
-  $('campAttackText').textContent=this.weapon==='rifle'?'連發':this.weapon==='pistol'?'開火':'攻擊';
+  if(this.interactionMode){
+   $('campAttackIcon').textContent='✋';
+   $('campAttackText').textContent='互動';
+  }else{
+   if(this.weapon==='rifle')$('campAttackIcon').innerHTML=RIFLE_ICON;
+   else $('campAttackIcon').textContent=this.weapon==='fists'?'✊':'🔫';
+   $('campAttackText').textContent=this.weapon==='rifle'?'連發':this.weapon==='pistol'?'開火':'攻擊';
+  }
+  $('campAttack').setAttribute('aria-label',this.interactionMode?'互動':'攻擊');
+  $('campModeSwitch').setAttribute('aria-pressed',String(this.interactionMode));
+  $('campModeSwitch').classList.toggle('active',this.interactionMode);
+  $('campAttack').classList.toggle('interaction',this.interactionMode);
   $('campAttack').disabled=this.gameOver;
+  $('campModeSwitch').disabled=this.gameOver;
   $('campWeaponSwitch').disabled=this.gameOver;
  }
  // Rifle-range NPCs use the identical sample/pitch as their combat counterparts.
@@ -405,7 +449,7 @@ export class CampCombat{
   return {clip:normalClip,speed:normalSpeed};
  }
  tryAttack(){
-  if(this.gameOver||this.wheelOpen||this.playerDown>0||this.playerRise>0||
+  if(this.gameOver||this.interactionMode||this.wheelOpen||this.playerDown>0||this.playerRise>0||
      this.playerHurt>0||window.armyMinigameActive||this.playerCooldown>0)return false;
   if(this.weapon==='fists'){
    this.provoked=true;this.playerAttack=.72;this.playerAttackApplied=false;this.playerCooldown=.79;
@@ -682,7 +726,8 @@ export class CampCombat{
     this.playerAttackApplied=true;this.melee();
    }
   }
-  if((this.attackKeyboard||this.attackPointer!==null)&&this.weapon==='rifle'&&!this.wheelOpen)this.tryAttack();
+  if(!this.interactionMode&&(this.attackKeyboard||this.attackPointer!==null)&&
+      this.weapon==='rifle'&&!this.wheelOpen)this.tryAttack();
   if(!this.provoked||this.gameOver){this.updateBullets(dt);return}
   const stage=weaponForKills(this.kills);
   const radius=chaseRadius(this.kills);

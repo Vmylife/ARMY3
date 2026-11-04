@@ -13,11 +13,17 @@
 #campCombatStatus #campKills{color:#ffd798}
 #campCombatStatus #campAlert{font-size:10px;color:#e8e8c9}
 .campCombatButtons{position:absolute;bottom:calc(24px + env(safe-area-inset-bottom));right:max(14px,env(safe-area-inset-right));
- display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:auto}
+ display:flex;flex-direction:column;align-items:flex-end;gap:10px;pointer-events:auto}
+.campCombatTools{display:flex;align-items:center;justify-content:flex-end;gap:9px}
 .campCombatButtons button{border:2px solid #f2d9a2;border-radius:16px;color:#fff5db;background:#254c3d;
  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;line-height:1;
  box-shadow:0 5px 20px #0b2b1c80;font-weight:900}
 #campWeaponSwitch{width:61px;height:61px;background:linear-gradient(140deg,#54745b,#264735)}
+#campModeSwitch{width:61px;height:61px;background:#244a3b8f;color:#fbf0d6bd;
+ border-color:#e3d4b088;box-shadow:0 3px 12px #0b2b1c40;
+ backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+#campModeSwitch.active{background:#e4c882ae;color:#16382d;border-color:#f5db9bd9}
+#campAttack.interaction{background:linear-gradient(140deg,#5b9279,#2e6858);border-color:#d5edcc}
 #campAttack{width:83px;height:83px;border-radius:50%;background:linear-gradient(140deg,#d6aa68,#995d37)}
 .campCombatButtons span{font-size:27px;line-height:1}
 .campCombatButtons small{font-size:11px}
@@ -57,7 +63,7 @@
 @keyframes campFloat{from{opacity:1}to{opacity:0;transform:translateY(-32px)}}
 @media(max-width:500px){#campCombatStatus span{padding:4px 7px;font-size:10px}#campCombatStatus #campAlert{font-size:9px}
  .campCombatButtons{right:11px;bottom:calc(23px + env(safe-area-inset-bottom))}
- #campAttack{width:76px;height:76px}#campWeaponSwitch{width:56px;height:56px}
+ #campAttack{width:76px;height:76px}#campWeaponSwitch,#campModeSwitch{width:56px;height:56px}
  #campCombatTip{bottom:calc(174px + env(safe-area-inset-bottom))}}
 @media(max-height:610px){.campCombatButtons{bottom:calc(12px + env(safe-area-inset-bottom))}
  #campCombatTip{bottom:calc(143px + env(safe-area-inset-bottom))}

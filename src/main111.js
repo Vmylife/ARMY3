@@ -9,14 +9,14 @@ import {TwoHandBroomRenderer} from './characters/twoHandBroomRenderer119.js?v=11
 import {CAMP} from './map/camp.js?v=093';
 import {movePlayer} from './map/navCollision109.js?v=124';
 import {createNavDebugger} from './ui/navDebug109.js?v=109';
-import {createBlanketPortal} from './ui/blanketPortal128.js?v=128';
+import {createBlanketPortal} from './ui/blanketPortal128.js?v=129';
 import {saveCampSession,getReturningCampSession,clearCampSession} from './systems/campSession.js?v=144';
 import {drawMinimap} from './ui/minimap.js?v=093';
 import {initWorldMap} from './ui/worldMap.js?v=093';
 import {setupInput} from './ui/input.js?v=062';
 import {options} from './systems/settings.js?v=060';
 import {createCampNPCs,updateCampNPCs,squadDebug} from './systems/npcSquads113.js?v=128';
-import {createCampCombat} from './systems/campCombat.js?v=8';
+import {createCampCombat} from './systems/campCombat.js?v=9';
 
 const $=id=>document.getElementById(id);
 const debug=new URLSearchParams(location.search).has('debug');
@@ -138,12 +138,14 @@ async function boot(){
    console.warn('[ARMY3] 戰鬥動畫骨架不相容，啟用原有替代姿勢',combat.animationStatus);
   const blanketPortal=createBlanketPortal(renderer,{
     resuming:!!returnSnapshot,
+    isAlerted:()=>combat.provoked,
     onTrainingStart:(trainingId)=>saveCampSession({
       player:{x:player.pos.x,z:player.pos.z,angle:player.angle},
       camera:{yaw:camYaw,pitch:camPitch,zoom:cameraZoom,targetZoom},
       npcs:npcs.map(n=>({id:n.id,x:n.pos.x,z:n.pos.z,angle:n.angle}))
     },trainingId)
   });
+  combat.setInteractionHandler(()=>blanketPortal.interact(player.pos,worldMap.isOpen()));
   progress('35 名 NPC：5 支小隊＋10 名自由活動士兵已就位…');
   const showNavDebug=debug?createNavDebugger():null;
   // The new cross-legged clip drops the hips below the original standing root.
@@ -286,7 +288,7 @@ async function boot(){
       }
     }
     combat.drawWeapons(now);
-    blanketPortal.update(player.pos,worldMap.isOpen());
+    blanketPortal.update(player.pos,worldMap.isOpen()||combat.provoked);
     showNavDebug?.(renderer.vp,player.pos,npcs,now);
     mapFacing=Math.PI-player.angle+mapYaw;
     if(now-lastMap>=16){
