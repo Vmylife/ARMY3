@@ -78,22 +78,13 @@ function setMode(next){
  E.trace.style.display=next==='done'&&comparison?'':'none';
  E.dot.setAttribute('visibility',(next==='imitate'||next==='countinPlayer')?'visible':'hidden');
  E.overlay.hidden=playing||next==='done';
- E.main.textContent=next==='empty'?'原版人聲載入中…':
-  next==='error'?'↻ 重新載入原版人聲':
-  next==='ready'?'▶ 班長先唱':
-  next==='countinTeacher'||next==='countinPlayer'?'答、答、答、答…':
-  next==='listen'?'班長正在唱原版人聲…':
-  next==='imitate'?'輪到你，憑記憶滑！':
-  next==='playback'?'正在播放你的走音…':'↻ 再挑戰一次';
- E.stage.textContent=next==='empty'?'正在自動載入原唱':
-  next==='error'?'原唱載入失敗':
-  next==='ready'?'音檔就緒 · 原版人聲':
-  next==='countinTeacher'?'① 班長預備拍 · 3 2 1 唱':
-  next==='countinPlayer'?'② 玩家預備拍 · 3 2 1 唱':
-  next==='listen'?'① 班長示範 · 原唱音準線':
-  next==='imitate'?'② 你唱 · 答案完全隱藏':
-  next==='playback'?'③ 公開播放玩家走音':'④ 鑑測報告';
- E.stage.textContent='第 '+(activePhrase+1)+'/'+PHRASES.length+' 句 · '+E.stage.textContent;
+ E.main.textContent=next==='empty'?'載入中':next==='error'?'重新載入':next==='ready'?'開始':
+  next==='countinPlayer'||next==='countinTeacher'?'準備開唱':
+  next==='listen'?'班長演唱中':next==='imitate'?'玩家演唱中':
+  next==='playback'?'總回顧播放中':'重新挑戰';
+ E.stage.textContent=next==='empty'?'載入中':next==='error'?'載入失敗':next==='ready'?'準備好了':
+  next==='countinPlayer'||next==='countinTeacher'?'3 · 2 · 1 · 唱':
+  next==='listen'?'班長示範':next==='imitate'?'換你唱':next==='playback'?'總回顧':'完成';
  E.overlay.textContent=next==='empty'?'正在載入內建原版人聲…':next==='error'?'載入失敗，點擊重新載入':vocals?'按「班長先唱」開始':'正在載入內建原版人聲…';
  if(next==='countinTeacher')E.speech.textContent='「聽好！我直接唱，不用等！」';
  if(next==='countinPlayer')E.speech.textContent='「3、2、1、唱！第五拍才開始！」';
