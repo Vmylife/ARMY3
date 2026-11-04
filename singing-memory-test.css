@@ -126,3 +126,35 @@ button:focus-visible,a:focus-visible,.pitchRail:focus-visible{outline:2px solid 
  .coachSpeech{font-size:11px}
 }
 @media(prefers-reduced-motion:reduce){.coachStage.react .coachGrade,.coachStage.react .coachSvg,.countdown.pulse .countdownCore{animation:none}}
+
+
+/* v1.1 – five distinct visible facial expressions, not just text recolors. */
+.coachAngryBrows,.coachAngryEyes,.coachHappyEyes,
+.coachFrown,.coachWorry,.coachBigSmile,.coachTeeth,
+.coachBlush,.coachSweat,.coachSparkles{opacity:0;pointer-events:none;transition:opacity .13s ease}
+.coachStage.mood-bad .coachNormalBrows,
+.coachStage.mood-bad .coachEyes,
+.coachStage.mood-bad .coachSmile{opacity:0}
+.coachStage.mood-bad .coachAngryBrows,
+.coachStage.mood-bad .coachAngryEyes,
+.coachStage.mood-bad .coachFrown{opacity:1}
+.coachStage.mood-bad .coachSvg{transform:rotate(-3deg)}
+.coachStage.mood-okay .coachSmile{opacity:0}
+.coachStage.mood-okay .coachWorry,.coachStage.mood-okay .coachSweat{opacity:1}
+.coachStage.mood-okay .coachNormalBrows{transform:translateY(-3px)}
+.coachStage.mood-good .coachEyes,.coachStage.mood-good .coachSmile{opacity:1}
+.coachStage.mood-great .coachEyes,.coachStage.mood-great .coachSmile{opacity:0}
+.coachStage.mood-great .coachHappyEyes,.coachStage.mood-great .coachBigSmile,
+.coachStage.mood-great .coachTeeth,.coachStage.mood-great .coachBlush{opacity:1}
+.coachStage.mood-perfect .coachEyes,.coachStage.mood-perfect .coachSmile{opacity:0}
+.coachStage.mood-perfect .coachHappyEyes,.coachStage.mood-perfect .coachBigSmile,
+.coachStage.mood-perfect .coachTeeth,.coachStage.mood-perfect .coachBlush,
+.coachStage.mood-perfect .coachSparkles{opacity:1}
+.coachStage.mood-perfect .coachSparkles{animation:coachTwinkle .8s ease-in-out alternate infinite}
+.coachStage.mood-okay .coachGrade{color:#d6c9ab}
+.coachStage.mood-good .coachGrade{color:#f1dca9}
+.coachStage.mood-bad .coachGrade{color:#ff8f88}
+.coachStage.mood-great .coachGrade{color:#b9e5a6}
+.coachStage.mood-perfect .coachGrade{color:#ffe88b}
+@keyframes coachTwinkle{from{transform:scale(.96);opacity:.5}to{transform:scale(1.05);opacity:1}}
+@media(prefers-reduced-motion:reduce){.coachStage.mood-perfect .coachSparkles{animation:none}}
