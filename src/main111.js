@@ -1,6 +1,6 @@
 // Army v0.10.10: keep the approved 3D camp; add autonomous NPC utility decisions, social interactions, and action labels.
-import {CampBuildings,BUILDING_MODELS,nearbyBuildingModelIds} from './buildings/buildingRenderer.js?v=146';
-import {CampProps,PROP_MODELS,nearbyPropModelIds} from './props/propRenderer.js?v=146';
+import {CampBuildings,BUILDING_MODELS} from './buildings/buildingRenderer.js?v=112';
+import {CampProps,PROP_MODELS} from './props/propRenderer.js?v=120';
 import {loadGlb} from './core/glb111.js?v=111';
 import {ArmyRenderer} from './core/renderer.js?v=116';
 import {RigAnimator} from './characters/rigAnimator.js?v=121';
@@ -42,7 +42,7 @@ async function boot(){
  try{
   // Real progress per streamed model; visible increments even before GLB parsing.
   const TOTAL=1000;let heroPart=0,npcPart=0,otherDone=0;
-  let otherTotal=BUILDING_MODELS.length+PROP_MODELS.length+1;
+  const otherTotal=BUILDING_MODELS.length+PROP_MODELS.length+1;
   const staticProgress=new Map();
   const progress=(message)=>window.armySetLoading?.(
     345*heroPart+145*npcPart+485*(Math.min(otherTotal,otherDone+[...staticProgress.values()].reduce((s,p)=>s+p,0))/otherTotal),TOTAL,message);
@@ -74,108 +74,37 @@ async function boot(){
   const buildings=new CampBuildings(renderer.gl);
   const props=new CampProps(renderer.gl);
   const playRangeShot=createRangeAudio();
-  const returnSnapshot=getReturningCampSession();
-  const entryPosition=returnSnapshot?.player??CAMP.spawn;
-  // First playable frame: only the model types around the player and tiny rifle.
-  // Nonessential models continue streaming after the camp is visible.
-  const firstBuildings=new Set(nearbyBuildingModelIds(entryPosition,3));
-  const firstProps=new Set(nearbyPropModelIds(entryPosition,4));
+  // Avoid firing 23 simultaneous model downloads / image decodes into iOS Safari.
+  // Keep 3 workers busy and show actual completed-model progress.
   const jobs=[
-    ...BUILDING_MODELS.map(m=>({kind:'building',id:m.id,label:'建築 '+m.id,url:m.url,essential:firstBuildings.has(m.id)})),
-    ...PROP_MODELS.map(m=>({kind:'prop',id:m.id,label:'道具 '+m.id,url:m.url,essential:firstProps.has(m.id)})),
-    {kind:'rifle',id:'rifle',label:'步槍',url:'./assets/weapons/rifle.glb?v=111',essential:true}
+    ...BUILDING_MODELS.map(m=>({label:'建築 '+m.id,fn:async()=>{
+      const glb=await loadGlb(m.url,{timeoutMs:90000,onProgress:(got,total)=>{staticProgress.set('building'+m.id,Math.min(.95,total?got/total:got/5000000));progress('下載建築 '+m.id+'：'+mb(got)+(total?' / '+mb(total):''));}});
+      await stage(buildings.add(m.id,glb),'建立建築 '+m.id,45000);staticProgress.delete('building'+m.id);
+    }})),
+    ...PROP_MODELS.map(m=>({label:'道具 '+m.id,fn:async()=>{
+      const glb=await loadGlb(m.url,{timeoutMs:90000,onProgress:(got,total)=>{staticProgress.set('prop'+m.id,Math.min(.95,total?got/total:got/5000000));progress('下載道具 '+m.id+'：'+mb(got)+(total?' / '+mb(total):''));}});
+      await stage(props.add(m.id,glb),'建立道具 '+m.id,45000);
+    }})),
+    {label:'步槍',fn:async()=>{
+      const glb=await loadGlb('./assets/weapons/rifle.glb?v=111',{timeoutMs:90000});
+      await stage(rifleRenderer.addModel(glb),'建立步槍',45000);
+    }}
   ];
-  const initialJobs=jobs.filter(j=>j.essential);
-  const deferredJobs=jobs.filter(j=>!j.essential);
-  otherTotal=initialJobs.length; // Loading bar measures time-to-first-playable-frame, not background uploads.
-  const loadJob=async(job,foreground=false)=>{
-   const key=job.kind+job.id;
-   const glb=await loadGlb(job.url,{timeoutMs:90000,onProgress:(got,total)=>{
-    if(!foreground)return;
-    staticProgress.set(key,Math.min(.95,total?got/total:got/5000000));
-    progress('下載'+job.label+'：'+mb(got)+(total?' / '+mb(total):''));
-   }});
-   if(!foreground){
-    // Do not upload GPU textures on the same frame as a game switch / fast movement.
-    await new Promise(resolve=>{
-     const check=()=>{
-      if(document.hidden||window.armyMinigameActive){setTimeout(check,250);return}
-      if(performance.now()-lastPlayerMove>270||performance.now()-deferredStartedAt>2700){resolve();return}
-      setTimeout(check,160);
-     };
-     check();
-    });
-    window.armyAssetUploadBusy=true;
-   }
-   try{
-    if(job.kind==='building')await stage(buildings.add(job.id,glb),'建立'+job.label,45000);
-    else if(job.kind==='prop')await stage(props.add(job.id,glb),'建立'+job.label,45000);
-    else await stage(rifleRenderer.addModel(glb),'建立步槍',45000);
-   }finally{
-    if(!foreground)window.armyAssetUploadBusy=false;
-    staticProgress.delete(key);
-   }
-  };
-  let initialIndex=0;
-  async function firstWorker(){
-   while(initialIndex<initialJobs.length){
-    const job=initialJobs[initialIndex++];
-    step='開場'+job.label;
-    progress('開場載入 '+job.label+'…');
-    await loadJob(job,true);
-    otherDone++;
-    progress('開場必要模型 '+otherDone+' / '+initialJobs.length);
-    await new Promise(resolve=>setTimeout(resolve,0));
-   }
-  }
-  await Promise.all(Array.from({length:Math.min(2,initialJobs.length)},firstWorker));
-  progress('附近環境已準備，進入軍營…');
-
-  // Deferred work is deliberately never awaited by the first-frame reveal.
-  // One download/decode and one GPU upload at a time prevents iOS Safari spikes.
-  let lastPlayerMove=performance.now(),deferredStartedAt=0;
-  const modelDistance=job=>{
-   if(job.kind==='building'){
-    // Prioritize model types needed nearest to the player's CURRENT position.
-    const ordered=nearbyBuildingModelIds(player.pos,BUILDING_MODELS.length);
-    return ordered.indexOf(job.id);
-   }
-   const ordered=nearbyPropModelIds(player.pos,PROP_MODELS.length);
-   return ordered.indexOf(job.id);
-  };
-  async function streamRemainingAssets(){
-   await new Promise(resolve=>setTimeout(resolve,1100));
-   window.armyAssetStreaming=true;
-   try{
-    while(deferredJobs.length){
-     if(document.hidden||window.armyMinigameActive){
-      await new Promise(resolve=>setTimeout(resolve,350));
-      continue;
-     }
-     // Reorder each iteration, because the player might have walked elsewhere.
-     deferredJobs.sort((a,b)=>modelDistance(a)-modelDistance(b));
-     const job=deferredJobs.shift();
-     deferredStartedAt=performance.now();
-     window.armyAssetNetBusy=true;
-     try{
-      await loadJob(job,false);
-      console.debug('[軍營背景補載]',job.label,'完成');
-     }catch(err){
-      console.warn('[軍營背景補載]',job.label,'失敗，保留簡化外形',err);
-     }finally{
-      window.armyAssetNetBusy=false;
-      window.armyAssetUploadBusy=false;
-     }
-     window.armyAssetLoaded=(window.armyAssetLoaded||0)+1;
-     await new Promise(resolve=>setTimeout(resolve,170));
+  let jobIndex=0;
+  async function worker(){
+    while(jobIndex<jobs.length){
+      const job=jobs[jobIndex++];step='載入'+job.label;
+      progress('載入'+job.label+'…（'+otherDone+' / '+otherTotal+'）');
+      await job.fn();otherDone++;
+      progress('已載入 '+otherDone+' / '+otherTotal+' 項營區模型');
+      // Yield to iOS's UI thread after each decoded model.
+      await new Promise(resolve=>setTimeout(resolve,0));
     }
-   }finally{
-    window.armyAssetStreaming=false;
-    window.armyAssetNetBusy=false;
-    window.armyAssetUploadBusy=false;
-   }
   }
+  await Promise.all(Array.from({length:Math.min(2,jobs.length)},worker));
+  progress('模型完成，正在準備第一個畫面…');
 
+  const returnSnapshot=getReturningCampSession();
   step='建立主角骨架';const player={pos:{...CAMP.spawn},angle:0,anim:new RigAnimator(heroGlb)};
   if(returnSnapshot?.player){
     player.pos={x:returnSnapshot.player.x,z:returnSnapshot.player.z};
@@ -281,7 +210,7 @@ async function boot(){
      player.pos=movePlayer(player.pos,mx*dt*m.speed,mz*dt*m.speed,npcs);
      if(Math.hypot(player.pos.x-before.x,player.pos.z-before.z)>1e-5){face(player,mx,mz);mapYaw=camYaw;}
     }
-    if(m.speed>0){audition=null;lastPlayerMove=now;}
+    if(m.speed>0)audition=null;
     if(audition&&player.anim.clip!==audition)player.anim.setClip(audition);
     else if(!audition&&player.anim.clip!==m.clip)player.anim.setClip(m.clip);
     player.anim.speed=m.rate;player.anim.evaluate(dt);
@@ -308,10 +237,8 @@ async function boot(){
       worldMap.update(player.pos,null,player.angle);lastMap=now;
     }
     if(debug&&now-lastDebug>150){$('debug').hidden=false;$('debug').textContent=`fps: ${measuredFps}\nNPC: ${npcs.length} (10自由＋5x5小隊)\n${squadDebug().map(s=>`隊${s.squad}: ${s.stage} ${s.phase} (${s.done}/5)`).join('\n')}\nmode: ${m.clip}\npos: ${player.pos.x.toFixed(2)},${player.pos.z.toFixed(2)}\ninput: ${stick.magnitude.toFixed(2)}\nzoom: ${cameraZoom.toFixed(2)}\nrenderer: webgl2`;lastDebug=now}
-    // First usable frame is ready; distant GLBs retain lightweight silhouettes until streamed.
+    // First frame (including ground + ALL models) must complete before reveal.
     if(!entered){entered=true;window.armyLoadComplete?.();last=now;
-      // Return control now; low-priority models finish after the playable frame.
-      streamRemainingAssets().catch(err=>console.warn('[軍營背景補載]非致命錯誤',err));
       if(returnSnapshot)clearCampSession();
     }
     requestAnimationFrame(tick);
