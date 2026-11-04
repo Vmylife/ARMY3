@@ -4,7 +4,7 @@ import {ArmyRenderer} from '../core/renderer.js?v=116';
 import {RigAnimator} from '../characters/rigAnimator.js?v=121';
 import {loadGlb} from '../core/glb111.js?v=111';
 import {mul,translation,rotateY} from '../core/math.js?v=060';
-import {FightEngine,ATTACKS,LAUNCH_AFTER_DAMAGE} from './engine.js?v=5';
+import {FightEngine,ATTACKS,LAUNCH_AFTER_DAMAGE} from './engine.js?v=6';
 import {installUserCombatClips} from './uploadedHitAnimations.js?v=1';
 import {setupInput} from '../ui/input.js?v=062';
 
@@ -124,8 +124,12 @@ function syncActor(f,actor,dt){
   anim.speed=clamp((anim.clips[clip]?.duration||2.2)/1.95,.85,1.7);
  }else if(f.state==='rise'){
   anim.speed=clamp((anim.clips[clip]?.duration||1.8)/1.70,.85,1.4);
- }else if(f.state==='walk'&&f.id==='player')anim.speed=clamp((f.moveSpeed||3)/4,.86,1.55);
- else anim.speed=1;
+ }else if(f.state==='walk'){
+  // Match animation stride to each recruit's actual chase velocity.
+  anim.speed=f.id==='player'
+   ?clamp((f.moveSpeed||3)/4,.86,1.55)
+   :clamp((f.moveSpeed||2.6)/2.7,.84,1.26);
+ }else anim.speed=1;
  anim.evaluate(dt);
 }
 function project(x,y,z){
