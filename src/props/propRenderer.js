@@ -22,6 +22,16 @@ export const PROP_MODELS=[
  {id:'grenadeCrate',url:'./assets/props/grenade-crate.glb?v=112'}
 ];
 
+export function nearbyPropModelIds(position,limit=4){
+ const closest=new Map();
+ for(const p of PROPS){
+  if(!p.type||!PROP_MODELS.some(m=>m.id===p.type))continue;
+  const d=Math.hypot(p.x-position.x,p.z-position.z);
+  if(d<(closest.get(p.type)??Infinity))closest.set(p.type,d);
+ }
+ return [...closest.entries()].sort((a,b)=>a[1]-b[1]).slice(0,limit).map(([id])=>id);
+}
+
 const VS=`#version 300 es
 precision highp float;
 layout(location=0) in vec3 p;layout(location=1) in vec3 n;layout(location=2) in vec2 uv;
