@@ -143,14 +143,14 @@ function followLabel(id,f){
 function hitBurst(event){
  if(!renderer)return;
  const at=project(event.at.x,1.18,event.at.z);
- const node=document.createElement('div');node.className='hitBurst '+(event.type==='heavy'?'heavy ':'')+(event.who==='enemy'?'enemy':'');
- node.dataset.text=event.type==='heavy'?'砰！':'啪！';
+ const node=document.createElement('div');node.className='hitBurst '+(event.down?'heavy ':'')+(event.who==='player'?'':'enemy');
+ node.dataset.text=event.down?'擊飛！':'啪！';
  node.style.left=at.x+'px';node.style.top=at.y+'px';
  $('burstLayer').appendChild(node);setTimeout(()=>node.remove(),410);
  const damage=document.createElement('div');damage.className='floatDamage';
  damage.textContent='-'+event.damage;damage.style.left=at.x+'px';damage.style.top=(at.y-23)+'px';
  $('burstLayer').appendChild(damage);setTimeout(()=>damage.remove(),810);
- const flash=$('flash');flash.style.transition='none';flash.style.opacity=event.type==='heavy'?.7:.42;
+ const flash=$('flash');flash.style.transition='none';flash.style.opacity=event.down?.70:.40;
  requestAnimationFrame(()=>{flash.style.transition='opacity 110ms ease-out';flash.style.opacity=0});
 }
 function unlockAudio(){
@@ -188,45 +188,59 @@ function thump(heavy=false){
 function react(){
  for(const event of e.drain()){
   if(event.kind==='swing'){
-   whoosh(event.type==='heavy'||event.type==='counter');
-   if(event.who==='enemy')tell('對方準備還手了！快走位！',950);
+   whoosh(false);
+   if(event.who!=='player')tell('有人要揍你了！快走位！',900);
   }else if(event.kind==='hit'){
-   const heavy=event.type==='heavy';
-   shake=Math.max(shake,heavy?.20:.11);
-   hitBurst(event);thump(heavy);
+   shake=Math.max(shake,event.down?.25:.095);
+   hitBurst(event);thump(Boolean(event.down));
    if(event.who==='player'){
-    tell(event.down?'重拳打趴！班長：你們是來當兵還是打 UFC？':event.chain>=2?event.chain+' 連擊！這拳有重量！':'命中！對方要反擊了！',1200);
-   }else tell(event.down?'你被打倒了！班長都看不下去了！':'欸靠！對方真的還手！',1250);
+    tell(event.down?'擊飛！這拳直接讓他躺平！':
+     event.damageSinceFall>=LAUNCH_AFTER_DAMAGE?'累積受傷 30%！下一拳直接擊飛！':
+     '命中！對方累積受傷 '+event.damageSinceFall+' / '+LAUNCH_AFTER_DAMAGE,1300);
+   }else{
+    tell(event.down?'你被打趴了！其他人還在追！':'靠北！你被反擊了！',1150);
+   }
    if(event.who==='player'&&event.chain>=2){
     $('combo').textContent=event.chain+' HIT COMBO';$('combo').hidden=false;
-    clearTimeout(react.comboTimer);react.comboTimer=setTimeout(()=>$('combo').hidden=true,1000);
+    clearTimeout(react.comboTimer);react.comboTimer=setTimeout(()=>$('combo').hidden=true,950);
    }
+  }else if(event.kind==='alarm'){
+   tell('阿兵哥：「欸！有人打我們的人！」',1200);
+  }else if(event.kind==='reinforcements'){
+   tell('靠北！另外 3 名友軍也衝過來揍你了！',2300);
   }else if(event.kind==='miss'){
-   if(event.who==='player')tell('揮空了！靠近一點再打。',850);
-  }else if(event.kind==='rise'&&event.who==='enemy'){tell('對手站起來了：「幹！還來？」',1200)}
-  else if(event.kind==='finished'){
+   if(event.who==='player')tell('揮空了！要自己面向對手才打得到。',850);
+  }else if(event.kind==='rise'&&event.who!=='player'){
+   tell('阿兵哥爬起來了：「你再打一次試試看！」',1100);
+  }else if(event.kind==='finished'){
    const serial=roundSerial;
-   setTimeout(()=>{if(serial===roundSerial)showEnd(event.winner)},1700);
+   setTimeout(()=>{if(serial===roundSerial)showEnd(event.winner)},1800);
   }
  }
 }
 function updateHUD(){
  for(const [id,hp] of [['player',e.player.hp],['enemy',e.enemy.hp]]){
-  const fill=$(id+'HP'),text=$(id+'HPText');
-  const display=Math.ceil(hp);
-  if(fill.dataset.hp!==String(display)){fill.style.width=hp+'%';fill.dataset.hp=String(display);text.textContent=display+' / 100'}
+  const fill=$(id+'HP'),txt=$(id+'HPText'),shown=Math.ceil(hp);
+  if(fill.dataset.hp!==String(shown)){fill.style.width=hp+'%';fill.dataset.hp=String(shown);txt.textContent=shown+' / 100'}
  }
- $('light').disabled=!ready||Boolean(e.winner);
- $('heavy').disabled=!ready||Boolean(e.winner);
- const title=e.winner?'本回合已結束':e.aggressive?(e.aiEnabled?'AI 已進入反擊模式':'AI 反擊已關閉'):'對手等待你先出拳';
- $('sceneStatus').textContent=title;
+ $('attack').disabled=!ready||Boolean(e.winner);
+ const active=e.opponents.filter(f=>f.hp>0).length;
+ $('sceneStatus').textContent=e.winner?'格鬥結束':e.reinforcements?'1 對 4！所有友軍都來了':
+  e.aggressive?'對手已還手 · 支援即將抵達':'先打其中一名阿兵哥看看';
+ const count=$('allyCount');
+ if(count)count.textContent=e.reinforcements?'友軍已參戰：'+active+' 人':'其他 3 人尚未警戒';
+ for(const ally of e.allies){
+  const badge=$('allyStatus'+ally.aiIndex);
+  if(badge){badge.textContent='友軍 '+ally.aiIndex+' · '+Math.ceil(ally.hp)+'%';
+   badge.classList.toggle('isDown',ally.hp<=0)}
+ }
 }
 function showEnd(winner){
- $('endTitle').textContent=winner==='player'?'你把阿兵哥打趴了！':'被阿兵哥反過來教育';
+ $('endTitle').textContent=winner==='player'?'一打四！全營最不想惹的人':'被阿兵哥們集體教育';
  $('endComment').textContent=winner==='player'?
-  '班長：「你很會打嘛？晚點自己去找連長報到。」':'班長：「不是你先動手的嗎？怎麼躺地上的是你？」';
- $('playerHits').textContent=e.hits;
- $('enemyHits').textContent=e.enemyHits;
+  '班長：「你以為軍營是格鬥場是不是？四個人都被你揍倒？」':
+  '班長：「你一個人挑四個，還真以為自己是葉問？」';
+ $('playerHits').textContent=e.hits;$('enemyHits').textContent=e.enemyHits;
  $('endScreen').hidden=false;
 }
 function reset(){
@@ -245,14 +259,11 @@ function controls(){
   (dx,dy)=>{cameraYaw+=dx;cameraPitch=clamp(cameraPitch+dy,.32,1.12);},
   ratio=>{if(Number.isFinite(ratio)&&ratio>0)targetZoom=clamp(targetZoom*ratio,6.5,17.6)}
  );
- function playAction(type){
+ function playAction(){
   if(!ready)return;
-  unlockAudio();
-  e.attack(type);
-  react();updateHUD();
+  unlockAudio();e.attack();react();updateHUD();
  }
- $('light').addEventListener('click',()=>playAction('jab'));
- $('heavy').addEventListener('click',()=>playAction('heavy'));
+ $('attack').addEventListener('click',playAction);
  $('reset').addEventListener('click',reset);$('again').addEventListener('click',reset);
  $('counter').addEventListener('change',event=>{
   e.enableAI(event.target.checked);
@@ -260,9 +271,8 @@ function controls(){
  });
  $('difficulty').addEventListener('change',event=>{e.difficulty=event.target.value});
  window.addEventListener('keydown',event=>{
-  if(!['KeyJ','KeyK'].includes(event.code)||event.repeat)return;
-  event.preventDefault();
-  playAction(event.code==='KeyJ'?'jab':'heavy');
+  if(event.code!=='KeyJ'||event.repeat)return;
+  event.preventDefault();playAction();
  });
 }
 // Identical 3D directional basis as src/main111.js: camera-relative movement.
@@ -341,7 +351,7 @@ window.armyFightLab={
   hasHitReaction:!!actors?.player.anim.hasClip('Hit_Reaction'),
   hasArise:!!actors?.player.anim.hasClip('Arise'),
   hasBlock2:!!actors?.player.anim.hasClip('Block2')}},
- attack:type=>{const ok=e.attack(type||'jab');react();return ok},
+ attack:()=>{const ok=e.attack();react();return ok},
  reset,engine:e,
  get camera(){return {yaw:cameraYaw,pitch:cameraPitch,zoom:cameraZoom,targetZoom}},
  get movement(){return direction()}
