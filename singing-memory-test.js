@@ -740,33 +740,65 @@ async function replay(){
  E.controls.classList.remove('isComparing');
  stopAudio();const id=session;
  try{
-  await getAudio().resume();
-  for(let i=0;i<PHRASES.length;i++){
-   if(id!==session)return;
-   await applyPhrase(i);
-   setMode('playback');
-   E.speech.textContent='「聽聽看你第 '+(i+1)+' 句唱得怎樣！」';
-   E.guide.style.display='none';E.trace.style.display='none';
-   const warped=takes[i].buffer;
-   // The original instrumental plays only here, matched to the same
-   // source-song timestamp as each recorded vocal phrase.
-   const c=getAudio(),when=c.currentTime+.04;
-   playReviewBacking(i,when);
-   const p=playBuffer(warped,0,PHRASES[i].duration,when);
-   await animateAudio(p,when);
-   await p;
-   stopBacking();
-  }
+  const c=getAudio();await c.resume();
   if(id!==session)return;
+  E.feedback.hidden=true;
+  setMode('playback');
+  E.guide.style.display='none';
+  E.trace.style.display='none';
+  E.words.textContent='♪ 前奏';
+  E.count.textContent='總回顧';
+  E.speech.textContent='先聽原版前奏，接著就是你的七句成果！';
+  E.coachScore.textContent='原曲伴奏從 0:00 不間斷播放';
+  E.reaction.textContent='♫';
+  for(let i=0;i<PHRASES.length;i++)$('phraseStep'+(i+1))?.classList.remove('active');
+  resetHead();
+  // Keep one musical timeline. We never stop/restart or seek the accompaniment
+  // when moving between lyrics: only the warped voices enter on their timestamps.
+  const startedAt=c.currentTime+.12;
+  const reviewDuration=scheduleContinuousReview(c,startedAt);
+  let current=-1;
+  const finished=await new Promise(resolve=>{
+   const tick=()=>{
+    if(id!==session){resolve(false);return}
+    const t=c.currentTime-startedAt;
+    if(t>=reviewDuration+.05){resolve(true);return}
+    let next=-1;
+    for(let i=0;i<PHRASES.length;i++){
+     if(t>=BACKING_PHRASE_STARTS[i])next=i;
+    }
+    if(next!==current&&next>=0){
+     current=next;activePhrase=next;
+     CLIP=PHRASES[next].duration;
+     E.words.textContent=PHRASES[next].text;
+     E.count.textContent=(next+1)+' / '+PHRASES.length;
+     E.speech.textContent='這句你唱了 '+takes[next].score.points+' 分，自己聽聽看！';
+     E.coachScore.textContent='第 '+(next+1)+' 句回放';
+     for(let i=0;i<PHRASES.length;i++)$('phraseStep'+(i+1))?.classList.toggle('active',i===next);
+    }
+    if(current>=0)headAt(Math.max(0,t-BACKING_PHRASE_STARTS[current]));
+    else headAtPre(Math.max(0,t)*4*BEAT_SECONDS/BACKING_PHRASE_STARTS[0]);
+    frame=requestAnimationFrame(tick);
+   };
+   frame=requestAnimationFrame(tick);
+  });
+  if(!finished||id!==session)return;
+  stopBacking();
   await applyPhrase(PHRASES.length-1);
   setMode('done');comparison=false;E.feedback.hidden=false;
   E.rank.textContent=lastScore.grade+' 級';
   E.points.textContent=lastScore.points+' / 100';
-  E.comment.textContent=lastScore.comment+'（七句平均跟唱率 '+lastScore.coverage+'%；平均走音 '+lastScore.error+' 個半音）';
-  E.phraseScores.textContent=takes.map((take,index)=>'第'+(index+1)+'句 '+take.score.points+' 分').join(' · ');
-  E.hint.textContent='七句走音人聲＋原版伴奏已回放完畢。可重播或選擇任一句比較音準。';
+  E.comment.textContent=lastScore.comment;
+  E.phraseScores.textContent=takes.map((take,index)=>'第'+(index+1)+'句 '+take.score.points+'分').join(' · ');
+  E.hint.textContent='完整原版伴奏已從頭連續播放，七段玩家人聲照原曲時間加入。';
   tracePathFor(takes[PHRASES.length-1]);
- }catch(err){console.error('[軍歌鑑測] 回放失敗',err);setText('播放走音人聲失敗：'+err.message);setMode('done')}
+ }catch(err){
+  stopBacking();
+  console.error('[軍歌鑑測] 總回顧播放失敗',err);
+  setText('總回顧播放失敗：'+err.message);
+  setMode('done');
+  E.feedback.hidden=false;
+ }
 }
 async function finishImitate(){
  playerHeld=false;pointerId=null;E.rail.classList.remove('active');
