@@ -43,8 +43,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #fae39c;outline-offset:2p
 .action{border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;box-shadow:0 6px 19px #203c2e5a;border:2px solid #f5e7baa8;line-height:1;color:white;font-weight:950;text-shadow:0 1px 1px #162d1f66}
 .action span{font-size:27px}
 .action small{font-size:11px}
-.action.light{width:79px;height:79px;background:linear-gradient(145deg,#50775a,#234b3a)}
-.action.heavy{width:92px;height:92px;background:linear-gradient(145deg,#e6a14c,#bb4d32);border:3px solid #ffe0a6}
+.action.attack{width:90px;height:90px;background:linear-gradient(145deg,#d8a963,#ad603d);border:3px solid #f6dfaa;box-shadow:0 7px 21px #223d2c68,inset 0 2px 4px #fff5}
 
 
 
@@ -88,7 +87,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #fae39c;outline-offset:2p
  .fighterName strong{font-size:10px}.fighterName span{font-size:8px}
  .controls{bottom:calc(94px + env(safe-area-inset-bottom));padding-inline:12px}
  
- .actionArea{gap:10px}.action.heavy{width:82px;height:82px}.action.light{width:69px;height:69px}
+ .actionArea{gap:10px}.action.attack{width:80px;height:80px}
  .action span{font-size:22px}.action small{font-size:10px}
  .callout{bottom:calc(193px + env(safe-area-inset-bottom));font-size:11px}
  .footer{padding:6px 7px calc(4px + env(safe-area-inset-bottom));min-height:90px}
@@ -102,7 +101,23 @@ button:focus-visible,a:focus-visible{outline:3px solid #fae39c;outline-offset:2p
  .callout{bottom:calc(153px + env(safe-area-inset-bottom))}
  .controls{bottom:calc(68px + env(safe-area-inset-bottom))}
  
- .action.heavy{width:73px;height:73px}.action.light{width:65px;height:65px}
+ .action.attack{width:73px;height:73px}
  .footer p:last-child{display:none}
 }
 @media(prefers-reduced-motion:reduce){.hitBurst,.floatDamage{animation-duration:1ms}#flash,.healthFill,}
+
+/* Three allied recruits: all use one shared mesh, but each has its own status. */
+.alliesHud{position:absolute;z-index:5;top:calc(197px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);width:min(440px,calc(100% - 22px));background:#183b30df;color:#e7eacb;border:1px solid #e2d0a276;border-radius:10px;padding:7px 10px;font-size:10px;line-height:1.25;text-align:center;pointer-events:none;box-shadow:0 4px 12px #1333203b}
+#allyCount{font-weight:900;color:#f5e0a6;display:block}
+.allyGroup{display:flex;justify-content:center;gap:6px;margin-top:5px;white-space:nowrap}
+.allyGroup span{font-variant-numeric:tabular-nums;background:#346049ab;border-radius:5px;padding:4px 6px;font-size:10px;font-weight:800}
+.allyGroup .isDown{background:#7b48418c;text-decoration:line-through;opacity:.64}
+@media(max-width:460px){
+ .alliesHud{top:calc(160px + env(safe-area-inset-top));padding:5px 6px}
+ .allyGroup{gap:3px}.allyGroup span{font-size:9px;padding:3px 4px}
+ .hudTop{top:calc(123px + env(safe-area-inset-top))}
+}
+@media(max-height:620px){
+ .alliesHud{top:calc(143px + env(safe-area-inset-top))}
+ .callout{bottom:calc(150px + env(safe-area-inset-bottom))}
+}
