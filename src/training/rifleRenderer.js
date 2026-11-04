@@ -69,7 +69,7 @@ export class RifleRenderer{
   // Calibrated local grip preserves the original rifle placement at rest.
   // A moving wrist drives its rotation/position in Run/Walk/Idle, while
   // actorModel adds the same root lift and torso leaning as the rendered body.
-  const local=mul(translation(-.085,.907,.300),mul(rotateY(-Math.PI/2),mul(translation(-.045*recoil,0,0),scale(.38))));
+  const local=mul(translation(-.085,actorModel?.907:1.002,.300),mul(rotateY(-Math.PI/2),mul(translation(-.045*recoil,0,0),scale(.38))));
   const grip=actor.anim.rightHandWorld&&this.referenceGripInverse
    ?mul(actor.anim.rightHandWorld,this.referenceGripInverse):null;
   const root=actorModel||mul(translation(actor.pos.x,0,actor.pos.z),rotateY(actor.angle));
