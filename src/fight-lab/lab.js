@@ -4,13 +4,16 @@ import {ArmyRenderer} from '../core/renderer.js?v=116';
 import {RigAnimator} from '../characters/rigAnimator.js?v=121';
 import {loadGlb} from '../core/glb111.js?v=111';
 import {mul,translation,rotateY} from '../core/math.js?v=060';
-import {FightEngine,ATTACKS,LAUNCH_AFTER_DAMAGE} from './engine.js?v=6';
+import {FightEngine,ATTACKS,LAUNCH_AFTER_DAMAGE} from './engine.js?v=7';
 import {installUserCombatClips} from './uploadedHitAnimations.js?v=1';
 import {setupInput} from '../ui/input.js?v=062';
+import {RifleRenderer} from '../training/rifleRenderer.js?v=117';
 
 const $=id=>document.getElementById(id);
 const e=new FightEngine();
-let renderer=null,ground=null,actors=null,ready=false,last=0,shake=0,noticeUntil=0,roundSerial=0,audio=null,sample=null;
+let renderer=null,ground=null,actors=null,rifle=null,rifleActor=null,ready=false,last=0,shake=0,noticeUntil=0,roundSerial=0,audio=null,sample=null;
+let gunAudioBuffer=null,gunAudioPromise=null;
+const tracerNodes=new Map();
 let input=()=>({x:0,y:0,magnitude:0});
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const lerp=(a,b,t)=>a+(b-a)*clamp(t,0,1);
@@ -89,7 +92,7 @@ function drawFighter(f,actor){
  const r=renderer,gl=r.gl,a=r.assets.get('duelist'),anim=actor.anim;
  if(!a)return;
  // Additive torso recoil around the waist, ON TOP of the original punch/knockdown animation.
- const lean=clamp(f.lean,-.65,.30);
+ const lean=clamp(f.lean+(f.id==='player'&&e.weapon==='rifle'?(f.gunKick||0):0),-.65,.30);
  const pivot=mul(translation(0,.77,0),mul(rotateX(lean),translation(0,-.77,0)));
  const model=mul(translation(f.x,lowFootLift(a,anim)+.095+(f.airHeight||0),f.z),mul(rotateY(f.angle),pivot));
  gl.useProgram(r.p);
@@ -106,8 +109,9 @@ function syncActor(f,actor,dt){
  const anim=actor.anim;
  let clip=CLIP[f.state]||'Idle';
  if(f.state==='hit')clip=f.impactAnim||'Hit_Reaction';
- if(f.state==='walk'&&f.id==='player'){
-  clip=f.moveSpeed>=7?'RunFast':f.moveSpeed>=4.2?'Running':'Walking';
+ if(f.state==='walk'){
+  clip=f.id==='player'?(f.moveSpeed>=7?'RunFast':f.moveSpeed>=4.2?'Running':'Walking')
+   :(f.moveSpeed>=4.0?'Running':'Walking');
  }
  if(!anim.hasClip(clip))clip=anim.hasClip('Walking')?'Walking':Object.keys(anim.clips)[0];
  if(clip!==actor.clip){
@@ -125,11 +129,16 @@ function syncActor(f,actor,dt){
  }else if(f.state==='rise'){
   anim.speed=clamp((anim.clips[clip]?.duration||1.8)/1.70,.85,1.4);
  }else if(f.state==='walk'){
-  // Match animation stride to each recruit's actual chase velocity.
+  // NPCs RUN, not sprint; foot tempo follows actual world displacement.
   anim.speed=f.id==='player'
    ?clamp((f.moveSpeed||3)/4,.86,1.55)
-   :clamp((f.moveSpeed||2.6)/2.7,.84,1.26);
+   :f.moveSpeed>=4.0?clamp((f.moveSpeed||5.05)/5.05,.90,1.18)
+    :clamp((f.moveSpeed||2.6)/2.7,.72,1.08);
  }else anim.speed=1;
+ if(f.id==='player'){
+  const target=e.weapon==='rifle'&&!['hit','down','rise'].includes(f.state)?1:0;
+  anim.rifleAim=lerp(anim.rifleAim||0,target,dt*13);
+ }
  anim.evaluate(dt);
 }
 function project(x,y,z){
@@ -337,6 +346,10 @@ async function boot(){
    actors[foe.id]={anim,clip:''};
   }
   for(const actor of Object.values(actors)){actor.anim.setClip('Idle');actor.anim.evaluate(0)}
+  $('loadText').textContent='載入原本的步槍模型與槍口火光…';
+  const rifleGlb=await loadGlb('./assets/weapons/rifle.glb?v=111',{timeoutMs:45000});
+  rifle=new RifleRenderer(renderer.gl);rifle.addModel(rifleGlb);
+  rifleActor={pos:e.player,angle:e.player.angle,anim:actors.player.anim,shotUntil:0};
   $('loadBar').style.width='100%';
   ready=true;$('loading').hidden=true;
   reset();requestAnimationFrame(frame);
