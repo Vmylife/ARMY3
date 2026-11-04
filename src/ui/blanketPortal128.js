@@ -49,7 +49,10 @@ function createPortalMenu({position,kind,panelId,startId,cancelId,destination,on
    if(distance>RESET_RADIUS){dismissed=false;wasNear=false;panel.hidden=true;return}
    const near=distance<=OPEN_RADIUS||(wasNear&&distance<=RESET_RADIUS);
    if(!near){panel.hidden=true;return}
-   wasNear=true;panel.hidden=blocked||dismissed;
+   // Entering the yellow circle never opens the menu on its own.
+   // Only a press on the dedicated interaction button may reveal it.
+   wasNear=true;
+   if(blocked)panel.hidden=true;
   },
   interact(playerPos,blocked=false){
    if(blocked||isAlerted())return false;

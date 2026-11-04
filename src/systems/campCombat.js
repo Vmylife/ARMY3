@@ -218,6 +218,32 @@ export class CampCombat{
    select(this.wheelSelection);return true;
   };
   this.openWheel=open;this.closeWheel=close;
+  // On mobile the browser may re-target a release (especially a right swipe
+  // toward the screen edge) away from the original button. Finalize at window
+  // capture phase so every direction uses the same release path.
+  let suppressSwitchClickUntil=0;
+  const updateSwitchGesture=(event)=>{
+   const p=this.wheelPointer;if(!p||p.id!==event.pointerId)return false;
+   const choice=dir(event.clientX-p.x,event.clientY-p.y);
+   if(choice){select(choice);p.dragged=true}
+   return true;
+  };
+  const finishSwitchGesture=(event,cancel=false)=>{
+   const p=this.wheelPointer;
+   if(!p||p.id!==event.pointerId)return false;
+   if(!cancel)updateSwitchGesture(event);
+   const dragged=p.dragged;
+   this.wheelPointer=null;
+   if(dragged){
+    // Some browsers synthesize a click after pointerup. Without this guard
+    // the wheel instantly re-opens and looks like the swipe never closed it.
+    suppressSwitchClickUntil=performance.now()+500;
+    close(true);
+   }else if(cancel)close(false);
+   // A stationary tap should keep the wheel visible for a second selection.
+   if(event.cancelable)event.preventDefault();
+   return true;
+  };
   sw.addEventListener('pointerdown',event=>{
    if(event.pointerType==='mouse'&&event.button!==0)return;
    if(!open())return;
@@ -225,20 +251,16 @@ export class CampCombat{
    try{sw.setPointerCapture(event.pointerId)}catch{}
    event.preventDefault();
   });
-  sw.addEventListener('pointermove',event=>{
-   const p=this.wheelPointer;if(!p||p.id!==event.pointerId)return;
-   const choice=dir(event.clientX-p.x,event.clientY-p.y);
-   if(choice){select(choice);p.dragged=true}
-  });
-  sw.addEventListener('pointerup',event=>{
-   if(this.wheelPointer?.id!==event.pointerId)return;
-   const moved=this.wheelPointer.dragged;this.wheelPointer=null;
-   if(moved)close(true);
-   event.preventDefault();
-  });
-  sw.addEventListener('pointercancel',()=>close(false));
+  sw.addEventListener('pointermove',updateSwitchGesture);
+  // Capture-phase fallback also handles release over the wheel/right slot.
+  window.addEventListener('pointermove',updateSwitchGesture,true);
+  window.addEventListener('pointerup',event=>finishSwitchGesture(event),true);
+  sw.addEventListener('pointerup',event=>finishSwitchGesture(event));
+  window.addEventListener('pointercancel',event=>finishSwitchGesture(event,true),true);
+  sw.addEventListener('lostpointercapture',event=>finishSwitchGesture(event,true));
   sw.addEventListener('click',event=>{
    event.preventDefault();
+   if(event.detail>0&&performance.now()<suppressSwitchClickUntil)return;
    // Pointer tap deliberately leaves the selector open for a second tap.
    if(!this.wheelOpen)open();
   });
@@ -339,7 +361,6 @@ export class CampCombat{
   }
   $('campAttack').setAttribute('aria-label',this.interactionMode?'互動':'攻擊');
   $('campModeSwitch').setAttribute('aria-pressed',String(this.interactionMode));
-  $('campModeSwitch').classList.toggle('active',this.interactionMode);
   $('campAttack').classList.toggle('interaction',this.interactionMode);
   $('campAttack').disabled=this.gameOver;
   $('campModeSwitch').disabled=this.gameOver;

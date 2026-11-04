@@ -22,7 +22,6 @@
 #campModeSwitch{width:61px;height:61px;background:#244a3b8f;color:#fbf0d6bd;
  border-color:#e3d4b088;box-shadow:0 3px 12px #0b2b1c40;
  backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
-#campModeSwitch.active{background:#e4c882ae;color:#16382d;border-color:#f5db9bd9}
 #campAttack.interaction{background:linear-gradient(140deg,#5b9279,#2e6858);border-color:#d5edcc}
 #campAttack{width:83px;height:83px;border-radius:50%;background:linear-gradient(140deg,#d6aa68,#995d37)}
 .campCombatButtons span{font-size:27px;line-height:1}
