@@ -37,7 +37,7 @@ export class ArmyBattleCombat extends CampCombat{
  constructor({player,enemies,allies,renderer,rifleGlb,npcGlb,createEnemy}){
   super({player,npcs:enemies,renderer,rifleGlb,npcGlb});
   this.allies=allies;
-  this.wave=0;this.waveTimer=1.8;this.running=false;
+  this.wave=0;this.waveTimer=1.8;this.lastWaveClock=null;this.running=false;
   this.totalSpawns=0;this.defenderKills=0;this.enemies=enemies;
   this.createEnemy=createEnemy;
   this.nameplateState='';this.lastWaveCount=-1;
@@ -513,11 +513,15 @@ export class ArmyBattleCombat extends CampCombat{
   if($('battleAllies'))$('battleAllies').textContent='友軍 '+allies+' / '+this.allies.length;
  }
  update(dt,now,{blocked=false}={}){
+  // Use real frame time for the wave clock, NOT hit-stop-scaled animation dt.
+  // Reset during map/pause so returning to the scene does not flood waves.
+  const elapsed=this.lastWaveClock===null?0:clamp((now-this.lastWaveClock)/1000,0,.5);
+  this.lastWaveClock=now;
   if(blocked||window.armyMinigameActive)return;
   if(this.gameOver){super.update(dt,now,{blocked});return}
   dt=clamp(dt,0,.05);
-  // One new wave every fifteen seconds, even if the last wave is alive.
-  this.waveTimer-=dt;
+  // One new wave every fifteen wall-clock seconds while playing.
+  this.waveTimer-=elapsed;
   if(this.waveTimer<=0){
    this.spawnWave();this.running=true;
    this.waveTimer+=WAVE_INTERVAL;
