@@ -7,7 +7,7 @@ import {waveEntry} from './breaches.js?v=5';
 import {insidePerimeter} from '../map/camp.js?v=093';
 import {renderBattleSettlement} from './settlement.js?v=3';
 import {BattlePerks} from './talentLab.js?v=3';
-import {BattleWeaponLevels} from './weaponLab.js?v=1';
+import {BattleWeaponLevels} from './weaponLab.js?v=2';
 const $=id=>document.getElementById(id);
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
@@ -48,6 +48,7 @@ export class ArmyBattleCombat extends CampCombat{
   this.lastPlayerHitFlashAt=-Infinity;
   this.perks=window.armyBattleTalents||new BattlePerks();
   this.weaponLab=window.armyBattleWeapons||new BattleWeaponLevels();
+  this.rifleBurst=null;this.rifleBurstShot=false;
   this.totalSpawns=0;this.defenderKills=0;this.enemies=enemies;
   this.createEnemy=createEnemy;
   this.nameplateState='';this.lastWaveCount=-1;
@@ -92,11 +93,11 @@ export class ArmyBattleCombat extends CampCombat{
  get liveAllies(){return this.allies.filter(a=>!a.combatDead)}
  refreshHUD(force=false){
   super.refreshHUD(force);
-  // The inherited label says '連發' for every rifle. Lower rifle levels
-  // are actually semi-auto and must not misleadingly say full auto.
   const fireLabel=$('campAttackText');
-  if(fireLabel&&this.weapon==='rifle')
-   fireLabel.textContent=(this.weaponLab?.level('rifle')||5)<3?'半自動':'連發';
+  if(fireLabel&&this.weapon==='rifle'){
+   const level=this.weaponLab?.level('rifle')||5;
+   fireLabel.textContent=level===1?'單發':level===2?'三連發':'連發';
+  }
   if(this.running){
    const el=$('campAlert');if(el)el.textContent='敵軍來襲';
    const k=$('campKills');if(k)k.textContent='擊殺 '+this.kills;
@@ -130,12 +131,38 @@ export class ArmyBattleCombat extends CampCombat{
   return this.weaponLab?.stats(this.weapon)?.interval??super.playerShotInterval();
  }
  autoRifle(){return this.weaponLab?.level('rifle')>=3}
+ cancelRifleBurst(){
+  this.rifleBurst=null;
+  this.rifleBurstShot=false;
+ }
+ updateRifleBurst(){
+  const burst=this.rifleBurst;
+  if(!burst)return;
+  // Finish a complete 3-round burst after a single tap, even if released.
+  // A weapon switch, level switch, death, or wheel cancels the remainder.
+  if(this.gameOver||this.weapon!=='rifle'||this.weaponLab?.level('rifle')!==2||
+     this.wheelOpen||this.interactionMode){this.cancelRifleBurst();return}
+  if(this.time+.0001<burst.nextAt||this.playerCooldown>0)return;
+  this.rifleBurstShot=true;
+  let fired=false;
+  try{fired=this.tryAttack()}finally{this.rifleBurstShot=false}
+  if(!fired){this.cancelRifleBurst();return}
+  burst.remaining--;
+  if(burst.remaining>0){
+   burst.nextAt=this.time+.11;
+   this.playerCooldown=.11;
+  }else{
+   this.cancelRifleBurst();
+   this.playerCooldown=this.playerShotInterval();
+  }
+ }
  onPlayerBulletBlocked(b,impact){this.perks?.onBlockedBullet(this,b,impact)}
  canTalentStand(p){return canOccupy(p,.4)}
  moveTalentEnemy(n,dx,dz){
   return moveNpc(n,dx,dz,[...this.allies,...this.enemies],this.player.pos);
  }
  tryAttack(){
+  if(this.rifleBurst&&!this.rifleBurstShot)return false;
   // Only roll negative traits on a real, available input, not on every frame
   // of an automatic rifle still cooling down.
   if(this.perks&&this.playerCooldown<=0&&!this.gameOver&&!this.wheelOpen&&
@@ -145,6 +172,11 @@ export class ArmyBattleCombat extends CampCombat{
   if(result&&this.perks){
    if(this.weapon==='fists')this.perks.onPunch();
    else this.perks.onShot(this,this.bullets.at(-1));
+  }
+  if(result&&this.weapon==='rifle'&&this.weaponLab?.level('rifle')===2&&!this.rifleBurstShot){
+   // The first round uses the normal sound/recoil/muzzle/physical bullet path.
+   this.rifleBurst={remaining:2,nextAt:this.time+.11};
+   this.playerCooldown=.11;
   }
   this.provoked=false;return result;
  }
@@ -671,6 +703,7 @@ export class ArmyBattleCombat extends CampCombat{
   // Normal shooting/knockdown/recoil still run, without player-only camp aggro.
   this.provoked=false;
   super.update(dt,now,{blocked});
+  if(!this.gameOver)this.updateRifleBurst();
   this.updateEnemyAI(dt,now);
   this.updateAllies(dt);
   // Win only after the FINAL wave has spawned AND every surviving red from
@@ -684,6 +717,7 @@ export class ArmyBattleCombat extends CampCombat{
 
  finishBattle(outcome){
   if(this.gameOver||!this.running)return false;
+  this.cancelRifleBurst();
   this.battleOutcome=outcome;
   this.gameOver=true;this.attackPointer=null;this.attackKeyboard=false;
   if(this.wheelOpen)this.closeWheel(false);

@@ -186,7 +186,7 @@ const WEAPON_LEVELS={
   {mag:12,damage:30,reload:1.3,interval:0.25,mode:'單發'}],
  rifle:[
   {mag:3,damage:30,reload:3.0,interval:0.42,mode:'半自動'},
-  {mag:6,damage:32,reload:2.7,interval:0.35,mode:'半自動'},
+  {mag:6,damage:32,reload:2.7,interval:0.35,mode:'三連發'},
   {mag:12,damage:35,reload:2.4,interval:0.25,mode:'慢速連發'},
   {mag:20,damage:38,reload:2.0,interval:0.17,mode:'連發'},
   {mag:30,damage:40,reload:1.6,interval:0.125,mode:'高速連發'}]

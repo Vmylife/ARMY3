@@ -12,7 +12,7 @@ import {initWorldMap} from '../ui/worldMap.js?v=093';
 import {setupInput} from '../ui/input.js?v=062';
 import {options} from '../systems/settings.js?v=060';
 import {createCampNPCs,updateCampNPCs} from '../systems/npcLife113.js?v=128';
-import {createArmyBattle,BATTLE_SPAWN} from './engine.js?v=19';
+import {createArmyBattle,BATTLE_SPAWN} from './engine.js?v=20';
 
 const $=id=>document.getElementById(id);
 const debug=new URLSearchParams(location.search).has('debug');

@@ -1,6 +1,6 @@
 // Independent battle-test loader. No modification to the normal ARMY3 homepage.
 import {initTalentLab} from './talentLab.js?v=3';
-import {initWeaponLab} from './weaponLab.js?v=1';
+import {initWeaponLab} from './weaponLab.js?v=2';
 initWeaponLab();
 initTalentLab();
 const $=id=>document.getElementById(id);
@@ -23,6 +23,6 @@ $('battleStart').addEventListener('click',async()=>{
   $('battleIntro').hidden=true;$('errorText').textContent=String(err?.message||err);
   $('fatal').hidden=false;
  };
- try{await import('./main.js?v=19')}
+ try{await import('./main.js?v=20')}
  catch(err){console.error('敵軍來襲測試版載入失敗',err);window.armyLoadFailure(err)}
 });
