@@ -28,7 +28,7 @@ if(OFFICIAL){
   // Same-origin frame shares sessionStorage with the live camp; award every
   // eligible enemy kill through the real progression system, not the lab.
   const script=document.createElement('script');
-  script.src='./src/systems/armyProgression.js?v=12';
+  script.src='./src/systems/armyProgression.js?v=13';
   await new Promise((resolve,reject)=>{
    script.addEventListener('load',resolve,{once:true});
    script.addEventListener('error',()=>reject(Error('軍功系統載入失敗')),{once:true});

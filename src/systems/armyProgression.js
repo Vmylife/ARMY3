@@ -287,11 +287,11 @@ function mountCampTraitNotice(){
 }
 // Rank upgrade combat bonuses. Same values in the home upgrade menu and
 // actual camp / official-battle gameplay; never exceed the 15 available ranks.
-const RANK_GAIN={hp:15,defense:2,damage:3,speed:1};
+const RANK_GAIN={hp:15,defense:2,damage:3,speed:50/(RANKS.length-1)};
 const rankBonus=level=>{
  const lv=clamp(Math.trunc(Number(level)||0),0,RANKS.length-1);
  return {hp:lv*RANK_GAIN.hp,defense:lv*RANK_GAIN.defense,
-  damage:lv*RANK_GAIN.damage,speed:lv*RANK_GAIN.speed};
+  damage:lv*RANK_GAIN.damage,speed:Math.round(lv*RANK_GAIN.speed)};
 };
 // Permanent weapon tier specifications applied to the final battle.
 const WEAPON_LEVELS={
@@ -377,7 +377,7 @@ function upgradeUI(){
     tip:next===null?'已達最高軍階':'升階增加的能力',
     lines:next===null?
      [['生命加成','+'+now.hp+' HP'],['防禦加成','+'+now.defense+'%'],['攻擊加成','+'+now.damage+'%'],['移速加成','+'+now.speed+'%']]:
-     [['生命上限','+'+RANK_GAIN.hp+' HP'],['防禦減傷','+'+RANK_GAIN.defense+'%'],['攻擊傷害','+'+RANK_GAIN.damage+'%'],['移動速度','+'+RANK_GAIN.speed+'%']],
+     [['生命上限','+'+RANK_GAIN.hp+' HP'],['防禦減傷','+'+RANK_GAIN.defense+'%'],['攻擊傷害','+'+RANK_GAIN.damage+'%'],['移動速度','+'+(after.speed-now.speed)+'%']],
     levels:next===null?[]:[{label:'升階後累計',text:'HP +'+after.hp+' · 防禦 +'+after.defense+'% · 攻擊 +'+after.damage+'% · 移速 +'+after.speed+'%'}],
     cost:next,action:()=>buy('rank')});
   }else if(tab==='weapon'){
