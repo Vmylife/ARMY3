@@ -41,6 +41,9 @@ export class ArmyBattleCombat extends CampCombat{
   this.allies=allies;
   this.wave=0;this.waveTimer=1.8;this.lastWaveClock=null;this.running=false;
   this.survivalSeconds=0;this.usedInvincible=false;this.battleOutcome=null;
+  // Normal hits never launch a reaction clip. Keep only a tiny feedback pause
+  // and the already-supported red screen flash (no extra UI layer).
+  this.lastPlayerHitFlashAt=-Infinity;
   this.totalSpawns=0;this.defenderKills=0;this.enemies=enemies;
   this.createEnemy=createEnemy;
   this.nameplateState='';this.lastWaveCount=-1;
@@ -607,12 +610,37 @@ export class ArmyBattleCombat extends CampCombat{
  endWithVictory(){return this.finishBattle('success')}
  endForReport(){return this.finishBattle('surrender')}
  damagePlayer(amount,kind='bullet'){
-  if(this.invincible)return;
+  if(this.invincible||this.gameOver)return;
+  const damage=Math.max(0,Number(amount)||0);
+  if(damage<=0)return;
+  // A non-lethal hit must NEVER call the camp's stun/knock-down handler:
+  // it plays Hit_Reaction, cancels punches and blocks movement/shooting.
+  // HP still drops normally; bullets/punches keep their original damage.
+  if(this.hp>damage){
+   this.hp=Math.max(0,this.hp-damage);
+   this.playerHurt=0;this.playerDown=0;this.playerRise=0;
+   this.playerDamageSinceFall=0;
+   this.player.combatDown=0;this.player.combatRise=0;
+   // 35 ms of full-scene hit-stop: felt but too short to lock input.
+   this.hitStop=Math.max(this.hitStop,.035);
+   this.shake=Math.max(this.shake,.045);
+   // The original combat flash already supports red. Strong variant is
+   // visible for 125 ms; limit repeated flashes in mass firefights.
+   const clock=performance.now();
+   if(clock-this.lastPlayerHitFlashAt>=95){
+    this.lastPlayerHitFlashAt=clock;
+    this.flashScreen(true,true);
+   }
+   this.spawnFx({...this.player.pos,y:1.9},
+    'campFloatDamage hostile','-'+Math.round(damage),650);
+   this.refreshHUD(true);
+   return;
+  }
+  // Lethal hits still use the established falling/death animation and
+  // 2.1-second delay before the full final-battle report appears.
   const wasAlive=this.playerAlive;
-  super.damagePlayer(amount,kind);
+  super.damagePlayer(damage,kind);
   if(wasAlive&&!this.playerAlive){
-   // CampCombat preserves the falling animation for 2.1 seconds; populate
-   // the report NOW, and its existing timer will reveal this same panel.
    this.battleOutcome='death';
    renderBattleSettlement(this,{outcome:'death'});
    $('battleReportNow').hidden=true;

@@ -1,5 +1,5 @@
 /* ARMY3 progression preview v1: economy, rank, armory, training skill and per-run trait journal.
- * Gameplay-affecting bonuses intentionally DO NOT run in this version.
+ * Gameplay-affecting bonuses are still a preview here; the final-battle combat test implements its own hit feel.
  */
 (()=>{
 'use strict';
@@ -24,13 +24,13 @@ const TRAINING=[
 const TRAITS={
  blanket:{
   good:[
-   ['彈簧棉被',['倒地時震退附近最多 1 名敵人','倒地時震退附近最多 3 名敵人','倒地時震退附近最多 5 名敵人']],
-   ['金鐘罩',['起身完成後無敵 1 秒','起身完成後無敵 2 秒','起身完成後無敵 3 秒']],
-   ['起床氣',['起身後下一次攻擊震暈最多 1 名敵人','起身後下一次攻擊震暈最多 2 名敵人','起身後下一次攻擊震暈最多 3 名敵人']]],
+   ['彈簧棉被',['每擊殺 5 名敵軍，回復 3 HP（每波最多 1 次）','每擊殺 5 名敵軍，回復 5 HP（每波最多 1 次）','每擊殺 5 名敵軍，回復 8 HP（每波最多 1 次）']],
+   ['金鐘罩',['受到敵軍傷害 -8%','受到敵軍傷害 -15%','受到敵軍傷害 -22%']],
+   ['起床氣',['生命低於 40% 時，拳頭傷害 +10%','生命低於 40% 時，拳頭傷害 +20%','生命低於 40% 時，拳頭傷害 +30%']]],
   bad:[
-   ['賴床王',['倒地額外延遲 1 秒','倒地額外延遲 2 秒','倒地額外延遲 3 秒']],
-   ['起床腿麻',['起身後 3 秒內移速 -15%','起身後 3 秒內移速 -30%','起身後 3 秒內移速 -45%']],
-   ['被角纏腳',['起身後 1 秒不能使用武器','起身後 2 秒不能使用武器','起身後 3 秒不能使用武器']]]},
+   ['賴床王',['移動速度 -5%','移動速度 -10%','移動速度 -15%']],
+   ['起床腿麻',['全力衝刺速度 -8%','全力衝刺速度 -16%','全力衝刺速度 -24%']],
+   ['被角纏腳',['切換武器後 2 秒內攻擊傷害 -10%','切換武器後 2 秒內攻擊傷害 -20%','切換武器後 2 秒內攻擊傷害 -30%']]]},
  shooting:{
   good:[
    ['分裂子彈',['同一發子彈最多追擊 2 名不同敵人','同一發子彈最多追擊 3 名不同敵人','同一發子彈最多追擊 4 名不同敵人']],
@@ -57,7 +57,7 @@ const TRAITS={
   bad:[
    ['拔錯根',['10% 機率把敵人拉向自己','20% 機率把敵人拉向自己','30% 機率把敵人拉向自己']],
    ['手套破洞',['連打 5 拳後短暫無法出拳','連打 4 拳後短暫無法出拳','連打 3 拳後短暫無法出拳']],
-   ['吃土專家',['倒地後 2 秒無法換武器','倒地後 4 秒無法換武器','倒地後 6 秒無法換武器']]]},
+   ['吃土專家',['生命低於 30% 時，受到敵軍傷害 +10%','生命低於 30% 時，受到敵軍傷害 +20%','生命低於 30% 時，受到敵軍傷害 +30%']]]},
  swipe:{
   good:[
    ['已讀不回',['護盾被打破後每 15 秒恢復 1 層','護盾被打破後每 10 秒恢復 1 層','護盾被打破後每 6 秒恢復 1 層']],
@@ -93,7 +93,19 @@ function write(key,obj){
  try{(key===RUN?sessionStorage:localStorage).setItem(key,JSON.stringify(obj));return true}catch(e){console.warn('[軍功簿] 儲存失敗',e);return false}
 }
 const state=()=>{const s=read(STORE,fresh);return {...fresh(),...s,weapons:{...fresh().weapons,...(s.weapons||{})},training:s.training||{}}};
-const run=()=>{const r=read(RUN,freshRun);return {...freshRun(),...r,trainings:r.trainings||{},battle:r.battle||{kills:0,medals:0,seen:[]}}};
+// Old session rewards may already have been rolled before the perk redesign.
+ // Keep the same rolled name/tier and display the NEW level text.
+const refreshTraitText=t=>{
+ if(!t?.name||!t.kind)return t;
+ const row=(TRAITS[t.kind]?.[t.positive?'good':'bad']||[]).find(x=>x[0]===t.name);
+ return row?{...t,description:row[1][clamp(t.level||1,1,3)-1]}:t;
+};
+const run=()=>{
+ const r=read(RUN,freshRun);
+ return {...freshRun(),...r,
+  trainings:Object.fromEntries(Object.entries(r.trainings||{}).map(([k,v])=>[k,refreshTraitText(v)])),
+  battle:r.battle||{kills:0,medals:0,seen:[]}};
+};
 function beginRun(){const r=freshRun();write(RUN,r);return r}
 function awardTraining(kind,score){
  if(!NAMES[kind])return null;
