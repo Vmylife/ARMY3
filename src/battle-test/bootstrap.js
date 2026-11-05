@@ -68,7 +68,7 @@ $('battleStart').addEventListener('click',async()=>{
   document.body.classList.add('battle-loaded');
   $('battleLoadBar').style.width='100%';
   $('battleIntro').hidden=true;$('battleHUD').hidden=false;
-  $('battleReportNow').hidden=false;$('battleGrenade').hidden=false;
+  $('battleReportNow').hidden=false;
   $('battleReload').hidden=false;
   if(!OFFICIAL){$('battleGodToggle').hidden=false;$('battleWeaponLab').hidden=false}
  };
@@ -76,7 +76,7 @@ $('battleStart').addEventListener('click',async()=>{
   $('battleIntro').hidden=true;$('errorText').textContent=String(error?.message||error);
   $('fatal').hidden=false;
  };
- try{await import('./main.js?v=26')}
+ try{await import('./main.js?v=27')}
  catch(error){console.error('軍營保衛戰載入失敗',error);window.armyLoadFailure(error)}
 });
 // Official battle starts immediately after authorisation; no second button.

@@ -3,7 +3,34 @@
 const TYPES={5121:Uint8Array,5123:Uint16Array,5125:Uint32Array,5126:Float32Array};
 const WIDTH={SCALAR:1,VEC2:2,VEC3:3,VEC4:4,MAT4:16};
 const inflight=new Map();
+const primed=new Map();
+// Parse player and NPC models silently on the homepage, reuse their results
+// when Start is pressed, and forward any still-running progress to the UI.
+export function primeGlb(url){
+ const cached=primed.get(url);
+ if(cached)return cached.job;
+ const item={job:null,listeners:new Set(),last:null};
+ item.job=loadGlb(url,{onProgress:(got,total)=>{
+  item.last={got,total};
+  for(const listener of item.listeners)listener(got,total);
+ }}).catch(error=>{
+  if(primed.get(url)===item)primed.delete(url);
+  throw error;
+ });
+ primed.set(url,item);
+ return item.job;
+}
 export function loadGlb(url,{onProgress,timeoutMs=90000}={}){
+ const prepared=primed.get(url);
+ if(prepared){
+  primed.delete(url);
+  if(onProgress){
+   prepared.listeners.add(onProgress);
+   if(prepared.last)onProgress(prepared.last.got,prepared.last.total);
+  }
+  // A failed silent prewarm should never stop the interactive retry.
+  return prepared.job.catch(()=>loadGlb(url,{onProgress,timeoutMs}));
+ }
  if(inflight.has(url))return inflight.get(url);
  const job=fetchAndParse(url,onProgress,timeoutMs);
  inflight.set(url,job);

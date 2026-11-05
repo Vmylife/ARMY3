@@ -1,7 +1,7 @@
 // Army v0.10.10: keep the approved 3D camp; add autonomous NPC utility decisions, social interactions, and action labels.
 import {CampBuildings,BUILDING_MODELS} from './buildings/buildingRenderer.js?v=112';
 import {CampProps,PROP_MODELS} from './props/propRenderer.js?v=120';
-import {loadGlb} from './core/glb111.js?v=111';
+import {loadGlb} from './core/glb111.js?v=112';
 import {ArmyRenderer} from './core/renderer.js?v=119';
 import {RigAnimator} from './characters/rigAnimator.js?v=121';
 import {installUserCombatClips} from './fight-lab/uploadedHitAnimations.js?v=1';

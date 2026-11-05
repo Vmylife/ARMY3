@@ -4,6 +4,17 @@ import {getReturningCampSession} from './systems/campSession.js?v=144';
 const $=id=>document.getElementById(id);
 const button=$('armyStart'),loading=$('armyLoading'),bar=$('armyBar');
 let highestPercentage=0;
+const sourceURL=new URL('./src/main111.js?v=173',location.href);
+let sourcePromise=null;
+const getCampSource=()=>{
+ if(!sourcePromise)sourcePromise=fetch(sourceURL,{cache:'default'}).then(response=>{
+  if(!response.ok)throw Error('軍營程式 HTTP '+response.status);
+  return response.text();
+ }).catch(error=>{sourcePromise=null;throw error});
+ return sourcePromise;
+};
+let stopPreload=()=>{};
+let enteringCamp=false;
 window.armySetLoading=(done,total,message)=>{
  loading.hidden=false;$('armyMessage').textContent=message;
  const percentage=highestPercentage=Math.max(highestPercentage,Math.min(99,Math.floor(100*done/Math.max(1,total))));
@@ -18,10 +29,8 @@ window.armyLoadFailure=err=>{
  $('armyMessage').style.color='#a52c27';button.hidden=false;button.disabled=false;button.textContent='重新載入';button.onclick=()=>location.reload();
 };
 async function loadCampWithPause(){
- const sourceURL=new URL('./src/main111.js?v=172',location.href);
- const response=await fetch(sourceURL,{cache:'default'});
- if(!response.ok)throw Error('軍營程式 HTTP '+response.status);
- let source=await response.text();
+ // Reuse the homepage download; retry normally if background prefetch failed.
+ let source=await getCampSource().catch(()=>getCampSource());
  const needle='  function tick(now){\n   try{';
  if(source.split(needle).length!==2)throw Error('軍營更新迴圈版本不相容，請確認目前 GitHub 版本');
  source=source.replace(needle,`  function tick(now){
@@ -35,6 +44,7 @@ async function loadCampWithPause(){
  try{await import(blob)}finally{URL.revokeObjectURL(blob)}
 }
 button.addEventListener('click',async()=>{
+ enteringCamp=true;stopPreload();
  if(!getReturningCampSession())window.armyProgression?.beginRun();
  button.disabled=true;button.hidden=true;
  window.armySetLoading(0,1,getReturningCampSession()?'正在恢復軍營進度…':'建立軍營場景…');
@@ -44,19 +54,18 @@ button.addEventListener('click',async()=>{
   await loadCampWithPause();
  }catch(error){console.error('軍營載入錯誤',error);window.armyLoadFailure(error)}
 },{once:true});
+// Homepage stays interactive while assets are primed quietly in the background.
+// No player state, NPC schedule or WebGL scene begins before Start is clicked.
 if(!getReturningCampSession()){
- const prefetch=async()=>{
-  for(const path of ['./src/main111.js?v=172','./assets/characters/cadet/cadet-life-lite.glb?v=119']){
-   if(document.body.classList.contains('army-ready'))break;
-   try{
-    if(navigator.connection?.saveData)break;
-    const response=await fetch(new URL(path,location.href),{cache:'default'});
-    if(response.ok)await response.arrayBuffer(); // finish download for HTTP cache
-   }catch{}
-  }
+ const prewarm=()=>{
+  if(enteringCamp)return;
+  void getCampSource().catch(()=>{});
+  void import('./systems/campPreloader.js?v=1').then(module=>{
+   if(!enteringCamp)stopPreload=module.startCampPreload();
+  }).catch(()=>{});
  };
- if('requestIdleCallback'in window)requestIdleCallback(prefetch,{timeout:1800});
- else setTimeout(prefetch,650);
+ if('requestIdleCallback' in window)requestIdleCallback(prewarm,{timeout:1000});
+ else setTimeout(prewarm,280);
 }
 if(getReturningCampSession()){
  $('armyHome').querySelector('h1').textContent='返回軍營';

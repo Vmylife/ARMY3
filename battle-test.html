@@ -62,7 +62,7 @@ body.battle-official:not(.battle-loaded) #battleReportNow{display:none!important
   <div class="battle-intro-kicker">獨立測試版 · v29</div>
   <h1>軍營保衛戰</h1>
   <p>與 5 名友軍防守營區。敵軍從南、西、餐廳東側圍牆外分五路進攻，北側不進攻；每 25 秒增援一波，不等上一波清完。第一波 10 名徒手紅軍。</p>
-  <div class="battle-intro-sub">拳頭、手槍、步槍與手榴彈均可測試。右側可手動換彈；彈匣用盡會自動換彈。左側可分別測試手槍／步槍 Lv.1～5，以及全部正負天賦等級。</div>
+  <div class="battle-intro-sub">拳頭、手槍、步槍均可測試。右側可手動換彈；彈匣用盡會自動換彈。左側可分別測試手槍／步槍 Lv.1～5，以及全部正負天賦等級。</div>
   <button id="battleStart" type="button">開始防守</button>
   <div id="battleLoading" hidden><span id="battleLoadText">準備軍營場景…</span><div class="battle-progress"><i id="battleLoadBar"></i></div></div>
   <a href="./index.html" class="battle-back">返回正式軍營</a>
@@ -80,10 +80,9 @@ body.battle-official:not(.battle-loaded) #battleReportNow{display:none!important
 <div id="battleTalentStatus" aria-live="polite"></div>
 <div id="battleTalentToast" class="btl-announce" role="status" hidden></div>
 <button id="battleReload" type="button" aria-label="手動更換彈匣" hidden>換彈</button>
-<button id="battleGrenade" type="button" aria-label="投擲手榴彈" hidden>榴彈</button>
 
 <button id="battleExit" type="button" aria-label="退出戰場">← 退出</button>
 <button id="battleReportNow" type="button" aria-label="結束防守並查看戰報" hidden>結算</button>
-<script type="module" src="./src/battle-test/bootstrap.js?v=30"></script>
+<script type="module" src="./src/battle-test/bootstrap.js?v=31"></script>
 </body>
 </html>

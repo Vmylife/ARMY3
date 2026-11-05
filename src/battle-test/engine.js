@@ -103,15 +103,13 @@ export class ArmyBattleCombat extends CampCombat{
    this.setInvincible(false);
   }
   $('battleReportNow')?.addEventListener('click',()=>this.endForReport());
-  $('battleGrenade')?.addEventListener('click',()=>this.perks.useGrenade(this));
   $('battleReload')?.addEventListener('click',()=>this.perks.reload(this));
   window.addEventListener('keydown',event=>{
-   if(!['KeyG','KeyR'].includes(event.code)||this.gameOver||!this.running||
+   if(event.code!=='KeyR'||this.gameOver||!this.running||
       this.wheelOpen||document.getElementById('battleTalentLab')?.open||
       /INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName||''))return;
    event.preventDefault();
-   if(event.code==='KeyG')this.perks.useGrenade(this);
-   else this.perks.reload(this);
+   this.perks.reload(this);
   });
  }
  get liveEnemies(){return this.enemies.filter(n=>n.assaultVisible&&!n.combatDead)}
