@@ -86,7 +86,7 @@ export function createFinalBattleGateway(renderer){
   const url=new URL('./battle-test.html',document.baseURI);
   url.searchParams.set('official','1');
   url.searchParams.set('fromCamp','1');
-  url.searchParams.set('v','26');
+  url.searchParams.set('v','27');
   iframe.src=url.href;
   frame=iframe;
   document.body.classList.add('army-in-final-battle');

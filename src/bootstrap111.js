@@ -8,7 +8,7 @@ const forceHome=new URLSearchParams(location.search).get('armyHome')==='1';
 if(forceHome)clearCampSession();
 const resumingCamp=()=>!forceHome&&getReturningCampSession();
 let highestPercentage=0;
-const sourceURL=new URL('./src/main111.js?v=175',location.href);
+const sourceURL=new URL('./src/main111.js?v=176',location.href);
 let sourcePromise=null;
 const getCampSource=()=>{
  if(!sourcePromise)sourcePromise=fetch(sourceURL,{cache:'default'}).then(response=>{

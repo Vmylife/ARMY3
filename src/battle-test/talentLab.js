@@ -261,8 +261,8 @@ export class BattlePerks{
    }
    if(emitted)this.message('分裂子彈：'+(emitted+1)+' 道彈線');
   }
-  // Extreme quick hands consumes real additional cartridges, unlike splits.
-  const extraCount=Math.min(this.bonusShots[gun],this.ammo[gun]);
+  // The normal trigger consumes one cartridge; bonus projectiles are free.
+  const extraCount=this.bonusShots[gun]||0;
   this.bonusShots[gun]=0;
   if(extraCount>0){
    const heading=Math.atan2(bullet.dx,bullet.dz);
@@ -271,9 +271,8 @@ export class BattlePerks{
      splitDepth:0,splitTargetId:null};
     this.pointBullet(clone,heading+(i-(extraCount-1)/2)*.085);
     combat.bullets.push(clone);
-    this.ammo[gun]--;
    }
-   this.message('極限手速：追加 '+extraCount+' 發（耗彈）');
+   this.message('極限手速：額外 '+extraCount+' 發（不耗彈）');
   }
   if(this.ammo[gun]===0)this.beginReload(combat);
   this.updateIndicator(combat);
