@@ -189,7 +189,7 @@ export function renderBattleSettlement(combat,{outcome='death',manual=false}={})
  restart.textContent='重新挑戰';
  restart.classList.add('btr-restart');
  if(combat.official){
-  const back=make('button','btr-restart','返回軍營');
+  const back=make('button','btr-home','返回首頁');
   back.type='button';
   back.addEventListener('click',()=>window.parent.postMessage({
    type:'ARMY3_OFFICIAL_BATTLE_CLOSE',outcome},location.origin));

@@ -34,3 +34,5 @@ body.army-in-final-battle #armyMissionObjective{visibility:hidden}
  #battleAssemblyMenu h2{font-size:20px}
 }
 body:not(.army-ready) #armyMissionObjective{display:none!important}
+
+#battleAssemblyMenu p strong{display:block;margin-top:5px;color:#f2d995;font-size:11px}

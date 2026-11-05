@@ -5,12 +5,12 @@ import './shootingRangeLauncher.js?v=100';
 import {clearCampSession} from './campSession.js?v=144';
 const ROOT = new URL('../../', import.meta.url);
 const urls = {
- blanket:'blanket-stack.html?v=194',
- grenade:'grenade-workshop-test.html?v=194',
- shooting:'shooting-paper-range.html?v=195',
- swipe:'/Don-t-like-your-mom/army-test/index.html?v=6',
- weed:'weed-pulling.html?v=196',
- singing:'singing-memory-test.html?v=16'
+ blanket:'blanket-stack.html?v=195',
+ grenade:'grenade-workshop-test.html?v=195',
+ shooting:'shooting-paper-range.html?v=196',
+ swipe:'/Don-t-like-your-mom/army-test/index.html?v=7',
+ weed:'weed-pulling.html?v=197',
+ singing:'singing-memory-test.html?v=17'
 };
 const nearbyAssets={
  blanket:[
@@ -18,7 +18,7 @@ const nearbyAssets={
   'assets/audio/minigames/blanket-parade-loop.mp3','src/systems/blanketSfx.js?v=170'
  ],
  grenade:[
-  urls.grenade,'grenade-user-play.html?embedded=1&v=194',
+  urls.grenade,'grenade-user-play.html?embedded=1&v=195',
   'grenade-user-scene.json?v=130','grenade-user-play-3d.js?v=138',
   'src/systems/grenadeEarlyAudio.js?v=190'
  ],

@@ -100,27 +100,44 @@ const refreshTraitText=t=>{
  const row=(TRAITS[t.kind]?.[t.positive?'good':'bad']||[]).find(x=>x[0]===t.name);
  return row?{...t,description:row[1][clamp(t.level||1,1,3)-1]}:t;
 };
+// Each kind stores up to three UNIQUE earned traits. Legacy single-result
+// sessions are normalized on read without wiping their saved rewards.
+const normalizedRewards=(value)=>(
+ Array.isArray(value)?value:[value]
+).filter(t=>t?.name&&NAMES[t.kind]).slice(0,3).map(refreshTraitText);
+const flattenRewards=r=>Object.values(r.trainings||{}).flatMap(v=>Array.isArray(v)?v:normalizedRewards(v));
 const run=()=>{
  const r=read(RUN,freshRun);
  return {...freshRun(),...r,
-  trainings:Object.fromEntries(Object.entries(r.trainings||{}).map(([k,v])=>[k,refreshTraitText(v)])),
+  trainings:Object.fromEntries(Object.entries(r.trainings||{}).filter(([k])=>!!NAMES[k])
+   .map(([k,v])=>[k,normalizedRewards(v)])),
   battle:r.battle||{kills:0,medals:0,seen:[]}};
 };
+const trainingCount=()=>Math.min(6,flattenRewards(run()).length);
+const trainingRewards=kind=>kind?run().trainings[kind]||[]:flattenRewards(run());
+const trainingLimit=kind=>{
+ const r=run(),count=flattenRewards(r).length,used=r.trainings[kind]?.length||0;
+ return {used,maxPerKind:3,total:count,maxTotal:6,
+  available:!!NAMES[kind]&&count<6&&used<3&&!r.battle?.outcome};
+};
+const canPlayTraining=kind=>trainingLimit(kind).available;
 function beginRun(){const r=freshRun();write(RUN,r);return r}
 function awardTraining(kind,score){
- if(!NAMES[kind])return null;
- const r=run(),s=state();
- const previous=r.trainings[kind];
- if(previous)return {...previous,first:false};
- const points=clamp(Math.round(Number(score)),0,100);
- const tier=scoreTier(points),pool=TRAITS[kind][tier.positive?'good':'bad'];
- const pick=pool[Math.floor(Math.random()*pool.length)];
+ if(!NAMES[kind]||!Number.isFinite(Number(score)))return null;
+ const r=run(),previous=r.trainings[kind]||[];
+ if(r.battle?.outcome||flattenRewards(r).length>=6||previous.length>=3)return null;
+ const points=clamp(Math.round(Number(score)),0,100),tier=scoreTier(points);
+ const already=new Set(flattenRewards(r).map(t=>t.name));
+ const candidates=TRAITS[kind][tier.positive?'good':'bad'].filter(t=>!already.has(t[0]));
+ if(!candidates.length)return null; // Never award an already-owned trait.
+ const pick=candidates[Math.floor(Math.random()*candidates.length)];
  const reward={kind,score:points,medals:medalsForScore(points),positive:tier.positive,
-   level:tier.level,name:pick[0],description:pick[1][tier.level-1],first:true};
- r.trainings[kind]=reward;
- s.medals+=reward.medals;
+   level:tier.level,name:pick[0],description:pick[1][tier.level-1],
+   attempt:previous.length+1,first:true};
+ r.trainings[kind]=[...previous,reward];
+ const stateBefore=state();
  if(!write(RUN,r))return null;
- write(STORE,s);
+ stateBefore.medals+=reward.medals;write(STORE,stateBefore);
  return reward;
 }
 function finishOfficialBattle(outcome){
@@ -166,15 +183,17 @@ function make(tag,cls,text){
 }
 function rewardPanel(kind,score,anchor){
  if(!anchor||!anchor.parentNode)return null;
- const record=awardTraining(kind,score);if(!record)return null;
+ // Guard duplicate completion events from the same results screen.
  const id='armyTrainingReward-'+kind;
  let box=document.getElementById(id);
+ if(box?.dataset?.rewardShown==='1'&&Date.now()-Number(box.dataset.rewardShownAt||0)<1800)return null;
+ const record=awardTraining(kind,score);if(!record)return null;
  if(box)box.remove();
- box=make('details','army-reward');box.id=id;
- const summary=make('summary','army-reward__summary',(record.first?'🎖 +'+record.medals:'🎖 已領取')+'　'+(record.positive?'正面':'負面')+'：'+record.name+' Lv.'+record.level);
+ box=make('details','army-reward');box.id=id;box.dataset.rewardShown='1';box.dataset.rewardShownAt=String(Date.now());
+ const summary=make('summary','army-reward__summary','第 '+record.attempt+'/3 次　🎖 +'+record.medals+'　'+(record.positive?'正面':'負面')+'：'+record.name+' Lv.'+record.level);
  box.append(summary);
  const detail=make('div','army-reward__desc',record.description);
- const foot=make('div','army-reward__foot','本輪限定');
+ const foot=make('div','army-reward__foot','本輪訓練 '+trainingCount()+'/6 · 同一項最多完成三次，天賦不重複');
  box.append(detail,foot);
  anchor.insertAdjacentElement('afterend',box);
  return record;
@@ -306,6 +325,12 @@ function upgradeUI(){
  for(const t of tabs)t.addEventListener('click',()=>{tab=t.dataset.tab;if(toast)toast.hidden=true;render()});
  window.addEventListener('storage',()=>{updateHomeWallet();if(!host.hidden)render()});
  updateHomeWallet();
+ const prior=run().battle?.outcome;
+ if(prior){
+  const button=$('armyStart'),subtitle=document.querySelector('#armyHome .army-home__tagline');
+  if(button)button.textContent='開始新的一輪';
+  if(subtitle)subtitle.textContent=(prior==='success'?'上輪防禦成功':prior==='death'?'上輪已陣亡':'上輪已投降')+' · 可先升級再出發';
+ }
 }
 function mountCampStatus(combat,options={}){
  if(!combat?.root||$('campCharacterButton'))return false;
@@ -409,13 +434,13 @@ function mountCampStatus(combat,options={}){
     }
    }
   }else if(tab==='traits'){
-   const earned=Object.values(r.trainings||{}).filter(t=>t?.name);
+   const earned=flattenRewards(r);
    section('本輪戰鬥特質 · '+earned.length+'/6');
    if(!earned.length)view.append(make('p','army-character-empty','尚未取得戰鬥特質'));
    for(const t of earned)card(t.name+' · Lv.'+t.level,(NAMES[t.kind]||'訓練')+' · '+(t.positive?'正面':'負面'),
     t.description,t.positive?'good':'bad');
   }else{
-   const b=r.battle||{},earned=Object.values(r.trainings||{});
+   const b=r.battle||{},earned=flattenRewards(r);
    section('本輪戰績');
    cards([['訓練完成',earned.length+' / 6'],['軍營擊殺',String(combat.kills)],
     ['敵軍擊殺',String(b.kills||0)],['榮譽勳章',String(s.medals)]]);
@@ -424,8 +449,10 @@ function mountCampStatus(combat,options={}){
    row('敵軍擊殺','+'+(b.medals||0));
    section('訓練成績');
    for(const kind of Object.keys(NAMES)){
-    const result=r.trainings?.[kind];
-    row(NAMES[kind],result?result.score+' 分 · 🎖 +'+result.medals:'未完成');
+    const results=r.trainings?.[kind]||[];
+    row(NAMES[kind],results.length?
+     results.length+'/3 次 · '+results.map(t=>t.score+' 分').join('、'):
+     '未完成');
    }
   }
   view.scrollTop=0;
@@ -447,7 +474,7 @@ function mountCampStatus(combat,options={}){
  return true;
 }
 function battleSummary(){
- const r=run(),b=r.battle||{},trainings=Object.values(r.trainings||{});
+ const r=run(),b=r.battle||{},trainings=flattenRewards(r);
  return {kills:b.kills||0,battleMedals:b.medals||0,trainingMedals:trainings.reduce((n,t)=>n+(t.medals||0),0),trainings};
 }
 function renderBattleSummary(){
@@ -457,7 +484,7 @@ function renderBattleSummary(){
  let el=$('armyBattleMedalSummary');if(!el){el=make('div','army-battle-summary');el.id='armyBattleMedalSummary';const btn=$('campCombatRestart');btn?.insertAdjacentElement('beforebegin',el)}
  if(el)el.textContent='🎖 本輪訓練 +'+s.trainingMedals+'　·　敵軍擊殺 +'+s.battleMedals+'　·　合計 '+(s.trainingMedals+s.battleMedals);
 }
-window.armyProgression={NAMES,TRAINING,TRAITS,RANKS,scoreTier,medalsForScore,beginRun,awardTraining,enemyKill,finishOfficialBattle,buy,state,run,battleSummary,rewardPanel,renderBattleSummary,mountCampStatus,RANK_GAIN,rankBonus,WEAPON_LEVELS};
+window.armyProgression={NAMES,TRAINING,TRAITS,RANKS,scoreTier,medalsForScore,beginRun,awardTraining,trainingCount,trainingRewards,trainingLimit,canPlayTraining,enemyKill,finishOfficialBattle,buy,state,run,battleSummary,rewardPanel,renderBattleSummary,mountCampStatus,RANK_GAIN,rankBonus,WEAPON_LEVELS};
 window.addEventListener('army:blanket:finished',e=>{
  const anchor=document.getElementById('modal')?.querySelector('.big');
  if(anchor)rewardPanel('blanket',e.detail?.score,anchor);

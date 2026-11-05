@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="./src/ui/playtest.css?v=077">
 <link rel="stylesheet" href="./src/ui/campCombat.css?v=8">
 <link rel="stylesheet" href="./src/ui/home105.css?v=105">
-<link rel="stylesheet" href="./src/ui/finalBattleGateway.css?v=1">
+<link rel="stylesheet" href="./src/ui/finalBattleGateway.css?v=2">
 <link rel="stylesheet" href="./src/ui/armyProgression.css?v=2">
 <style>
 /* Global game UI behavior */
@@ -47,7 +47,7 @@ input[type="range"]{-webkit-user-select:none;user-select:none;-webkit-touch-call
 <canvas id="world" aria-label="國軍模擬器 3D 軍營"></canvas>
 <button id="minimap" type="button" aria-label="開啟新兵訓練營地圖" title="開啟新兵訓練營地圖"><canvas id="miniCanvas" width="224" height="224" aria-hidden="true"></canvas></button>
 <div id="armyMissionObjective" class="army-mission" role="status" aria-live="polite" aria-label="任務：完成訓練 0/6">
- <span>任務目標</span><strong>完成訓練（0/6）</strong><small>完成六項不同訓練</small>
+ <span>任務目標</span><strong>完成訓練（0/6）</strong><small>每項訓練最多三次</small>
 </div>
 <section id="worldMap" class="world-map" role="dialog" aria-label="新兵訓練營地圖" aria-modal="true" hidden>
   <div class="world-map-panel">
@@ -105,11 +105,9 @@ input[type="range"]{-webkit-user-select:none;user-select:none;-webkit-touch-call
 <section id="battleAssemblyMenu" class="army-assembly" aria-label="彈藥庫集結：最終戰役" hidden>
  <div class="army-assembly-eyebrow">最終戰役</div>
  <h2>敵軍來襲</h2>
- <p>彈藥庫集結完成。整備裝備後，和 5 名友軍守住 8 波紅軍。</p>
- <div id="battleAssemblyWallet" class="army-assembly-wallet"></div>
- <div id="battleAssemblyWeapons" class="army-assembly-weapons"></div>
+ <p>集結完成！武器與天賦已經準備就緒，和 5 名友軍守住 8 波紅軍。<strong>升級只能在首頁進行。</strong></p>
  <div class="army-assembly-actions">
-  <button id="battleAssemblyStart" type="button">進入戰場</button>
+  <button id="battleAssemblyStart" type="button">參加防衛戰</button>
   <button id="battleAssemblyCancel" type="button">稍後再說</button>
  </div>
 </section>
@@ -150,9 +148,9 @@ input[type="range"]{-webkit-user-select:none;user-select:none;-webkit-touch-call
 <script type="importmap">
 {"imports":{"./src/map/campGeometry.js?v=092":"./src/map/ground103.js?v=124","./src/map/mapDrawing.js?v=093":"./src/map/drawMap95.js?v=095","./src/map/roadMesh.js?v=071":"./src/map/roadMesh104.js?v=125","./src/ui/blanketPortal128.js?v=128":"./src/ui/blanketPortal128.js?v=202","./src/systems/campSession.js?v=144":"./src/systems/campSession.js?v=190","./src/ui/worldMap.js?v=093":"./src/ui/worldMap.js?v=180","./src/training/rangeTraining.js?v=111":"./src/training/rangeTraining.js?v=209"}}
 </script>
-<script src="./src/systems/armyProgression.js?v=8" defer></script>
+<script src="./src/systems/armyProgression.js?v=9" defer></script>
 <script type="module" src="./src/systems/campBgm.js?v=192"></script>
-<script type="module" src="./src/systems/campGameWarmup.js?v=207"></script>
-<script type="module" src="./src/bootstrap111.js?v=213"></script>
+<script type="module" src="./src/systems/campGameWarmup.js?v=208"></script>
+<script type="module" src="./src/bootstrap111.js?v=214"></script>
 </body>
 </html>

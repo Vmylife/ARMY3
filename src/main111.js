@@ -9,8 +9,8 @@ import {TwoHandBroomRenderer} from './characters/twoHandBroomRenderer119.js?v=11
 import {CAMP} from './map/camp.js?v=093';
 import {movePlayer} from './map/navCollision109.js?v=124';
 import {createNavDebugger} from './ui/navDebug109.js?v=109';
-import {createBlanketPortal} from './ui/blanketPortal128.js?v=134';
-import {createFinalBattleGateway} from './systems/finalBattleGateway.js?v=1';
+import {createBlanketPortal} from './ui/blanketPortal128.js?v=135';
+import {createFinalBattleGateway} from './systems/finalBattleGateway.js?v=2';
 import {saveCampSession,getReturningCampSession,clearCampSession,returnToCamp} from './systems/campSession.js?v=144';
 import {drawMinimap} from './ui/minimap.js?v=093';
 import {initWorldMap} from './ui/worldMap.js?v=093';
@@ -147,19 +147,7 @@ async function boot(){
       npcs:npcs.map(n=>({id:n.id,x:n.pos.x,z:n.pos.z,angle:n.angle}))
     },trainingId)
   });
-  const finalBattleGateway=createFinalBattleGateway(renderer,{
-   onBegin:()=>saveCampSession({
-    player:{x:player.pos.x,z:player.pos.z,angle:player.angle},
-    camera:{yaw:camYaw,pitch:camPitch,zoom:cameraZoom,targetZoom},
-    npcs:npcs.map(n=>({id:n.id,x:n.pos.x,z:n.pos.z,angle:n.angle}))
-   },'battle'),
-   onReturn:()=>{
-    // On iPhone a second WebGL context may evict the suspended camp.
-    // Cold-resume using the existing snapshot rather than starting a NEW run.
-    if(renderer.gl.isContextLost())returnToCamp();
-    else clearCampSession();
-   }
-  });
+  const finalBattleGateway=createFinalBattleGateway(renderer);
   combat.setInteractionHandler(()=>
    finalBattleGateway.interact(player.pos,worldMap.isOpen())||
    blanketPortal.interact(player.pos,worldMap.isOpen()));

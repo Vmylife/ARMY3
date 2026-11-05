@@ -1,15 +1,13 @@
 // ARMY3 official final-battle gateway. Lives in the NORMAL camp scene.
 // Uses real six-training awards from armyProgression.run(); does not create
 // invented training completions or write the battle laboratory selections.
+import {clearCampSession} from './campSession.js?v=144';
 const $=id=>document.getElementById(id);
 export const BATTLE_RENDEZVOUS={x:22.4,z:16.8}; // Ammunition depot public entry.
 const KINDS=['blanket','shooting','grenade','weed','swipe','singing'];
-const COST={pistol:[20,12,18,25,36],rifle:[60,24,34,48,70]};
 const near=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
-const complete=()=>window.armyProgression?.run()?.trainings||{};
 export function completedTrainingCount(){
- const records=complete();
- return KINDS.reduce((total,kind)=>total+(records[kind]?.name?1:0),0);
+ return Math.min(6,window.armyProgression?.trainingCount?.()||0);
 }
 function yellowGroundRing(renderer){
  const gl=renderer.gl,coords=[],colors=[],normals=[],segments=72;
@@ -37,72 +35,43 @@ function yellowGroundRing(renderer){
  return ()=>{gl.useProgram(renderer.pFlat);gl.uniformMatrix4fv(renderer.flatVP,false,renderer.vp);
   gl.bindVertexArray(vao);gl.drawArrays(gl.TRIANGLES,0,coords.length/3);gl.bindVertexArray(null)};
 }
-export function createFinalBattleGateway(renderer,{onBegin=()=>{},onReturn=()=>{}}={}){
- const ring=yellowGroundRing(renderer),mission=$('armyMissionObjective'),menu=$('battleAssemblyMenu'),
-  start=$('battleAssemblyStart'),cancel=$('battleAssemblyCancel'),guns=$('battleAssemblyWeapons'),
-  wallet=$('battleAssemblyWallet');
- if(!mission||!menu||!start||!cancel||!guns||!wallet)throw Error('正式戰役入口 UI 未載入');
- let frame=null,dismissed=false,wasClose=false,lastScan=0,lastKey='';
- let checkedAt=-Infinity,cachedStatus={count:0,won:false,ready:false};
- function progress(){return window.armyProgression}
+export function createFinalBattleGateway(renderer){
+ const ring=yellowGroundRing(renderer);
+ const mission=$('armyMissionObjective'),menu=$('battleAssemblyMenu'),
+  start=$('battleAssemblyStart'),cancel=$('battleAssemblyCancel');
+ if(!mission||!menu||!start||!cancel)throw Error('正式戰役入口 UI 未載入');
+ let frame=null,dismissed=false,wasNear=false,lastScan=0,lastKey='';
+ let checkedAt=-Infinity,cached={count:0,ready:false,finished:false};
  function status(force=false){
-  // 3D draws 60 fps; avoid six-record sessionStorage parsing every frame.
   const now=performance.now();
-  if(!force&&now-checkedAt<280)return cachedStatus;
+  if(!force&&now-checkedAt<280)return cached;
   checkedAt=now;
-  const run=progress()?.run(),records=run?.trainings||{};
-  const won=run?.battle?.outcome==='success';
-  const count=KINDS.reduce((sum,k)=>sum+(records[k]?.name?1:0),0);
-  const code=won?'won':count===6?'battle':String(count);
-  if(code!==lastKey){
-   lastKey=code;
-   mission.classList.toggle('army-mission-alert',count===6&&!won);
-   mission.querySelector('strong').textContent=won?'防禦成功':count===6?'敵軍來襲':'完成訓練（'+count+'/6）';
-   mission.querySelector('small').textContent=won?'營區安全':count===6?'前往彈藥庫集結':'完成六項不同訓練';
-   mission.setAttribute('aria-label',won?'任務完成：防禦成功':count===6?'任務：敵軍來襲，前往彈藥庫':'任務：完成訓練 '+count+'/6');
+  const run=window.armyProgression?.run(),count=completedTrainingCount();
+  const finished=!!run?.battle?.outcome,won=run?.battle?.outcome==='success';
+  const key=finished?'finished-'+run.battle.outcome:count===6?'battle':String(count);
+  if(lastKey!==key){
+   lastKey=key;
+   mission.classList.toggle('army-mission-alert',count>=6&&!finished);
+   mission.querySelector('strong').textContent=finished?
+    (won?'防禦成功':'本輪結束'):count>=6?'敵軍來襲':'完成訓練（'+count+'/6）';
+   mission.querySelector('small').textContent=finished?
+    '返回首頁準備新的一輪':count>=6?'前往彈藥庫集結':'每項訓練最多三次';
+   mission.setAttribute('aria-label',count>=6&&!finished?'敵軍來襲，前往彈藥庫集結':
+    '訓練進度 '+count+'/6');
   }
-  cachedStatus={count,won,ready:count>=6&&!won};
-  return cachedStatus;
+  cached={count,finished,ready:count>=6&&!finished};
+  return cached;
  }
- function renderSupplies(){
-  const s=progress()?.state();
-  if(!s)return;
-  const owned=(s.weapons?.pistol||0)+(s.weapons?.rifle||0);
-  wallet.textContent='🎖 '+s.medals+' 枚 · '+(owned?
-   '已購買的武器將帶入戰役':'尚未購買槍械，進場後只能使用拳頭');
-  guns.replaceChildren();
-  for(const [gun,label] of [['pistol','手槍'],['rifle','步槍']]){
-   const level=Math.min(5,Math.max(0,Number(s.weapons?.[gun])||0));
-   const row=document.createElement('div');row.className='army-assembly-weapon';
-   const info=document.createElement('span');info.textContent=label+' · '+(level?'Lv.'+level:'未解鎖');
-   const button=document.createElement('button');button.type='button';
-   const cost=COST[gun][level];
-   button.textContent=level>=5?'已滿級':'🎖 '+cost+' 升級';
-   button.disabled=level>=5||s.medals<cost;
-   button.addEventListener('click',()=>{
-    const transaction=progress()?.buy('weapon',gun);
-    if(transaction?.success)renderSupplies();
-   });
-   row.append(info,button);guns.append(row);
-  }
- }
- function close(){
-  if(!frame)return;
-  frame.remove();frame=null;
-  document.body.classList.remove('army-in-final-battle');
-  window.armyMinigameActive=false;
-  window.armyFinalBattleActive=false;
-  dismissed=true;wasClose=false;menu.hidden=true;
-  lastScan=0;lastKey='';checkedAt=-Infinity;
-  status(true);
-  onReturn();
+ function goHome(){
+  if(frame){frame.remove();frame=null}
+  window.armyMinigameActive=false;window.armyFinalBattleActive=false;
+  // Clear the camp checkpoint so the homepage does not auto-resume the
+  // old round. All medals/upgrades remain in persistent progression storage.
+  clearCampSession();
+  location.replace(new URL('./index.html?armyHome=1&v=23',document.baseURI).href);
  }
  function begin(){
-  const s=status(true);if(!s.ready||frame)return;
-  try{onBegin()}catch(error){
-   console.error('最終戰役進度儲存失敗',error);
-   alert('無法儲存軍營位置，請稍後再試。');return;
-  }
+  if(!status(true).ready||frame)return;
   menu.hidden=true;dismissed=true;
   const iframe=document.createElement('iframe');
   iframe.title='正式最終戰役：軍營保衛戰';
@@ -111,18 +80,19 @@ export function createFinalBattleGateway(renderer,{onBegin=()=>{},onReturn=()=>{
   iframe.setAttribute('allow','autoplay');
   iframe.style.cssText='position:fixed;inset:0;width:100%;height:100%;border:0;z-index:100;background:#10231b;pointer-events:auto;';
   const url=new URL('./battle-test.html',document.baseURI);
-  url.searchParams.set('official','1');url.searchParams.set('fromCamp','1');url.searchParams.set('v','22');
+  url.searchParams.set('official','1');
+  url.searchParams.set('fromCamp','1');
+  url.searchParams.set('v','23');
   iframe.src=url.href;
   frame=iframe;
   document.body.classList.add('army-in-final-battle');
   window.armyMinigameActive=true;window.armyFinalBattleActive=true;
   document.body.append(iframe);
  }
- const receive=event=>{
+ window.addEventListener('message',event=>{
   if(!frame||event.origin!==location.origin||event.source!==frame.contentWindow)return;
-  if(event.data?.type==='ARMY3_OFFICIAL_BATTLE_CLOSE')close();
- };
- window.addEventListener('message',receive);
+  if(event.data?.type==='ARMY3_OFFICIAL_BATTLE_CLOSE')goHome();
+ });
  start.addEventListener('click',begin);
  cancel.addEventListener('click',()=>{menu.hidden=true;dismissed=true});
  return {
@@ -132,20 +102,16 @@ export function createFinalBattleGateway(renderer,{onBegin=()=>{},onReturn=()=>{
    if(frame||blocked){menu.hidden=true;return}
    const now=performance.now();
    if(now-lastScan<240)return;lastScan=now;
-   const s=status();
-   if(!s.ready){menu.hidden=true;return}
+   if(!status().ready){menu.hidden=true;return}
    const distance=near(playerPos,BATTLE_RENDEZVOUS);
-   if(distance>3.9){wasClose=false;dismissed=false;menu.hidden=true;return}
-   if(distance<=2.65&&!dismissed&&!wasClose){
-    wasClose=true;renderSupplies();menu.hidden=false;
-   }
+   if(distance>3.9){wasNear=false;dismissed=false;menu.hidden=true;return}
+   if(distance<=2.65&&!dismissed&&!wasNear){wasNear=true;menu.hidden=false}
   },
   interact(playerPos,blocked=false){
-   if(frame||blocked||!status().ready||near(playerPos,BATTLE_RENDEZVOUS)>2.95)return false;
-   renderSupplies();menu.hidden=false;dismissed=false;wasClose=true;
-   return true;
+   if(frame||blocked||!status(true).ready||near(playerPos,BATTLE_RENDEZVOUS)>2.95)return false;
+   dismissed=false;wasNear=true;menu.hidden=false;return true;
   },
   isActive:()=>!!frame,
-  close
+  close:goHome
  };
 }
