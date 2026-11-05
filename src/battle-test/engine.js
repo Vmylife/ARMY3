@@ -1,11 +1,12 @@
 // ARMY3 enemy-wave sandbox, intentionally NOT imported by the main camp.
 // Uses the approved punch, gun, knockdown and stand-up combat mechanics.
-import {CampCombat,COMBAT_RISE_SECONDS,COMBAT_DOWN_SECONDS} from '../systems/campCombat.js?v=13';
+import {CampCombat,COMBAT_RISE_SECONDS,COMBAT_DOWN_SECONDS} from '../systems/campCombat.js?v=14';
 import {moveNpc,canOccupy,bulletClearance,bulletLineClear,meleeLineClear} from './battleCollision.js?v=1';
 import {battleRoute,battleClear} from './battleNav.js?v=3';
 import {waveEntry} from './breaches.js?v=5';
 import {insidePerimeter} from '../map/camp.js?v=093';
 import {renderBattleSettlement} from './settlement.js?v=3';
+import {BattlePerks} from './talentLab.js?v=1';
 const $=id=>document.getElementById(id);
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
@@ -44,6 +45,7 @@ export class ArmyBattleCombat extends CampCombat{
   // Normal hits never launch a reaction clip. Keep only a tiny feedback pause
   // and the already-supported red screen flash (no extra UI layer).
   this.lastPlayerHitFlashAt=-Infinity;
+  this.perks=window.armyBattleTalents||new BattlePerks();this.perks.attach(this);
   this.totalSpawns=0;this.defenderKills=0;this.enemies=enemies;
   this.createEnemy=createEnemy;
   this.nameplateState='';this.lastWaveCount=-1;
@@ -72,6 +74,13 @@ export class ArmyBattleCombat extends CampCombat{
   const god=$('battleGodToggle');
   if(god){god.addEventListener('click',()=>this.setInvincible(!this.invincible));this.setInvincible(false)}
   $('battleReportNow')?.addEventListener('click',()=>this.endForReport());
+  $('battleGrenade')?.addEventListener('click',()=>this.perks.useGrenade(this));
+  window.addEventListener('keydown',event=>{
+   if(event.code!=='KeyG'||this.gameOver||!this.running||this.wheelOpen||
+      document.getElementById('battleTalentLab')?.open||
+      /INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName||''))return;
+   event.preventDefault();this.perks.useGrenade(this);
+  });
  }
  get liveEnemies(){return this.enemies.filter(n=>n.assaultVisible&&!n.combatDead)}
  get liveAllies(){return this.allies.filter(a=>!a.combatDead)}
@@ -102,8 +111,55 @@ export class ArmyBattleCombat extends CampCombat{
  shotLineClear(a,b,padding=.11){return bulletLineClear(a,b,padding)}
  meleeLineClear(a,b,padding=.11){return meleeLineClear(a,b,padding)}
  shotClearance(pos){return bulletClearance(pos)}
- tryAttack(){const result=super.tryAttack();this.provoked=false;return result}
- damageNPC(n,damage,kind='bullet'){super.damageNPC(n,damage,kind);this.provoked=false}
+ aimToleranceDegrees(){return this.perks?this.perks.aimAngle():7.5}
+ onPlayerBulletBlocked(b,impact){this.perks?.onBlockedBullet(this,b,impact)}
+ canTalentStand(p){return canOccupy(p,.4)}
+ moveTalentEnemy(n,dx,dz){
+  return moveNpc(n,dx,dz,[...this.allies,...this.enemies],this.player.pos);
+ }
+ tryAttack(){
+  // Only roll negative traits on a real, available input, not on every frame
+  // of an automatic rifle still cooling down.
+  if(this.perks&&this.playerCooldown<=0&&!this.gameOver&&!this.wheelOpen&&
+     !this.playerHurt&&!this.playerDown&&!this.playerRise&&!this.interactionMode&&
+     !window.armyMinigameActive&&!this.perks.beforeAttack(this))return false;
+  const result=super.tryAttack();
+  if(result&&this.perks){
+   if(this.weapon==='fists')this.perks.onPunch();
+   else this.perks.onShot(this,this.bullets.at(-1));
+  }
+  this.provoked=false;return result;
+ }
+ melee(){
+  const p=this.player.pos,dir={x:Math.sin(this.player.angle),z:Math.cos(this.player.angle)};
+  const max=[1,2,3,4][this.perks?.level('人體割草機')||0];
+  const targets=this.enemies.filter(n=>!n.combatDead&&!n.incoming)
+   .map(n=>({n,d:dist(p,n.pos)})).filter(o=>o.d<1.85)
+   .sort((a,b)=>a.d-b.d);
+  let hit=0;
+  for(const {n,d}of targets){
+   const face=((n.pos.x-p.x)*dir.x+(n.pos.z-p.z)*dir.z)/Math.max(.01,d);
+   if(face<.22||!this.meleeLineClear(p,n.pos,.1))continue;
+   this.damageNPC(n,10,'punch');if(++hit>=max)break;
+  }
+ }
+ damageNPC(n,amount,kind='bullet'){
+  if(n.combatDead||amount<=0)return;
+  const wasDead=n.combatDead,wasDown=n.combatDown;
+  if(kind==='punch'){
+   amount=this.perks?.punchDamage(this,amount)??amount;
+   if(this.perks&&this.time<this.perks.switchUntil)
+    amount*=1-this.perks.level('被角纏腳')*.1;
+  }
+  super.damageNPC(n,amount,kind);
+  if(wasDown<=0&&n.combatDown>0)n.talentLandDone=false;
+  if(kind==='punch')this.perks?.pullTarget(this,n);
+  if(!n.combatDead&&(kind==='punch'||kind==='bullet'))this.perks.focus=n;
+  if(kind==='bullet'&&!this.perks?.splitting&&!this.perks?.reflecting)
+   this.perks?.splitHit(this,n,amount);
+  if(!wasDead&&n.combatDead)this.perks?.onKill(this);
+  this.provoked=false;
+ }
  // Allied bullets must never contribute to the player's floating damage or HIT COMBO.
  // Keep an unlabelled hit spark, with no hit-stop or screen shake on allied shots.
  onCombatHit(pos,damage,info={}){
@@ -169,6 +225,7 @@ export class ArmyBattleCombat extends CampCombat{
    n.anim.setClip('Running',{restart:true});n.anim.speed=1.2;n.anim.rifleAim=0;
   }
   this.totalSpawns+=pool.length;
+  this.perks?.onWave(this);
   const set=waveLoadout(this.wave);
   this.showIntroBanner('第 '+this.wave+' 波：拳 '+set.fists+' · 手槍 '+set.pistol+' · 步槍 '+set.rifle,2000);
   this.updateBattleHUD();
@@ -176,6 +233,8 @@ export class ArmyBattleCombat extends CampCombat{
 
  // Stable target lock: don't switch direction every time another red runs by.
  chooseAllyTarget(a,reds){
+  const marked=this.perks?.focusAlly(this,a,this.allies.indexOf(a));
+  if(marked)return marked;
   const current=a.battleTarget;
   let currentDist=Infinity;
   if(current&&!current.combatDead&&!current.incoming&&insidePerimeter(current.pos)){
@@ -222,6 +281,9 @@ export class ArmyBattleCombat extends CampCombat{
     }
     continue;
    }
+   if(this.perks?.allyMuted(this,a,i)){
+    a.anim.setClip('Idle');a.anim.rifleAim=0;continue;
+   }
    if(a.combatHurt>0){
     a.combatHurt=Math.max(0,a.combatHurt-dt);
     a.anim.rifleAim=0;
@@ -233,7 +295,10 @@ export class ArmyBattleCombat extends CampCombat{
    let moving=false,moved=0;
    const targetDistance=target?dist(a.pos,target.pos):Infinity;
    let goal=null,desiredSpeed=0;
-   if(target&&targetDistance>16&&dist(a.pos,home)<6.7){
+   const diversion=this.perks?.wrongGoal(this,a);
+   if(diversion){
+    goal=diversion;desiredSpeed=1.9;
+   }else if(target&&targetDistance>16&&dist(a.pos,home)<6.7){
     goal=target.pos;desiredSpeed=2.1;
    }else if(!target&&dist(a.pos,home)>1.20){
     goal=home;desiredSpeed=1.65;
@@ -285,13 +350,14 @@ export class ArmyBattleCombat extends CampCombat{
      dx:Math.sin(bulletHeading),dz:Math.cos(bulletHeading),
      range:27,speed:46,damage:18});
     a.shotUntil=performance.now()+110;
-    a.shotAt=this.time+1.72+((a.id||0)%3)*.18+Math.random()*.26;
+    a.shotAt=this.time+(1.72+((a.id||0)%3)*.18+Math.random()*.26)/this.perks.fireRate();
     this.playRangeShot(targetDistance,performance.now());
    }
   }
  }
 
  damageAlly(a,damage){
+  damage=this.perks?.allyDamage(damage)??damage;
   if(a.combatDead||damage<=0)return;
   a.combatHP=Math.max(0,a.combatHP-damage);
   if(a.combatHP<=0){
@@ -526,6 +592,7 @@ export class ArmyBattleCombat extends CampCombat{
   const specials=this.bullets.filter(b=>b.owner==='ally'||b.owner==='enemyAlly');
   this.bullets=this.bullets.filter(b=>b.owner==='player'||b.owner==='npc');
   super.updateBullets(dt);
+  this.perks?.flushRicochets(this);
   for(const b of specials){
    let travel=Math.min(b.range,b.speed*dt),alive=true;
    while(travel>.0001&&alive){
@@ -574,6 +641,7 @@ export class ArmyBattleCombat extends CampCombat{
   this.lastWaveClock=now;
   if(blocked||window.armyMinigameActive)return;
   if(this.gameOver){super.update(dt,now,{blocked});return}
+  this.perks?.beforeFrame(this);
   dt=clamp(dt,0,.05);
   // 25-second overlapping waves, capped at eight. No ninth wave.
   if(this.running)this.survivalSeconds+=elapsed;
@@ -615,7 +683,9 @@ export class ArmyBattleCombat extends CampCombat{
  endForReport(){return this.finishBattle('surrender')}
  damagePlayer(amount,kind='bullet'){
   if(this.invincible||this.gameOver)return;
-  const damage=Math.max(0,Number(amount)||0);
+  const base=Math.max(0,Number(amount)||0);
+  if(base<=0)return;
+  const damage=Math.max(0,this.perks?.damageToPlayer(this,base,kind)??base);
   if(damage<=0)return;
   // A non-lethal hit must NEVER call the camp's stun/knock-down handler:
   // it plays Hit_Reaction, cancels punches and blocks movement/shooting.

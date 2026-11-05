@@ -478,6 +478,8 @@ export class CampCombat{
  shotLineClear(a,b,padding=.11){return lineClear(a,b,padding)}
  meleeLineClear(a,b,padding=.11){return lineClear(a,b,padding)}
  shotClearance(pos){return staticClearance(pos)}
+ aimToleranceDegrees(){return 7.5}
+ onPlayerBulletBlocked(b,impact){}
  tryAttack(){
   if(this.gameOver||this.interactionMode||this.wheelOpen||this.playerDown>0||this.playerRise>0||
      this.playerHurt>0||window.armyMinigameActive||this.playerCooldown>0)return false;
@@ -493,7 +495,7 @@ export class CampCombat{
    const dx=n.pos.x-p.x,dz=n.pos.z-p.z,d=Math.hypot(dx,dz);
    if(d>26||d<.01)continue;
    const dot=(dx*forward.x+dz*forward.z)/d;
-   if(dot<Math.cos(7.5*Math.PI/180))continue;
+   if(dot<Math.cos(this.aimToleranceDegrees()*Math.PI/180))continue;
    if(!this.shotLineClear(p,n.pos,.10))continue;
    if(d<min){min=d;target=n}
   }
@@ -703,7 +705,9 @@ export class CampCombat{
     const segment=Math.min(travel,.095);
     const x=b.x+b.dx*segment,z=b.z+b.dz*segment,at={x,z};
     // A real bullet disappears at the first collision; no through-wall hits.
-    if(!insidePerimeter(at)||this.shotClearance(at)<.065){alive=false;break}
+    if(!insidePerimeter(at)||this.shotClearance(at)<.065){
+     if(b.owner==='player')this.onPlayerBulletBlocked(b,{x:b.x,z:b.z});
+     alive=false;break}
     b.x=x;b.z=z;b.range-=segment;travel-=segment;
     if(b.owner==='player'){
      for(const n of this.npcs){
