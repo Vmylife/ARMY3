@@ -3,7 +3,7 @@
 import {CampCombat,lineClear,COMBAT_RISE_SECONDS,COMBAT_DOWN_SECONDS} from '../systems/campCombat.js?v=12';
 import {moveNpc,staticClearance,canOccupy} from '../map/navCollision109.js?v=124';
 import {battleRoute} from './battleNav.js?v=1';
-import {waveEntry} from './breaches.js?v=4';
+import {waveEntry} from './breaches.js?v=5';
 import {insidePerimeter} from '../map/camp.js?v=093';
 const $=id=>document.getElementById(id);
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
@@ -12,7 +12,7 @@ export const BATTLE_SPAWN={player:{x:22.4,z:13.2},allies:[
  {x:16.6,z:14.1},{x:19.3,z:13.5},{x:22.0,z:11.0},{x:24.9,z:13.6},{x:27.1,z:11.7}
 ]};
 // Every wave arrives on schedule, irrespective of survivors.
-export const WAVE_INTERVAL=15;
+export const WAVE_INTERVAL=25;
 export function waveLoadout(wave){
  if(wave===1)return {fists:10,pistol:0,rifle:0};
  if(wave===2)return {fists:7,pistol:5,rifle:0};
@@ -62,7 +62,7 @@ export class ArmyBattleCombat extends CampCombat{
    n.combatDead=true;n.combatActive=false;
    n.pos={x:200+n.id,z:200};n.home.job='life';
   }
-  this.showIntroBanner('圍牆外紅軍集結！南側與辦公大樓多路來襲',1900);
+  this.showIntroBanner('圍牆外紅軍集結！南側、西側與餐廳東側來襲',1900);
   const god=$('battleGodToggle');
   if(god){god.addEventListener('click',()=>this.setInvincible(!this.invincible));this.setInvincible(false)}
  }
@@ -520,7 +520,7 @@ export class ArmyBattleCombat extends CampCombat{
   if(blocked||window.armyMinigameActive)return;
   if(this.gameOver){super.update(dt,now,{blocked});return}
   dt=clamp(dt,0,.05);
-  // One new wave every fifteen wall-clock seconds while playing.
+  // One new wave every 25 real seconds, even with enemies still alive.
   this.waveTimer-=elapsed;
   if(this.waveTimer<=0){
    this.spawnWave();this.running=true;
