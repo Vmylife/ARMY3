@@ -15,7 +15,8 @@ const ACHIEVEMENTS=[
  {id:'all_allies',icon:'🤝',name:'全員平安下哨',desc:'至少迎接第三波，五名友軍全數生還。',rarity:'史詩',check:s=>s.wave>=3&&s.allies===5},
  {id:'solo',icon:'🪖',name:'剩我一個是怎樣',desc:'五名友軍全部陣亡，仍親手擊殺五名紅軍。',rarity:'稀有',check:s=>s.allies===0&&s.kills>=5},
  {id:'observer',icon:'🔭',name:'戰地觀察員',desc:'撐到第二波，但本人零擊殺。',rarity:'稀有',check:s=>s.wave>=2&&s.kills===0},
- {id:'god_tester',icon:'🧪',name:'國軍神祕黑科技',desc:'本場開啟過無敵測試模式。',rarity:'測試',check:s=>s.god}
+ {id:'god_tester',icon:'🧪',name:'國軍神祕黑科技',desc:'本場開啟過無敵測試模式。',rarity:'測試',check:s=>s.god},
+ {id:'defended',icon:'🛡️',name:'營區守護者',desc:'清除第八波及之前全部敵軍，完成防禦。',rarity:'傳說',check:s=>s.outcome==='success'}
 ];
 const ORDER={普通:0,稀有:1,史詩:2,傳說:3,測試:4};
 function scoreOf(s){
@@ -31,6 +32,7 @@ function medalsForKills(kills){
 }
 function rating(score){return score>=90?'S':score>=75?'A':score>=60?'B':score>=40?'C':score>=22?'D':'F'}
 function titleOf(s){
+ if(s.outcome==='success'&&!s.god)return '營區守護者';
  if(s.god)return '戰場規則測試員';
  if(s.wave>=8&&s.kills>=20)return '防線傳說';
  if(s.kills>=20)return '紅軍收割機';
@@ -41,7 +43,9 @@ function titleOf(s){
 }
 function quoteOf(s){
  let lines;
- if(s.god)lines=['你開無敵打成這樣，紅軍想先找程式設計師理論。','國軍最新裝備：無敵開關。採購單上找不到這一項。'];
+ if(s.outcome==='success')lines=['第八波紅軍全部清空，連長終於可以宣布今天不用再加班。','守住了！現在最難的任務是說服班長真的讓大家下哨。'];
+ else if(s.outcome==='surrender')lines=['敵軍還沒打完，你先幫全連示範了什麼叫戰術性撤退。','報告班長，我不是落跑，我只是提早申請結束演練。'];
+ else if(s.god)lines=['你開無敵打成這樣，紅軍想先找程式設計師理論。','國軍最新裝備：無敵開關。採購單上找不到這一項。'];
  else if(s.kills===0)lines=['全程零擊殺，班長懷疑你是在替敵軍導覽營區。','槍拿得很穩，穩到一個紅軍都沒被你送走。'];
  else if(s.allies===0)lines=['友軍全部退場，你一個人扛起了全連的加班費。','其他人都躺了，你還在打。這叫戰鬥意志，還是沒看到撤退通知？'];
  else if(s.wave>=8)lines=['第八波都來了，紅軍的人力資源部應該已經崩潰。','連長說可以休息了，下一秒才發現敵人還在排隊入場。'];
@@ -69,6 +73,7 @@ function line(label,value,glyph){
  return div;
 }
 export function calculateBattleStats(combat,manual=false){
+ const outcome=combat.battleOutcome|| (manual?'surrender':'death');
  const kills=Math.max(0,Math.floor(Number(combat.kills)||0));
  const allies=combat.liveAllies.length;
  const seconds=Math.max(0,Math.round(Number(combat.survivalSeconds)||0));
@@ -76,17 +81,21 @@ export function calculateBattleStats(combat,manual=false){
   kills,medals:medalsForKills(kills),allies,wave:Math.max(1,combat.wave),
   seconds,allyKills:Math.max(0,Math.floor(combat.defenderKills||0)),
   spawned:Math.max(0,Math.floor(combat.totalSpawns||0)),
-  god:!!combat.usedInvincible,manual:!!manual
+  god:!!combat.usedInvincible,manual:outcome==='surrender',outcome
  };
  stats.score=scoreOf(stats);stats.grade=rating(stats.score);
  return stats;
 }
-export function renderBattleSettlement(combat,{manual=false}={}){
+export function renderBattleSettlement(combat,{outcome='death',manual=false}={}){
+ // manual is accepted for older test callers, but all new entry points
+ // supply an explicit outcome: death, surrender or genuine victory.
+ outcome=outcome==='success'?'success':outcome==='surrender'||manual?'surrender':'death';
+ combat.battleOutcome=outcome;
  const root=$('campCombatFinish'),title=$('campFinishTitle'),restart=$('campCombatRestart');
  if(!root||!title||!restart)return null;
  if(root.dataset.reportDone==='1')return null;
  root.dataset.reportDone='1';
- const s=calculateBattleStats(combat,manual);
+ const s=calculateBattleStats(combat,outcome==='surrender');
  const known=safelyLoad(),earned=ACHIEVEMENTS.filter(a=>a.check(s));
  const fresh=earned.filter(a=>!known.has(a.id));
  for(const a of earned)known.add(a.id);
@@ -100,9 +109,11 @@ export function renderBattleSettlement(combat,{manual=false}={}){
  kicker.append(make('span','btr-kicker-label','FINAL BATTLE REPORT'),
   make('span','btr-number','ARMY / AFTER ACTION'));
  const stars=make('div','btr-stars','✦  ✦  ✦');
- title.textContent='最終戰役';
+ title.textContent='戰報';
  title.className='btr-title';
- const state=make('p','btr-subtitle',manual?'防守任務結束 · 本場戰績':'防線失守 · 陣亡戰績');
+ const state=make('p','btr-subtitle',
+  outcome==='success'?'第八波肅清 · 全面防禦成功':
+  outcome==='surrender'?'中途結束防守 · 本場戰績':'防線失守 · 陣亡戰績');
  const banner=make('section','btr-gradehero');
  const left=make('div','btr-gradepanel');
  const gradeBadge=make('div','btr-gradebadge');
@@ -110,14 +121,16 @@ export function renderBattleSettlement(combat,{manual=false}={}){
   make('span','btr-grade-unit','GRADE'));
  left.append(gradeBadge,make('div','btr-graderank',titleOf(s)));
  const right=make('div','btr-heroquote');
- right.append(make('small','btr-hero-label',manual?'防守任務結束':'任務結果：陣亡'),
-  make('strong','btr-hero-title',manual?'完成本次演練':'榮譽留在戰場'),
+ right.append(make('small','btr-hero-label',
+  outcome==='success'?'任務結果：勝利':outcome==='surrender'?'任務結果：投降':'任務結果：陣亡'),
+  make('strong','btr-hero-title',
+   outcome==='success'?'防禦成功':outcome==='surrender'?'你已投降':'你已陣亡'),
   make('span','btr-hero-wave','最高抵達第 '+s.wave+' 波'));
  banner.append(left,right);
  const medals=make('section','btr-medalband');
  medals.append(make('span','btr-medal-emblem','✦'));
  const medalLabel=make('div','btr-medal-label');
- medalLabel.append(make('span','','榮譽勳章'),make('small','','個人擊殺獎勵 · 試算'));
+ medalLabel.append(make('span','','榮譽勳章'),make('small','','國家感謝你的奉獻'));
  medals.append(medalLabel,make('strong','btr-medal-number',String(s.medals)));
  head.append(kicker,stars,title,state,banner,medals);
  const contents=make('div','btr-scroll');
@@ -173,6 +186,7 @@ export function renderBattleSettlement(combat,{manual=false}={}){
  actions.append(restart,home);foot.append(actions);
  shell.append(head,contents,foot);
  root.classList.add('btr-active');
+ document.body.classList.add('battle-report-open');
  root.replaceChildren(shell);
  return s;
 }

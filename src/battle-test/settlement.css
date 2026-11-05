@@ -157,3 +157,12 @@
 @media(prefers-reduced-motion:reduce){
  #campCombatFinish.btr-active *{scroll-behavior:auto!important}
 }
+
+/* Raise the report ABOVE the game's HUD stacking context. The game HUD,
+   minimap and invincibility/exit controls must never cover the white dossier. */
+body.battle-report-open #campCombatUI{z-index:50!important}
+body.battle-report-open #battleHUD,
+body.battle-report-open #battleExit,
+body.battle-report-open #battleGodToggle,
+body.battle-report-open #battleReportNow,
+body.battle-report-open #minimap{display:none!important}

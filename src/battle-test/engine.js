@@ -5,7 +5,7 @@ import {moveNpc,staticClearance,canOccupy} from '../map/navCollision109.js?v=124
 import {battleRoute,battleClear} from './battleNav.js?v=2';
 import {waveEntry} from './breaches.js?v=5';
 import {insidePerimeter} from '../map/camp.js?v=093';
-import {renderBattleSettlement} from './settlement.js?v=2';
+import {renderBattleSettlement} from './settlement.js?v=3';
 const $=id=>document.getElementById(id);
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
@@ -14,6 +14,7 @@ export const BATTLE_SPAWN={player:{x:22.4,z:13.2},allies:[
 ]};
 // Every wave arrives on schedule, irrespective of survivors.
 export const WAVE_INTERVAL=25;
+export const FINAL_WAVE=8;
 export function waveLoadout(wave){
  if(wave===1)return {fists:10,pistol:0,rifle:0};
  if(wave===2)return {fists:7,pistol:5,rifle:0};
@@ -39,7 +40,7 @@ export class ArmyBattleCombat extends CampCombat{
   super({player,npcs:enemies,renderer,rifleGlb,npcGlb});
   this.allies=allies;
   this.wave=0;this.waveTimer=1.8;this.lastWaveClock=null;this.running=false;
-  this.survivalSeconds=0;this.usedInvincible=false;
+  this.survivalSeconds=0;this.usedInvincible=false;this.battleOutcome=null;
   this.totalSpawns=0;this.defenderKills=0;this.enemies=enemies;
   this.createEnemy=createEnemy;
   this.nameplateState='';this.lastWaveCount=-1;
@@ -128,6 +129,8 @@ export class ArmyBattleCombat extends CampCombat{
   }
  }
  spawnWave(){
+  // Exactly eight waves. The eighth is the last, regardless of the timer.
+  if(this.wave>=FINAL_WAVE||this.gameOver)return;
   this.wave++;
   const weapons=waveWeapons(this.wave),wanted=weapons.length;
   // Preserve ALL survivors from previous waves. Recycle only finished dead
@@ -565,12 +568,14 @@ export class ArmyBattleCombat extends CampCombat{
   if(blocked||window.armyMinigameActive)return;
   if(this.gameOver){super.update(dt,now,{blocked});return}
   dt=clamp(dt,0,.05);
-  // One new wave every 25 real seconds, even with enemies still alive.
+  // 25-second overlapping waves, capped at eight. No ninth wave.
   if(this.running)this.survivalSeconds+=elapsed;
-  this.waveTimer-=elapsed;
-  if(this.waveTimer<=0){
-   this.spawnWave();this.running=true;
-   this.waveTimer+=WAVE_INTERVAL;
+  if(this.wave<FINAL_WAVE){
+   this.waveTimer-=elapsed;
+   if(this.waveTimer<=0){
+    this.spawnWave();this.running=true;
+    this.waveTimer+=WAVE_INTERVAL;
+   }
   }
   this.updateIncoming(dt);
   // Normal shooting/knockdown/recoil still run, without player-only camp aggro.
@@ -578,19 +583,29 @@ export class ArmyBattleCombat extends CampCombat{
   super.update(dt,now,{blocked});
   this.updateEnemyAI(dt,now);
   this.updateAllies(dt);
-  // Never wait for the live-enemy count to reach zero before the next wave.
+  // Win only after the FINAL wave has spawned AND every surviving red from
+  // ALL waves has been eliminated. Being alive at the start of wave 8 is
+  // not sufficient. Player death has priority if it happened this frame.
+  if(!this.gameOver&&this.wave===FINAL_WAVE&&this.liveEnemies.length===0){
+   this.endWithVictory();
+  }
   this.updateBattleHUD();
  }
 
- endForReport(){
-  if(this.gameOver||!this.running)return;
+ finishBattle(outcome){
+  if(this.gameOver||!this.running)return false;
+  this.battleOutcome=outcome;
   this.gameOver=true;this.attackPointer=null;this.attackKeyboard=false;
   if(this.wheelOpen)this.closeWheel(false);
-  renderBattleSettlement(this,{manual:true});
+  clearTimeout(this.endTimer);
+  renderBattleSettlement(this,{outcome});
   $('campCombatFinish').hidden=false;
   $('battleReportNow').hidden=true;
   this.refreshHUD(true);
+  return true;
  }
+ endWithVictory(){return this.finishBattle('success')}
+ endForReport(){return this.finishBattle('surrender')}
  damagePlayer(amount,kind='bullet'){
   if(this.invincible)return;
   const wasAlive=this.playerAlive;
@@ -598,7 +613,8 @@ export class ArmyBattleCombat extends CampCombat{
   if(wasAlive&&!this.playerAlive){
    // CampCombat preserves the falling animation for 2.1 seconds; populate
    // the report NOW, and its existing timer will reveal this same panel.
-   renderBattleSettlement(this,{manual:false});
+   this.battleOutcome='death';
+   renderBattleSettlement(this,{outcome:'death'});
    $('battleReportNow').hidden=true;
   }
  }
