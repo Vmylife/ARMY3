@@ -200,7 +200,7 @@ export function renderBattleSettlement(combat,{outcome='death',manual=false}={})
    }catch(error){console.warn('直接返回首頁失敗',error)}
    // Older embeds can still return home without a working message handler.
    try{sessionStorage.removeItem('ARMY3_camp_resume_v1')}catch{}
-   const home=new URL('./index.html?armyHome=1&v=24',document.baseURI);
+   const home=new URL('./index.html?armyHome=1&v=26',document.baseURI);
    try{window.top.location.replace(home.href)}
    catch{window.location.replace(home.href)}
   });

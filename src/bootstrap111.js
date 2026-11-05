@@ -1,10 +1,14 @@
-import {getReturningCampSession} from './systems/campSession.js?v=144';
+import {getReturningCampSession,clearCampSession} from './systems/campSession.js?v=144';
 // ARMY3 v1.95: progressive camp boot; suspend the expensive camp WebGL loop
 // while a prewarmed minigame iframe covers the screen.
 const $=id=>document.getElementById(id);
 const button=$('armyStart'),loading=$('armyLoading'),bar=$('armyBar');
+const forceHome=new URLSearchParams(location.search).get('armyHome')==='1';
+// Mandatory fresh home after final-battle report: no automatic camp resume.
+if(forceHome)clearCampSession();
+const resumingCamp=()=>!forceHome&&getReturningCampSession();
 let highestPercentage=0;
-const sourceURL=new URL('./src/main111.js?v=174',location.href);
+const sourceURL=new URL('./src/main111.js?v=175',location.href);
 let sourcePromise=null;
 const getCampSource=()=>{
  if(!sourcePromise)sourcePromise=fetch(sourceURL,{cache:'default'}).then(response=>{
@@ -45,9 +49,9 @@ async function loadCampWithPause(){
 }
 button.addEventListener('click',async()=>{
  enteringCamp=true;stopPreload();
- if(!getReturningCampSession())window.armyProgression?.beginRun();
+ if(!resumingCamp())window.armyProgression?.beginRun();
  button.disabled=true;button.hidden=true;
- window.armySetLoading(0,1,getReturningCampSession()?'正在恢復軍營進度…':'建立軍營場景…');
+ window.armySetLoading(0,1,resumingCamp()?'正在恢復軍營進度…':'建立軍營場景…');
  try{
   await import('./map/activeCampLayout116.js?v=126');
   await import('./lighting96.js?v=096');
@@ -56,7 +60,7 @@ button.addEventListener('click',async()=>{
 },{once:true});
 // Homepage stays interactive while assets are primed quietly in the background.
 // No player state, NPC schedule or WebGL scene begins before Start is clicked.
-if(!getReturningCampSession()){
+if(!resumingCamp()){
  const prewarm=()=>{
   if(enteringCamp)return;
   void getCampSource().catch(()=>{});
@@ -67,7 +71,7 @@ if(!getReturningCampSession()){
  if('requestIdleCallback' in window)requestIdleCallback(prewarm,{timeout:1000});
  else setTimeout(prewarm,280);
 }
-if(getReturningCampSession()){
+if(resumingCamp()){
  $('armyHome').querySelector('h1').textContent='返回軍營';
  $('armyHome').querySelector('.army-home__tagline').textContent='正在恢復你剛剛的位置';
  button.hidden=true;queueMicrotask(()=>{button.hidden=false;button.click()});

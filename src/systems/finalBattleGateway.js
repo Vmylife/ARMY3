@@ -63,13 +63,13 @@ export function createFinalBattleGateway(renderer){
   return cached;
  }
  function goHome(){
-  // Clear state before removing the caller iframe (Safari may tear it down).
+  // IMPORTANT: called from inside the child iframe's click event.
+  // Removing the frame here can terminate the child execution context and
+  // prevent the subsequent navigation; the player only sees the old camp.
+  // Navigate the PARENT document first; page unload will remove the frame.
   clearCampSession();
   window.armyMinigameActive=false;window.armyFinalBattleActive=false;
-  loan.hidden=true;
-  if(frame){frame.remove();frame=null}
-  document.body.classList.remove('army-in-final-battle');
-  location.replace(new URL('./index.html?armyHome=1&v=24',document.baseURI).href);
+  window.location.replace(new URL('./index.html?armyHome=1&v=26',document.baseURI).href);
  }
  // Same-origin child report can invoke the real gateway without waiting
  // for an iframe message. The message listener remains as a fallback.
@@ -86,7 +86,7 @@ export function createFinalBattleGateway(renderer){
   const url=new URL('./battle-test.html',document.baseURI);
   url.searchParams.set('official','1');
   url.searchParams.set('fromCamp','1');
-  url.searchParams.set('v','23');
+  url.searchParams.set('v','26');
   iframe.src=url.href;
   frame=iframe;
   document.body.classList.add('army-in-final-battle');

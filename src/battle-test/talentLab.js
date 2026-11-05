@@ -1,6 +1,6 @@
 // ARMY3 final-battle talent runtime & in-lab selector. Never changes the
 // official trait awards, honor wallet or any other minigame.
-import {TRAITS,GROUPS} from './traitCatalog.js?v=4';
+import {TRAITS,GROUPS} from './traitCatalog.js?v=5';
 import {insidePerimeter} from '../map/camp.js?v=093';
 const KEY='ARMY3_battle_test_selected_traits_v1';
 const $=id=>document.getElementById(id);

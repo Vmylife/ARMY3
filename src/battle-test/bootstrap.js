@@ -1,5 +1,5 @@
 // Shared 3D battle scene: sandbox laboratory OR official campaign mission.
-import {initTalentLab} from './talentLab.js?v=7';
+import {initTalentLab} from './talentLab.js?v=8';
 import {initWeaponLab} from './weaponLab.js?v=3';
 import {needsTemporaryPistol} from '../systems/temporaryPistol.js?v=1';
 const $=id=>document.getElementById(id);
@@ -32,7 +32,7 @@ if(OFFICIAL){
   // Same-origin frame shares sessionStorage with the live camp; award every
   // eligible enemy kill through the real progression system, not the lab.
   const script=document.createElement('script');
-  script.src='./src/systems/armyProgression.js?v=14';
+  script.src='./src/systems/armyProgression.js?v=15';
   await new Promise((resolve,reject)=>{
    script.addEventListener('load',resolve,{once:true});
    script.addEventListener('error',()=>reject(Error('軍功系統載入失敗')),{once:true});
@@ -76,7 +76,7 @@ $('battleStart').addEventListener('click',async()=>{
   $('battleIntro').hidden=true;$('errorText').textContent=String(error?.message||error);
   $('fatal').hidden=false;
  };
- try{await import('./main.js?v=28')}
+ try{await import('./main.js?v=29')}
  catch(error){console.error('軍營保衛戰載入失敗',error);window.armyLoadFailure(error)}
 });
 // Official battle starts immediately after authorisation; no second button.

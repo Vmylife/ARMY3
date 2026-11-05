@@ -53,17 +53,9 @@ export function installWeaponRules(combat,{mode='camp',temporaryPistol=false}={}
  }
  if(!loan){combat.refreshHUD(true);return combat}
  // Lv.1 stats and magazine were provisioned by the official loadout.
- // Count spent cartridges, including any perk-generated extra rounds.
+ // Only paid, primary trigger shots wear out the ten-shot loaner.
+ // Free 極限手速 projectiles never consume durability or cartridges.
  const perks=combat.perks,originalShot=perks.onShot.bind(perks);
- const oldIndicator=perks.updateIndicator.bind(perks);
- perks.updateIndicator=function(c){
-  oldIndicator(c);
-  const badge=document.getElementById('battleTalentStatus');
-  if(badge){
-   const mark=broken?'臨時手槍已報廢':'臨時手槍 '+(10-shots)+'/10 發';
-   if(!badge.textContent.includes(mark))badge.textContent+=(badge.textContent?' · ':'')+mark;
-  }
- };
  function showBroken(){
   const node=document.createElement('div');
   node.id='battlePistolBreakNotice';node.textContent='手槍壞掉了…';
@@ -73,11 +65,9 @@ export function installWeaponRules(combat,{mode='camp',temporaryPistol=false}={}
  }
  perks.onShot=function(c,bullet){
   const loanShot=c.weapon==='pistol'&&!broken;
-  const before=loanShot?perks.ammo.pistol:0;
-  if(loanShot)perks.bonusShots.pistol=Math.min(perks.bonusShots.pistol,Math.max(0,9-shots));
   originalShot(c,bullet);
   if(!loanShot)return;
-  shots=Math.min(10,shots+Math.max(1,before-perks.ammo.pistol));
+  shots=Math.min(10,shots+1);
   c.temporaryPistolShots=shots;
   if(shots>=10){
    broken=true;c.temporaryPistolBroken=true;
