@@ -13,12 +13,12 @@ $('battleStart').addEventListener('click',async()=>{
  };
  window.armyLoadComplete=()=>{
   $('battleLoadBar').style.width='100%';
-  $('battleIntro').hidden=true;$('battleHUD').hidden=false;$('battleGodToggle').hidden=false;
+  $('battleIntro').hidden=true;$('battleHUD').hidden=false;$('battleGodToggle').hidden=false;$('battleReportNow').hidden=false;
  };
  window.armyLoadFailure=err=>{
   $('battleIntro').hidden=true;$('errorText').textContent=String(err?.message||err);
   $('fatal').hidden=false;
  };
- try{await import('./main.js?v=11')}
+ try{await import('./main.js?v=12')}
  catch(err){console.error('敵軍來襲測試版載入失敗',err);window.armyLoadFailure(err)}
 });

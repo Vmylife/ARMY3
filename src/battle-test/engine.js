@@ -5,6 +5,7 @@ import {moveNpc,staticClearance,canOccupy} from '../map/navCollision109.js?v=124
 import {battleRoute,battleClear} from './battleNav.js?v=2';
 import {waveEntry} from './breaches.js?v=5';
 import {insidePerimeter} from '../map/camp.js?v=093';
+import {renderBattleSettlement} from './settlement.js?v=1';
 const $=id=>document.getElementById(id);
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
@@ -38,6 +39,7 @@ export class ArmyBattleCombat extends CampCombat{
   super({player,npcs:enemies,renderer,rifleGlb,npcGlb});
   this.allies=allies;
   this.wave=0;this.waveTimer=1.8;this.lastWaveClock=null;this.running=false;
+  this.survivalSeconds=0;this.usedInvincible=false;
   this.totalSpawns=0;this.defenderKills=0;this.enemies=enemies;
   this.createEnemy=createEnemy;
   this.nameplateState='';this.lastWaveCount=-1;
@@ -65,6 +67,7 @@ export class ArmyBattleCombat extends CampCombat{
   this.showIntroBanner('圍牆外紅軍集結！南側、西側與餐廳東側來襲',1900);
   const god=$('battleGodToggle');
   if(god){god.addEventListener('click',()=>this.setInvincible(!this.invincible));this.setInvincible(false)}
+  $('battleReportNow')?.addEventListener('click',()=>this.endForReport());
  }
  get liveEnemies(){return this.enemies.filter(n=>n.assaultVisible&&!n.combatDead)}
  get liveAllies(){return this.allies.filter(a=>!a.combatDead)}
@@ -83,6 +86,7 @@ export class ArmyBattleCombat extends CampCombat{
  }
  setInvincible(on){
   this.invincible=!!on;
+  if(this.invincible)this.usedInvincible=true;
   const toggle=$('battleGodToggle');
   if(toggle){toggle.textContent='無敵：'+(this.invincible?'開':'關');
    toggle.setAttribute('aria-pressed',String(this.invincible));toggle.classList.toggle('active',this.invincible)}
@@ -562,6 +566,7 @@ export class ArmyBattleCombat extends CampCombat{
   if(this.gameOver){super.update(dt,now,{blocked});return}
   dt=clamp(dt,0,.05);
   // One new wave every 25 real seconds, even with enemies still alive.
+  if(this.running)this.survivalSeconds+=elapsed;
   this.waveTimer-=elapsed;
   if(this.waveTimer<=0){
    this.spawnWave();this.running=true;
@@ -577,12 +582,24 @@ export class ArmyBattleCombat extends CampCombat{
   this.updateBattleHUD();
  }
 
+ endForReport(){
+  if(this.gameOver||!this.running)return;
+  this.gameOver=true;this.attackPointer=null;this.attackKeyboard=false;
+  if(this.wheelOpen)this.closeWheel(false);
+  renderBattleSettlement(this,{manual:true});
+  $('campCombatFinish').hidden=false;
+  $('battleReportNow').hidden=true;
+  this.refreshHUD(true);
+ }
  damagePlayer(amount,kind='bullet'){
   if(this.invincible)return;
   const wasAlive=this.playerAlive;
   super.damagePlayer(amount,kind);
   if(wasAlive&&!this.playerAlive){
-   $('campFinishTitle').textContent='你已陣亡 · 第 '+this.wave+' 波 · 擊殺 '+this.kills;
+   // CampCombat preserves the falling animation for 2.1 seconds; populate
+   // the report NOW, and its existing timer will reveal this same panel.
+   renderBattleSettlement(this,{manual:false});
+   $('battleReportNow').hidden=true;
   }
  }
  drawAllyWeapons(now){
