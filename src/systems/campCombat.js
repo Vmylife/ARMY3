@@ -479,6 +479,10 @@ export class CampCombat{
  meleeLineClear(a,b,padding=.11){return lineClear(a,b,padding)}
  shotClearance(pos){return staticClearance(pos)}
  aimToleranceDegrees(){return 7.5}
+ // Overridden by the independent battle lab; normal camp gunplay is unchanged.
+ playerBulletDamage(){return this.weapon==='rifle'?40:25}
+ playerShotInterval(){return this.weapon==='rifle'?.125:.25}
+ autoRifle(){return true}
  onPlayerBulletBlocked(b,impact){}
  tryAttack(){
   if(this.gameOver||this.interactionMode||this.wheelOpen||this.playerDown>0||this.playerRise>0||
@@ -505,8 +509,8 @@ export class CampCombat{
   const z=p.z+forward.z*muzzle+Math.sin(this.player.angle)*.085;
   this.bullets.push({id:this.seq++,owner:'player',x,z,dx:Math.sin(aim),dz:Math.cos(aim),
    angle:aim,targetId:target?.id??null,
-   range:28,speed:49,damage:this.weapon==='rifle'?40:25});
-  this.playerCooldown=this.weapon==='rifle'?.125:.25;
+   range:28,speed:49,damage:this.playerBulletDamage()});
+  this.playerCooldown=this.playerShotInterval();
   this.playerShotAt=performance.now();
   this.player.shotUntil=this.playerShotAt+(this.weapon==='rifle'?100:115);
   shotSound(this.weapon==='rifle');
@@ -769,7 +773,7 @@ export class CampCombat{
    }
   }
   if(!this.interactionMode&&(this.attackKeyboard||this.attackPointer!==null)&&
-      this.weapon==='rifle'&&!this.wheelOpen)this.tryAttack();
+      this.weapon==='rifle'&&this.autoRifle()&&!this.wheelOpen)this.tryAttack();
   if(!this.provoked||this.gameOver){this.updateBullets(dt);return}
   const stage=weaponForKills(this.kills);
   const radius=chaseRadius(this.kills);

@@ -1,6 +1,6 @@
 // ARMY3 final-battle talent runtime & in-lab selector. Never changes the
 // official trait awards, honor wallet or any other minigame.
-import {TRAITS,GROUPS} from './traitCatalog.js?v=2';
+import {TRAITS,GROUPS} from './traitCatalog.js?v=3';
 import {insidePerimeter} from '../map/camp.js?v=093';
 const KEY='ARMY3_battle_test_selected_traits_v1';
 const $=id=>document.getElementById(id);
@@ -42,6 +42,16 @@ export class BattlePerks{
   this.shield=this.level('已讀不回')?2:0;
   this.shieldNext=0;
   this.updateIndicator(combat);
+ }
+ setMagazine(gun,size){
+  if(!['pistol','rifle'].includes(gun))return;
+  const mag=Math.max(1,Math.trunc(size));
+  this.capacity[gun]=mag;this.ammo[gun]=mag;
+  // Level swaps replenish that gun for testing and cancel its old reload.
+  if(this.reloadWeapon===gun){this.reloadWeapon=null;this.reloadAt=0}
+  this.bonusShots[gun]=0;
+  if(this.combat?.weapon===gun)this.reloadPenaltyUntil=0;
+  if(this.combat)this.updateIndicator(this.combat);
  }
  message(msg){
   let el=$('battleTalentToast');
@@ -150,7 +160,8 @@ export class BattlePerks{
   if(this.ammo[gun]>=this.capacity[gun]){
    if(manual)this.message('彈匣已滿');return false;
   }
-  this.reloadWeapon=gun;this.reloadAt=combat.time+(gun==='rifle'?1.6:1.3);
+  this.reloadWeapon=gun;
+  this.reloadAt=combat.time+(combat.weaponLab?.stats(gun)?.reload??(gun==='rifle'?1.6:1.3));
   this.message(gun==='rifle'?'更換步槍彈匣…':'更換手槍彈匣…');
   this.updateIndicator(combat);return true;
  }
@@ -334,7 +345,7 @@ export class BattlePerks{
   }
   let d=amount*(1-[0,.08,.15,.22][this.level('金鐘罩')]);
   if(combat.hp<30)d*=1+this.level('吃土專家')*.1;
-  const reflect=[0,.25,.40,.60][this.level('反彈訊息')];
+  const reflect=[0,.10,.20,.30][this.level('反彈訊息')];
   if(kind==='bullet'&&!this.reflecting&&Math.random()<reflect){
    const target=combat.enemies.filter(n=>!n.combatDead&&!n.incoming&&
     dist(n.pos,combat.player.pos)<20&&combat.shotLineClear(combat.player.pos,n.pos,.12))

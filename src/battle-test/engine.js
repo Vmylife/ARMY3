@@ -1,12 +1,13 @@
 // ARMY3 enemy-wave sandbox, intentionally NOT imported by the main camp.
 // Uses the approved punch, gun, knockdown and stand-up combat mechanics.
-import {CampCombat,COMBAT_RISE_SECONDS,COMBAT_DOWN_SECONDS} from '../systems/campCombat.js?v=15';
+import {CampCombat,COMBAT_RISE_SECONDS,COMBAT_DOWN_SECONDS} from '../systems/campCombat.js?v=16';
 import {moveNpc,canOccupy,bulletClearance,bulletLineClear,meleeLineClear} from './battleCollision.js?v=1';
 import {battleRoute,battleClear} from './battleNav.js?v=3';
 import {waveEntry} from './breaches.js?v=5';
 import {insidePerimeter} from '../map/camp.js?v=093';
 import {renderBattleSettlement} from './settlement.js?v=3';
-import {BattlePerks} from './talentLab.js?v=2';
+import {BattlePerks} from './talentLab.js?v=3';
+import {BattleWeaponLevels} from './weaponLab.js?v=1';
 const $=id=>document.getElementById(id);
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
@@ -45,11 +46,13 @@ export class ArmyBattleCombat extends CampCombat{
   // Normal hits never launch a reaction clip. Keep only a tiny feedback pause
   // and the already-supported red screen flash (no extra UI layer).
   this.lastPlayerHitFlashAt=-Infinity;
-  this.perks=window.armyBattleTalents||new BattlePerks();this.perks.attach(this);
+  this.perks=window.armyBattleTalents||new BattlePerks();
+  this.weaponLab=window.armyBattleWeapons||new BattleWeaponLevels();
   this.totalSpawns=0;this.defenderKills=0;this.enemies=enemies;
   this.createEnemy=createEnemy;
   this.nameplateState='';this.lastWaveCount=-1;
   this.interactionMode=false;this.weapon='rifle';this.provoked=false;
+  this.perks.attach(this);this.weaponLab.attach(this);
   this.invincible=false;this.maxShooters=7;
   this.refreshHUD(true);
   this.root.querySelector('#campModeSwitch').hidden=true;
@@ -89,6 +92,11 @@ export class ArmyBattleCombat extends CampCombat{
  get liveAllies(){return this.allies.filter(a=>!a.combatDead)}
  refreshHUD(force=false){
   super.refreshHUD(force);
+  // The inherited label says '連發' for every rifle. Lower rifle levels
+  // are actually semi-auto and must not misleadingly say full auto.
+  const fireLabel=$('campAttackText');
+  if(fireLabel&&this.weapon==='rifle')
+   fireLabel.textContent=(this.weaponLab?.level('rifle')||5)<3?'半自動':'連發';
   if(this.running){
    const el=$('campAlert');if(el)el.textContent='敵軍來襲';
    const k=$('campKills');if(k)k.textContent='擊殺 '+this.kills;
@@ -115,6 +123,13 @@ export class ArmyBattleCombat extends CampCombat{
  meleeLineClear(a,b,padding=.11){return meleeLineClear(a,b,padding)}
  shotClearance(pos){return bulletClearance(pos)}
  aimToleranceDegrees(){return this.perks?this.perks.aimAngle():7.5}
+ playerBulletDamage(){
+  return this.weaponLab?.stats(this.weapon)?.damage??super.playerBulletDamage();
+ }
+ playerShotInterval(){
+  return this.weaponLab?.stats(this.weapon)?.interval??super.playerShotInterval();
+ }
+ autoRifle(){return this.weaponLab?.level('rifle')>=3}
  onPlayerBulletBlocked(b,impact){this.perks?.onBlockedBullet(this,b,impact)}
  canTalentStand(p){return canOccupy(p,.4)}
  moveTalentEnemy(n,dx,dz){

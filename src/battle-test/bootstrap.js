@@ -1,5 +1,7 @@
 // Independent battle-test loader. No modification to the normal ARMY3 homepage.
-import {initTalentLab} from './talentLab.js?v=2';
+import {initTalentLab} from './talentLab.js?v=3';
+import {initWeaponLab} from './weaponLab.js?v=1';
+initWeaponLab();
 initTalentLab();
 const $=id=>document.getElementById(id);
 let started=false;
@@ -15,12 +17,12 @@ $('battleStart').addEventListener('click',async()=>{
  };
  window.armyLoadComplete=()=>{
   $('battleLoadBar').style.width='100%';
-  $('battleIntro').hidden=true;$('battleHUD').hidden=false;$('battleGodToggle').hidden=false;$('battleReportNow').hidden=false;$('battleGrenade').hidden=false;$('battleReload').hidden=false;
+  $('battleIntro').hidden=true;$('battleHUD').hidden=false;$('battleGodToggle').hidden=false;$('battleReportNow').hidden=false;$('battleGrenade').hidden=false;$('battleReload').hidden=false;$('battleWeaponLab').hidden=false;
  };
  window.armyLoadFailure=err=>{
   $('battleIntro').hidden=true;$('errorText').textContent=String(err?.message||err);
   $('fatal').hidden=false;
  };
- try{await import('./main.js?v=18')}
+ try{await import('./main.js?v=19')}
  catch(err){console.error('敵軍來襲測試版載入失敗',err);window.armyLoadFailure(err)}
 });

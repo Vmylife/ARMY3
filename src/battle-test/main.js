@@ -12,7 +12,7 @@ import {initWorldMap} from '../ui/worldMap.js?v=093';
 import {setupInput} from '../ui/input.js?v=062';
 import {options} from '../systems/settings.js?v=060';
 import {createCampNPCs,updateCampNPCs} from '../systems/npcLife113.js?v=128';
-import {createArmyBattle,BATTLE_SPAWN} from './engine.js?v=18';
+import {createArmyBattle,BATTLE_SPAWN} from './engine.js?v=19';
 
 const $=id=>document.getElementById(id);
 const debug=new URLSearchParams(location.search).has('debug');
@@ -177,7 +177,7 @@ async function boot(){
     const dt=entered?Math.min(.05,Math.max(0,(now-last)/1000)):0;last=now;
     if(debug){fpsFrames++;if(now-fpsSince>=1000){measuredFps=Math.round(fpsFrames*1000/(now-fpsSince));fpsFrames=0;fpsSince=now;}}
     const mapOpen=worldMap.isOpen();
-    const talentOpen=!!$('battleTalentLab')?.open;
+    const talentOpen=!!$('battleTalentLab')?.open||!!$('battleWeaponLab')?.open;
     combat.root.style.visibility=mapOpen?'hidden':'visible';
     const stick=(mapOpen||talentOpen||!combat.playerAlive||combat.playerDown>0||combat.playerRise>0||
      combat.playerHurt>0||(combat.weapon==='fists'&&combat.playerAttack>0))

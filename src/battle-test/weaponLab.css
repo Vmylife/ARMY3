@@ -1,0 +1,31 @@
+/* Weapon level tester in the isolated battle lab. */
+#battleWeaponLab{position:fixed;z-index:36;left:max(9px,env(safe-area-inset-left));
+ top:calc(env(safe-area-inset-top) + 142px);width:min(355px,calc(100vw - 18px));
+ border:1px solid #aab9af;border-radius:12px;box-shadow:0 7px 23px #09231838;
+ box-sizing:border-box;background:#fdfefbf4;color:#20422e;font:12px/1.4 system-ui,-apple-system,"PingFang TC",sans-serif;
+ touch-action:pan-y;user-select:none}
+#battleWeaponLab>summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;
+ align-items:center;gap:8px;padding:10px 12px;font-weight:900;touch-action:manipulation}
+#battleWeaponLab>summary::-webkit-details-marker{display:none}
+#battleWeaponLab>summary::after{content:"▾";margin-left:auto}
+#battleWeaponLab[open]>summary::after{content:"▴"}
+#battleWeaponSummary{color:#65796a;font-size:10px;font-weight:800}
+#battleWeaponBody{padding:0 12px 12px;max-height:min(60dvh,475px);overflow-y:auto;
+ -webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.bwl-intro{font-size:10px;line-height:1.6;color:#75867a;margin:0 0 8px}
+.bwl-section{border-top:1px solid #e3e9e1;padding:9px 0 4px}
+.bwl-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.bwl-head strong{font-size:13px;color:#264a35}
+.bwl-head select{min-width:90px;border-radius:8px;border:1px solid #bacbbb;
+ padding:7px 9px;background:#fff;color:#21412e;font:800 12px system-ui}
+.bwl-stats{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:9px 0 2px}
+.bwl-metric{display:flex;justify-content:space-between;gap:5px;align-items:center;
+ border:1px solid #e4e9e3;background:#f6f9f5;padding:8px;border-radius:8px}
+.bwl-metric small{font-size:10px;color:#758477}
+.bwl-metric strong{font-size:12px;color:#274b34}
+.bwl-mode{grid-column:1/-1;text-align:center;font-size:10px;font-weight:900;
+ color:#557059;margin:2px 0 0}
+#battleWeaponLab[open]{z-index:37}
+body.battle-report-open #battleWeaponLab{display:none!important}
+@media(max-height:620px){#battleWeaponLab{top:calc(env(safe-area-inset-top) + 70px)}
+ #battleWeaponBody{max-height:58dvh}}
