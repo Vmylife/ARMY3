@@ -1,79 +1,159 @@
-/* ARMY3 independent battle result: small, clear olive/gold field report. */
-#campCombatFinish.btr-active{padding:calc(10px + env(safe-area-inset-top)) 10px calc(10px + env(safe-area-inset-bottom));
- background:#081b15e9;backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
- align-items:center;justify-content:center;gap:0;box-sizing:border-box}
-#campCombatFinish.btr-active .btr-sheet{display:flex;flex-direction:column;gap:0;
- width:min(480px,100%);max-height:min(750px,calc(100dvh - 20px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
- min-height:0;overflow:hidden;box-sizing:border-box;padding:15px 14px 10px;
- background:linear-gradient(150deg,#294a38,#162e25 72%);color:#f7f0d8;
- border:1px solid #dcca9588;border-radius:18px;box-shadow:0 18px 55px #020f0aab;
- font-family:system-ui,-apple-system,"PingFang TC",sans-serif}
-#campCombatFinish.btr-active .btr-head{flex:none}
-.btr-kicker{display:flex;justify-content:space-between;gap:8px;font-size:10px;letter-spacing:.09em;
- font-weight:850;color:#d0dfc8}
-.btr-kicker .btr-number{color:#e5cd8f}
-#campCombatFinish .btr-title{font-size:clamp(23px,5.5vw,31px);line-height:1.25;margin:8px 0 2px;color:#f8dfa1}
-.btr-subtitle{font-size:11px;line-height:1.35;color:#c1d3bd;margin:0 0 10px}
-.btr-scoreband{display:grid;grid-template-columns:1fr 1.1fr;gap:9px;border:1px solid #dbc68a66;
- border-radius:13px;background:#133426c7;padding:11px 12px;margin-bottom:12px}
-.btr-score,.btr-medals{display:flex;flex-direction:column;gap:2px;min-width:0}
-.btr-medals{border-left:1px solid #d2c29355;padding-left:15px}
-.btr-score>small,.btr-medals>small{font-size:10px;font-weight:850;color:#cee0c9}
-#campCombatFinish .btr-score>strong,#campCombatFinish .btr-medals>strong{font-weight:950;
- font-size:clamp(24px,6.7vw,35px);color:#ffe1a0;line-height:1.15;white-space:nowrap}
-.btr-score>span,.btr-medals>span{font-size:10px;color:#d6dfc7}
-.btr-scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
- padding:0 1px 6px;touch-action:pan-y;user-select:none}
-.btr-sectiontitle{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:4px 0 8px}
-#campCombatFinish .btr-sectiontitle>strong{font-size:13px;color:#f5e2ae}
-.btr-sectiontitle>span{font-size:10px;color:#bccebb}
+/* FINAL BATTLE / PAPER REPORT — white, sparse, not a minigame green card */
+#campCombatFinish.btr-active{
+ position:fixed;inset:0;z-index:40;box-sizing:border-box;
+ display:flex;align-items:center;justify-content:center;
+ padding:calc(9px + env(safe-area-inset-top)) max(9px,env(safe-area-inset-right))
+   calc(9px + env(safe-area-inset-bottom)) max(9px,env(safe-area-inset-left));
+ background:#eff1ec;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+ font-family:-apple-system,BlinkMacSystemFont,"PingFang TC",system-ui,sans-serif;
+ color:#202e24;touch-action:auto;
+}
+#campCombatFinish.btr-active .btr-sheet{
+ position:relative;display:flex;flex-direction:column;gap:0;
+ box-sizing:border-box;width:min(530px,100%);min-height:0;
+ max-height:calc(100dvh - 18px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+ border-radius:15px;overflow:hidden;
+ border:1px solid #e3e5da;
+ background:linear-gradient(151deg,#fff 0%,#fff 60%,#fbfcfa 100%);
+ box-shadow:0 16px 52px #25362a24;
+}
+#campCombatFinish.btr-active .btr-sheet::before{
+ content:"";position:absolute;right:-38px;top:-60px;pointer-events:none;
+ width:158px;height:230px;transform:rotate(36deg);background:#e5e9df54;
+ clip-path:polygon(0 0,42% 0,42% 100%,0 100%);
+}
+.btr-head{padding:19px 22px 0;flex:none;position:relative;z-index:1}
+.btr-kicker{display:flex;align-items:center;justify-content:space-between;gap:10px;
+ font-size:9px;letter-spacing:.14em;color:#6d795f;font-weight:800}
+.btr-kicker .btr-number{font-size:8px;letter-spacing:.08em;color:#a3a99d;text-align:right}
+.btr-stars{text-align:center;letter-spacing:10px;font-size:11px;color:#ad9253;margin:10px 0 2px}
+#campCombatFinish .btr-title{text-align:center;margin:3px 0 2px;font-size:clamp(26px,7vw,34px);
+ color:#172d21;letter-spacing:.065em;line-height:1.26;font-weight:950}
+.btr-subtitle{text-align:center;margin:3px 0 11px;font-size:11px;
+ font-weight:750;color:#7a867b}
+.btr-gradehero{display:grid;grid-template-columns:132px 1fr;gap:13px;align-items:center;
+ margin:0 0 10px;min-height:120px}
+.btr-gradepanel{min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.btr-gradebadge{width:95px;height:95px;box-sizing:border-box;border-radius:50%;
+ border:2px solid #b49a65;outline:4px solid #f1eee6;
+ background:radial-gradient(circle at 38% 27%,#fffdf6,#f2ede2);
+ box-shadow:inset 0 0 0 5px #faf8f2,0 3px 12px #99865719;
+ position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0}
+.btr-gradebadge::before,.btr-gradebadge::after{
+ content:"❧";position:absolute;top:40px;font-size:24px;color:#b39a67}
+.btr-gradebadge::before{left:-28px;transform:rotate(-70deg)}
+.btr-gradebadge::after{right:-28px;transform:scaleX(-1) rotate(-70deg)}
+.btr-grade-star{font-size:10px;line-height:1;color:#aa8a4d}
+#campCombatFinish.btr-active .btr-gradebadge .btr-grade-value{
+ font:900 57px/.87 Georgia,"Times New Roman",serif;display:block;
+ color:#9e7e3e;letter-spacing:-.07em;padding-right:3px}
+.btr-grade-unit{font:700 8px/1.3 system-ui,sans-serif;letter-spacing:.20em;color:#b7a171}
+.btr-graderank{font-size:10px;font-weight:900;color:#334b34;margin-top:8px}
+.btr-heroquote{display:flex;flex-direction:column;gap:8px;border-left:1px solid #dfdfd7;
+ padding-left:19px;justify-content:center;min-height:85px}
+.btr-hero-label{font-size:10px;color:#81897d;font-weight:750}
+#campCombatFinish.btr-active .btr-hero-title{
+ display:block;font-size:clamp(16px,4.6vw,22px);line-height:1.4;color:#1e3928;
+ letter-spacing:.02em;font-weight:900}
+.btr-hero-wave{font-size:11px;font-weight:750;color:#8b784e}
+.btr-medalband{display:flex;align-items:center;gap:11px;border-radius:10px;
+ background:linear-gradient(105deg,#244834 0%,#355a40 61%,#3e6449 100%);
+ color:#fff8e5;padding:11px 14px;margin-bottom:15px;box-shadow:0 3px 7px #1e392423}
+.btr-medal-emblem{width:37px;height:37px;flex:none;display:grid;place-items:center;
+ background:#f3dfab;color:#37553a;border-radius:50%;border:2px solid #ccb26f;
+ box-shadow:inset 0 0 0 3px #fdf5e2;font-size:24px;line-height:1}
+.btr-medal-label{display:flex;flex-direction:column;gap:3px;min-width:0}
+.btr-medal-label span{font-size:14px;font-weight:900;letter-spacing:.08em}
+.btr-medal-label small{font-size:9px;color:#d8e2d4}
+#campCombatFinish.btr-active .btr-medal-number{margin-left:auto;font-size:36px;
+ line-height:1;font-weight:950;color:#f8d989;white-space:nowrap}
+.btr-scroll{position:relative;z-index:1;min-height:0;flex:1;
+ overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+ padding:0 22px 14px;touch-action:pan-y}
+.btr-sectiontitle{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+ border-bottom:1px solid #e5e7df;padding-bottom:7px;margin:2px 0 9px}
+#campCombatFinish.btr-active .btr-sectiontitle strong{font-size:14px;color:#1c3426;font-weight:950}
+.btr-sectiontitle span{font-size:10px;color:#929c90;font-weight:750}
 .btr-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
-.btr-stat{display:flex;flex-direction:column;gap:3px;min-width:0;padding:9px 4px 8px;text-align:center;
- background:#0d281d94;border:1px solid #cdd6b234;border-radius:10px}
-.btr-stat small{color:#bdcdb9;font-size:10px}
-#campCombatFinish .btr-stat strong{color:#f7f2dc;font-size:16px;line-height:1.2;font-weight:900}
-.btr-quote{display:block;border-left:3px solid #e5c789;background:#102b20b8;border-radius:0 9px 9px 0;
- color:#f8e5bb;font-size:12px;font-weight:750;line-height:1.65;margin:12px 0;padding:10px 11px}
-.btr-achgrid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
-.btr-ach{min-height:56px;display:flex;align-items:center;position:relative;gap:8px;
- background:#254637;border:1px solid #d2c48a56;padding:8px;border-radius:10px;box-sizing:border-box}
-.btr-achicon{font-size:23px;flex:none}
+.btr-stat{display:flex;flex-direction:column;align-items:center;justify-content:center;
+ min-width:0;gap:2px;text-align:center;border-radius:9px;padding:9px 4px;
+ background:#f7f8f5;border:1px solid #e6e8e0}
+.btr-stat-icon{font-size:18px;height:23px;color:#647b67;font-weight:900}
+.btr-stat small{font-size:10px;font-weight:750;color:#798579}
+#campCombatFinish.btr-active .btr-stat strong{font-size:clamp(13px,3.7vw,18px);
+ font-weight:950;color:#26372a;line-height:1.25;white-space:nowrap}
+.btr-quote{position:relative;border:1px solid #e3e5dc;border-radius:11px;
+ background:linear-gradient(125deg,#fafaf7 0%,#f2f5ef 100%);padding:12px 14px;
+ margin:13px 0 15px;min-height:0}
+#campCombatFinish.btr-active .btr-quote-label{font-size:12px;color:#3a5941;
+ font-weight:900;letter-spacing:.04em}
+.btr-quote-copy{font-size:13px;color:#2c3c2f;font-weight:800;line-height:1.65;
+ margin:8px 0 1px;padding-right:4px}
+.btr-quote::after{content:"✦";position:absolute;right:12px;top:8px;font-size:17px;color:#cfbe93}
+.btr-achgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.btr-ach{position:relative;display:flex;align-items:center;gap:10px;min-height:63px;
+ background:#fcfcfa;border:1px solid #e6e6dc;border-radius:10px;padding:9px;box-sizing:border-box}
+.btr-achicon{font-size:24px;flex:none;filter:saturate(.75)}
 .btr-achtext{display:flex;flex-direction:column;gap:3px;min-width:0}
-#campCombatFinish .btr-achtext strong{font-size:11px;color:#f8e6b5;line-height:1.3}
-.btr-achtext small{font-size:9px;color:#c5d0bf;line-height:1.35}
-.btr-new{position:absolute;top:-5px;right:-3px;background:#efd28c;color:#1e4030;
- border-radius:6px;font-size:8px;font-weight:950;padding:2px 4px}
-.btr-ach-empty{font-size:11px;color:#d3dccc;grid-column:1/-1}
-.btr-gallery{margin-top:10px;border:1px solid #b3bca65c;border-radius:9px;background:#122b21;padding:0}
-.btr-gallery-toggle{font-size:11px;font-weight:900;color:#eed395;cursor:pointer;padding:10px}
-.btr-gallery-grid{display:grid;grid-template-columns:1fr;gap:6px;padding:0 9px 10px}
-.btr-book-entry{display:grid;grid-template-columns:24px 1fr auto;gap:7px;align-items:center;border-top:1px solid #f7efca18;padding-top:6px}
-.btr-book-entry.locked{opacity:.54}
+#campCombatFinish.btr-active .btr-achtext strong{font-size:11px;line-height:1.3;
+ font-weight:900;color:#293d2d}
+.btr-achtext small{font-size:9px;line-height:1.4;color:#828a81}
+.btr-new{position:absolute;right:4px;top:3px;font-size:8px;font-weight:950;
+ border-radius:4px;background:#e7c977;color:#33422f;padding:2px 3px}
+.btr-ach-empty{grid-column:1/-1;color:#7b867c;font-size:11px}
+.btr-gallery{margin-top:10px;border:1px solid #e3e5df;border-radius:9px;background:#f8faf6}
+.btr-gallery-toggle{padding:11px;font-size:11px;font-weight:900;color:#355842;cursor:pointer;
+ list-style-position:inside}
+.btr-gallery-grid{display:grid;grid-template-columns:1fr;gap:5px;padding:0 11px 12px}
+.btr-book-entry{display:grid;grid-template-columns:27px minmax(0,1fr) auto;
+ gap:8px;align-items:center;border-top:1px solid #e3e8de;padding:8px 0 0}
+.btr-book-entry.locked{opacity:.52}
 .btr-book-text{display:flex;flex-direction:column;gap:3px}
-#campCombatFinish .btr-book-text strong{font-size:11px;color:#f3e3b7}
-.btr-book-text small{font-size:10px;color:#cfdbcc}
-.btr-rarity{font-size:9px;color:#e0ce9c}
-.btr-foot{flex:none;border-top:1px solid #d5cc9460;padding-top:8px;margin-top:8px}
-.btr-note{font-size:9px;line-height:1.35;color:#bbccb7;margin:0 0 9px}
-.btr-actions{display:flex;gap:8px}
+#campCombatFinish.btr-active .btr-book-text strong{font-size:11px;color:#324737}
+.btr-book-text small{font-size:10px;color:#748177}
+.btr-rarity{font-size:9px;color:#968058}
+.btr-foot{position:relative;z-index:1;flex:none;padding:9px 22px max(13px,env(safe-area-inset-bottom));
+ background:#fff;border-top:1px solid #e6e8e0}
+.btr-note{font-size:9px;line-height:1.35;color:#949e94;margin:0 0 9px;text-align:center}
+.btr-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 #campCombatFinish.btr-active .btr-actions button,
-#campCombatFinish.btr-active .btr-actions a{flex:1;display:flex;align-items:center;justify-content:center;
- text-align:center;border-radius:10px;min-height:44px;padding:10px 7px;box-sizing:border-box;
- font-weight:900;font-size:13px;text-decoration:none}
-#campCombatFinish.btr-active .btr-actions button{background:#eed18b;color:#1a3c2a;border:0}
-#campCombatFinish.btr-active .btr-actions a{color:#f3e8c8;border:1px solid #dfd5b27c;background:#2e503f}
+#campCombatFinish.btr-active .btr-actions a{display:flex;align-items:center;justify-content:center;
+ text-align:center;min-width:0;min-height:45px;padding:9px 7px;box-sizing:border-box;
+ border-radius:11px;font-size:13px;font-weight:900;text-decoration:none}
+#campCombatFinish.btr-active .btr-actions button{color:#294736;background:#fff;
+ border:1.5px solid #42644b}
+#campCombatFinish.btr-active .btr-actions a{color:#fff;background:#2d523b;
+ border:1.5px solid #2d523b}
 #battleReportNow{position:fixed;top:calc(env(safe-area-inset-top) + 6px);
  left:calc(env(safe-area-inset-left) + 73px);min-width:51px;height:30px;z-index:12;
  background:#17392dd9;border:1px solid #d8c9947b;border-radius:9px;color:#f6e0b1;
  font:850 11px system-ui,-apple-system,"PingFang TC",sans-serif;touch-action:manipulation}
 #battleReportNow[hidden]{display:none!important}
-@media(max-width:380px){#campCombatFinish.btr-active .btr-sheet{padding:11px 10px 8px}
- #campCombatFinish .btr-medals>strong{font-size:25px}
- .btr-achgrid{grid-template-columns:1fr 1fr}
- .btr-ach{padding:6px;gap:4px}}
-@media(max-height:620px){#campCombatFinish.btr-active .btr-sheet{padding:8px 10px 6px}
- .btr-scoreband{padding:6px 9px;margin-bottom:7px}
+@media(max-width:375px){
+ .btr-head{padding:14px 14px 0}
+ .btr-scroll{padding:0 14px 9px}
+ .btr-foot{padding:8px 14px 12px}
+ .btr-gradehero{grid-template-columns:115px 1fr;gap:7px;min-height:106px}
+ .btr-gradebadge{height:82px;width:82px}
+ #campCombatFinish.btr-active .btr-gradebadge .btr-grade-value{font-size:47px}
+ .btr-heroquote{padding-left:12px}
+ .btr-medalband{padding:9px 12px}
+ .btr-stat{padding:7px 3px}
+ .btr-ach{padding:7px;gap:6px}
+}
+@media(max-height:640px){
+ .btr-head{padding-top:11px}
+ .btr-stars{margin:4px 0 0}
  .btr-subtitle{margin-bottom:5px}
- .btr-stat{padding:5px 3px}
- .btr-quote{margin:7px 0}}
-@media(prefers-reduced-motion:reduce){#campCombatFinish.btr-active *{scroll-behavior:auto!important}}
+ .btr-gradehero{min-height:82px;margin-bottom:7px}
+ .btr-gradebadge{height:74px;width:74px}
+ #campCombatFinish.btr-active .btr-gradebadge .btr-grade-value{font-size:40px}
+ .btr-gradebadge::before,.btr-gradebadge::after{top:29px}
+ .btr-medalband{padding:7px 12px;margin-bottom:8px}
+ .btr-quote{margin:8px 0}
+ .btr-stat{padding:6px 3px}
+ .btr-foot{padding-top:6px}
+}
+@media(prefers-reduced-motion:reduce){
+ #campCombatFinish.btr-active *{scroll-behavior:auto!important}
+}

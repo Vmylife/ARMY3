@@ -5,7 +5,7 @@ import {moveNpc,staticClearance,canOccupy} from '../map/navCollision109.js?v=124
 import {battleRoute,battleClear} from './battleNav.js?v=2';
 import {waveEntry} from './breaches.js?v=5';
 import {insidePerimeter} from '../map/camp.js?v=093';
-import {renderBattleSettlement} from './settlement.js?v=1';
+import {renderBattleSettlement} from './settlement.js?v=2';
 const $=id=>document.getElementById(id);
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));

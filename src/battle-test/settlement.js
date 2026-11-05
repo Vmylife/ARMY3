@@ -1,5 +1,5 @@
-// Standalone ARMY3 combat after-action report. Matches blanket/shooting/song
-// olive-gold reports without touching official progression storage.
+// Standalone ARMY3 white final-battle dossier. Intentionally distinct from
+// the olive-green minigame reports; official medal storage remains untouched.
 const KEY='ARMY3_battle_test_achievements_v1';
 const $=id=>document.getElementById(id);
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
@@ -63,9 +63,9 @@ function safelyLoad(){
  catch{return new Set()}
 }
 function safelySave(set){try{localStorage.setItem(KEY,JSON.stringify([...set]))}catch{}}
-function line(label,value){
+function line(label,value,glyph){
  const div=make('div','btr-stat');
- div.append(make('small','',label),make('strong','',String(value)));
+ div.append(make('span','btr-stat-icon',glyph),make('small','',label),make('strong','',String(value)));
  return div;
 }
 export function calculateBattleStats(combat,manual=false){
@@ -92,35 +92,50 @@ export function renderBattleSettlement(combat,{manual=false}={}){
  for(const a of earned)known.add(a.id);
  safelySave(known);
  const shell=make('article','btr-sheet');
- shell.setAttribute('aria-label','軍營保衛戰結算報告');
+ shell.setAttribute('aria-label','最終戰役結算報告');
  shell.setAttribute('role','dialog');
  shell.setAttribute('aria-modal','true');
  const head=make('header','btr-head');
  const kicker=make('div','btr-kicker');
- kicker.append(make('span','', '國軍戰場紀錄 / 結算報告'),make('span','btr-number','NO. C-005'));
- title.textContent=manual?'防守結束':'防線失守';
+ kicker.append(make('span','btr-kicker-label','FINAL BATTLE REPORT'),
+  make('span','btr-number','ARMY / AFTER ACTION'));
+ const stars=make('div','btr-stars','✦  ✦  ✦');
+ title.textContent='最終戰役';
  title.className='btr-title';
- head.append(kicker,title,make('p','btr-subtitle',manual?'測試任務已結束 · 戰績結算':'陣亡後自動結算 · 戰績留存'));
- const banner=make('section','btr-scoreband');
- const left=make('div','btr-score');
- left.append(make('small','','戰鬥評級'),make('strong','',s.grade+' 級'),make('span','',titleOf(s)));
- const right=make('div','btr-medals');
- right.append(make('small','','本場榮譽勳章'),make('strong','','🎖 '+s.medals),make('span','','按個人擊殺試算'));
- banner.append(left,right);head.append(banner);
+ const state=make('p','btr-subtitle',manual?'防守任務結束 · 本場戰績':'防線失守 · 陣亡戰績');
+ const banner=make('section','btr-gradehero');
+ const left=make('div','btr-gradepanel');
+ const gradeBadge=make('div','btr-gradebadge');
+ gradeBadge.append(make('span','btr-grade-star','★'),make('strong','btr-grade-value',s.grade),
+  make('span','btr-grade-unit','GRADE'));
+ left.append(gradeBadge,make('div','btr-graderank',titleOf(s)));
+ const right=make('div','btr-heroquote');
+ right.append(make('small','btr-hero-label',manual?'防守任務結束':'任務結果：陣亡'),
+  make('strong','btr-hero-title',manual?'完成本次演練':'榮譽留在戰場'),
+  make('span','btr-hero-wave','最高抵達第 '+s.wave+' 波'));
+ banner.append(left,right);
+ const medals=make('section','btr-medalband');
+ medals.append(make('span','btr-medal-emblem','✦'));
+ const medalLabel=make('div','btr-medal-label');
+ medalLabel.append(make('span','','榮譽勳章'),make('small','','個人擊殺獎勵 · 試算'));
+ medals.append(medalLabel,make('strong','btr-medal-number',String(s.medals)));
+ head.append(kicker,stars,title,state,banner,medals);
  const contents=make('div','btr-scroll');
  const statsHead=make('div','btr-sectiontitle');
- statsHead.append(make('strong','','作戰數據'),make('span','',s.god?'無敵測試模式':'一般防守模式'));
+ statsHead.append(make('strong','','戰績總覽'),make('span','',s.god?'無敵測試模式':'一般防守模式'));
  contents.append(statsHead);
  const grid=make('section','btr-stats');
  const mm=String(Math.floor(s.seconds/60)).padStart(2,'0'),ss=String(s.seconds%60).padStart(2,'0');
- grid.append(line('個人殺敵',s.kills+' 人'),line('友軍擊殺',s.allyKills+' 人'),
-  line('最高波次','第 '+s.wave+' 波'),line('存活時間',mm+':'+ss),
-  line('剩餘友軍',s.allies+' / 5'),line('敵軍累計投入',s.spawned+' 人'));
+ grid.append(line('個人殺敵',s.kills+' 人','◎'),line('最高波次','第 '+s.wave+' 波','≋'),
+  line('存活時間',mm+':'+ss,'◷'),line('剩餘友軍',s.allies+' / 5','♟'),
+  line('友軍擊殺',s.allyKills+' 人','✚'),line('敵軍總投入',s.spawned+' 人','◇'));
  contents.append(grid);
- const qu=make('blockquote','btr-quote','「'+quoteOf(s)+'」');
+ const qu=make('blockquote','btr-quote');
+ qu.append(make('strong','btr-quote-label','戰場評語'),
+   make('p','btr-quote-copy','「'+quoteOf(s)+'」'));
  contents.append(qu);
  const achHead=make('div','btr-sectiontitle');
- achHead.append(make('strong','','本次達成成就'),make('span','',earned.length+' 項達成 · '+fresh.length+' 項 NEW'));
+ achHead.append(make('strong','','本次達成'),make('span','',earned.length+' 項達成 · '+fresh.length+' 項 NEW'));
  contents.append(achHead);
  const achGrid=make('div','btr-achgrid');
  const sorted=[...earned].sort((a,b)=>Number(fresh.includes(b))-Number(fresh.includes(a))||ORDER[a.rarity]-ORDER[b.rarity]);
@@ -136,7 +151,7 @@ export function renderBattleSettlement(combat,{manual=false}={}){
  if(!earned.length)achGrid.append(make('p','btr-ach-empty','這次還沒解鎖成就，班長說不急，紅軍還會再來。'));
  contents.append(achGrid);
  const gallery=make('details','btr-gallery');
- const summary=make('summary','btr-gallery-toggle','🏅 成就圖鑑　'+known.size+' / '+ACHIEVEMENTS.length);
+ const summary=make('summary','btr-gallery-toggle','查看全部成就圖鑑　'+known.size+' / '+ACHIEVEMENTS.length);
  gallery.append(summary);
  const book=make('div','btr-gallery-grid');
  for(const a of ACHIEVEMENTS){
@@ -149,7 +164,7 @@ export function renderBattleSettlement(combat,{manual=false}={}){
  }
  gallery.append(book);contents.append(gallery);
  const foot=make('footer','btr-foot');
- const note=make('p','btr-note','* 測試版勳章僅供戰報試算，不會寫入正式軍旅進度。');
+ const note=make('p','btr-note','測試戰報 · 勳章僅供試算，不影響正式軍旅進度。');
  foot.append(note);
  const actions=make('div','btr-actions');
  restart.textContent='重新挑戰';
