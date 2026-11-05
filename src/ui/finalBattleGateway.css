@@ -33,3 +33,19 @@ body.army-in-final-battle #armyMissionObjective{visibility:hidden}
 body:not(.army-ready) #armyMissionObjective{display:none!important}
 
 #battleAssemblyMenu p strong{display:block;margin-top:5px;color:#f2d995;font-size:11px}
+
+/* Sergeant dialogue for players with no purchased guns. */
+#battleLoanDialog{position:fixed;inset:0;z-index:40;display:grid;place-items:center;
+ padding:18px;background:#071c15d9;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+ font-family:system-ui,-apple-system,"PingFang TC",sans-serif;color:#f8edd2}
+#battleLoanDialog[hidden]{display:none!important}
+.army-loan-panel{width:min(390px,100%);box-sizing:border-box;padding:24px 23px 19px;
+ background:#1c3d30;border:1px solid #d7c28c;border-radius:18px;box-shadow:0 14px 42px #071810a6}
+.army-loan-speaker{color:#f2d38e;font-size:12px;font-weight:900;letter-spacing:.07em}
+.army-loan-panel h2{font-size:clamp(21px,6vw,26px);line-height:1.3;margin:10px 0 16px}
+.army-loan-panel p{font-size:15px;line-height:1.7;margin:0 0 10px}
+.army-loan-actions{display:grid;grid-template-columns:1.6fr 1fr;gap:9px;margin-top:21px}
+.army-loan-actions button{min-height:46px;border-radius:10px;border:1px solid #ecd596;
+ font-weight:900;touch-action:manipulation}
+#battleLoanAccept{background:#f0d17d;color:#3f3318}
+#battleLoanCancel{background:#466251;color:#fff3d8}

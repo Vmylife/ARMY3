@@ -491,7 +491,7 @@ function mountCampStatus(combat,options={}){
     ['防禦減傷',bonus.defense+'%'],
     ['目前武器',WEAPON_NAMES[combat.weapon]||'拳頭'],['軍階',RANKS[rank]]]);
    section('攻擊力（已包含軍階加成）');
-   row('拳頭',fmt(10*dmg));row('手槍',fmt(25*dmg));row('步槍',fmt(40*dmg));
+   row('拳頭',fmt(10*dmg));row('手槍',s.weapons.pistol>0?fmt(25*dmg):'未解鎖');row('步槍',s.weapons.rifle>0?fmt(40*dmg):'未解鎖');
    section('移動速度（已包含軍階加成）');
    row('走路',fmt((options.moveSpeed??4.2)*move)+' m/s');
    row('跑步',fmt((options.runSpeed??6.6)*move)+' m/s');
@@ -504,7 +504,7 @@ function mountCampStatus(combat,options={}){
   }else if(tab==='weapon'){
    section('目前裝備');
    row('手持武器',WEAPON_NAMES[combat.weapon]||'拳頭');
-   row('拳頭傷害','10');row('手槍傷害','25');row('步槍傷害','40');
+   row('拳頭傷害','10');row('手槍傷害',s.weapons.pistol>0?'25':'未解鎖');row('步槍傷害',s.weapons.rifle>0?'40':'未解鎖');
    section('武器升級');
    for(const id of ['pistol','rifle']){
     const level=clamp(s.weapons[id],0,5),spec=level?WEAPON_LEVELS[id][level-1]:null;

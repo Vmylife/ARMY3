@@ -2,6 +2,7 @@
 // Uses real six-training awards from armyProgression.run(); does not create
 // invented training completions or write the battle laboratory selections.
 import {clearCampSession} from './campSession.js?v=144';
+import {needsTemporaryPistol} from './temporaryPistol.js?v=1';
 const $=id=>document.getElementById(id);
 export const BATTLE_RENDEZVOUS={x:22.4,z:16.8}; // Ammunition depot public entry.
 const KINDS=['blanket','shooting','grenade','weed','swipe','singing'];
@@ -38,8 +39,9 @@ function yellowGroundRing(renderer){
 export function createFinalBattleGateway(renderer){
  const ring=yellowGroundRing(renderer);
  const mission=$('armyMissionObjective'),menu=$('battleAssemblyMenu'),
-  start=$('battleAssemblyStart'),cancel=$('battleAssemblyCancel');
- if(!mission||!menu||!start||!cancel)throw Error('正式戰役入口 UI 未載入');
+  start=$('battleAssemblyStart'),cancel=$('battleAssemblyCancel'),
+   loan=$('battleLoanDialog'),acceptLoan=$('battleLoanAccept'),declineLoan=$('battleLoanCancel');
+ if(!mission||!menu||!start||!cancel||!loan||!acceptLoan||!declineLoan)throw Error('正式戰役入口 UI 未載入');
  let frame=null,dismissed=false,wasNear=false,lastScan=0,lastKey='';
  let checkedAt=-Infinity,cached={count:0,ready:false,finished:false};
  function status(force=false){
@@ -62,6 +64,7 @@ export function createFinalBattleGateway(renderer){
  }
  function goHome(){
   if(frame){frame.remove();frame=null}
+  loan.hidden=true;
   window.armyMinigameActive=false;window.armyFinalBattleActive=false;
   // Clear the camp checkpoint so the homepage does not auto-resume the
   // old round. All medals/upgrades remain in persistent progression storage.
@@ -70,7 +73,7 @@ export function createFinalBattleGateway(renderer){
  }
  function begin(){
   if(!status(true).ready||frame)return;
-  menu.hidden=true;dismissed=true;
+  menu.hidden=true;loan.hidden=true;dismissed=true;
   const iframe=document.createElement('iframe');
   iframe.title='正式最終戰役：軍營保衛戰';
   iframe.id='armyOfficialBattleFrame';
@@ -91,13 +94,24 @@ export function createFinalBattleGateway(renderer){
   if(!frame||event.origin!==location.origin||event.source!==frame.contentWindow)return;
   if(event.data?.type==='ARMY3_OFFICIAL_BATTLE_CLOSE')goHome();
  });
- start.addEventListener('click',begin);
+ start.addEventListener('click',()=>{
+  if(!status(true).ready||frame)return;
+  if(needsTemporaryPistol(window.armyProgression?.state?.()?.weapons)){
+   menu.hidden=true;dismissed=true;loan.hidden=false;
+   window.armyMinigameActive=true;
+   acceptLoan.focus({preventScroll:true});
+  }else begin();
+ });
+ acceptLoan.addEventListener('click',begin);
+ declineLoan.addEventListener('click',()=>{
+  loan.hidden=true;dismissed=true;window.armyMinigameActive=false;
+ });
  cancel.addEventListener('click',()=>{menu.hidden=true;dismissed=true});
  return {
   status,
   draw(){if(status().ready)ring()},
   update(playerPos,blocked=false){
-   if(frame||blocked){menu.hidden=true;return}
+   if(frame||blocked||!loan.hidden){menu.hidden=true;return}
    const now=performance.now();
    if(now-lastScan<240)return;lastScan=now;
    if(!status().ready){menu.hidden=true;return}
@@ -106,6 +120,7 @@ export function createFinalBattleGateway(renderer){
    if(distance<=2.65&&!dismissed&&!wasNear){wasNear=true;menu.hidden=false}
   },
   interact(playerPos,blocked=false){
+   if(!loan.hidden)return true;
    if(frame||blocked||!status(true).ready||near(playerPos,BATTLE_RENDEZVOUS)>2.95)return false;
    dismissed=false;wasNear=true;menu.hidden=false;return true;
   },

@@ -1,6 +1,7 @@
 // Shared 3D battle scene: sandbox laboratory OR official campaign mission.
 import {initTalentLab} from './talentLab.js?v=6';
 import {initWeaponLab} from './weaponLab.js?v=3';
+import {needsTemporaryPistol} from '../systems/temporaryPistol.js?v=1';
 const $=id=>document.getElementById(id);
 const OFFICIAL=new URLSearchParams(location.search).get('official')==='1';
 let authorised=false;
@@ -8,13 +9,16 @@ if(OFFICIAL){
  try{
   const parent=window.parent!==window?window.parent.armyProgression:null;
   const run=parent?.run(),results=parent?.trainingRewards?.()||[];
+   const ownedWeapons={...parent?.state?.()?.weapons};
+   const temporaryPistol=needsTemporaryPistol(ownedWeapons);
   if(!run||results.length!==6||run.battle?.outcome)
    throw Error('正式戰役須先取得六個不重複的訓練天賦，且本輪尚未結束。');
   window.armyBattleOfficial=true;
   window.armyBattleOfficialLoadout={
    traits:Object.fromEntries(results.map(t=>[t.name,
     Math.max(1,Math.min(3,Number(t.level)||1))])),
-   weapons:{...parent.state().weapons},
+   weapons:temporaryPistol?{...ownedWeapons,pistol:1}:ownedWeapons,
+   temporaryPistol,
    attemptId:'final-'+run.id+'-'+Date.now().toString(36)
   };
   document.body.classList.add('battle-official');
@@ -28,7 +32,7 @@ if(OFFICIAL){
   // Same-origin frame shares sessionStorage with the live camp; award every
   // eligible enemy kill through the real progression system, not the lab.
   const script=document.createElement('script');
-  script.src='./src/systems/armyProgression.js?v=13';
+  script.src='./src/systems/armyProgression.js?v=14';
   await new Promise((resolve,reject)=>{
    script.addEventListener('load',resolve,{once:true});
    script.addEventListener('error',()=>reject(Error('軍功系統載入失敗')),{once:true});
@@ -72,7 +76,7 @@ $('battleStart').addEventListener('click',async()=>{
   $('battleIntro').hidden=true;$('errorText').textContent=String(error?.message||error);
   $('fatal').hidden=false;
  };
- try{await import('./main.js?v=25')}
+ try{await import('./main.js?v=26')}
  catch(error){console.error('軍營保衛戰載入失敗',error);window.armyLoadFailure(error)}
 });
 // Official battle starts immediately after authorisation; no second button.

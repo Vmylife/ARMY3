@@ -13,6 +13,7 @@ import {setupInput} from '../ui/input.js?v=062';
 import {options} from '../systems/settings.js?v=060';
 import {createCampNPCs,updateCampNPCs} from '../systems/npcLife113.js?v=128';
 import {createArmyBattle,BATTLE_SPAWN} from './engine.js?v=24';
+import {installWeaponRules} from '../systems/weaponRules.js?v=1';
 
 const $=id=>document.getElementById(id);
 const debug=new URLSearchParams(location.search).has('debug');
@@ -126,6 +127,7 @@ async function boot(){
    return npc;
   }
   const combat=createArmyBattle({player,allies,enemies,renderer,rifleGlb:combatRifleGlb,npcGlb,createEnemy});
+  installWeaponRules(combat,{mode:window.armyBattleOfficial?'official':'sandbox',temporaryPistol:!!window.armyBattleOfficialLoadout?.temporaryPistol});
   const rankSpeed=combat.rankMovementMultiplier();
   window.armyBattleTest=combat;
   progress('玩家、5 名友軍、紅軍波次已就位');

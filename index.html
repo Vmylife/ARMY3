@@ -7,9 +7,9 @@
 <link rel="preload" as="fetch" href="./assets/characters/cadet/cadet-green.glb?v=120" crossorigin="anonymous">
 <title>國軍模擬器｜Army</title>
 <link rel="stylesheet" href="./src/ui/playtest.css?v=077">
-<link rel="stylesheet" href="./src/ui/campCombat.css?v=8">
+<link rel="stylesheet" href="./src/ui/campCombat.css?v=9">
 <link rel="stylesheet" href="./src/ui/home105.css?v=105">
-<link rel="stylesheet" href="./src/ui/finalBattleGateway.css?v=3">
+<link rel="stylesheet" href="./src/ui/finalBattleGateway.css?v=4">
 <link rel="stylesheet" href="./src/ui/armyProgression.css?v=3">
 <style>
 /* Global game UI behavior */
@@ -108,6 +108,19 @@ input[type="range"]{-webkit-user-select:none;user-select:none;-webkit-touch-call
   <button id="battleAssemblyCancel" type="button">稍後再說</button>
  </div>
 </section>
+<section id="battleLoanDialog" class="army-loan-dialog" role="dialog" aria-modal="true" aria-labelledby="battleLoanTitle" hidden>
+ <div class="army-loan-panel">
+  <div class="army-loan-speaker">🪖 班長</div>
+  <h2 id="battleLoanTitle">什麼？你沒有槍？</h2>
+  <p>但你太菜了……給你槍有點浪費。</p>
+  <p>這樣吧，這把手槍給你用。</p>
+  <p>但應該再打幾發就壞了……自己小心！</p>
+  <div class="army-loan-actions">
+   <button id="battleLoanAccept" type="button">收下臨時手槍</button>
+   <button id="battleLoanCancel" type="button">稍後再說</button>
+  </div>
+ </div>
+</section>
 <div id="floatingStick" aria-hidden="true"><div class="stick-base"><div id="stickThumb" class="stick-thumb"></div></div></div>
 <div id="notice" role="status" hidden></div>
 <section class="army-home" id="armyHome" aria-label="國軍模擬器首頁">
@@ -145,9 +158,9 @@ input[type="range"]{-webkit-user-select:none;user-select:none;-webkit-touch-call
 <script type="importmap">
 {"imports":{"./src/map/campGeometry.js?v=092":"./src/map/ground103.js?v=124","./src/map/mapDrawing.js?v=093":"./src/map/drawMap95.js?v=095","./src/map/roadMesh.js?v=071":"./src/map/roadMesh104.js?v=125","./src/ui/blanketPortal128.js?v=128":"./src/ui/blanketPortal128.js?v=202","./src/systems/campSession.js?v=144":"./src/systems/campSession.js?v=190","./src/ui/worldMap.js?v=093":"./src/ui/worldMap.js?v=180","./src/training/rangeTraining.js?v=111":"./src/training/rangeTraining.js?v=209"}}
 </script>
-<script src="./src/systems/armyProgression.js?v=13" defer></script>
+<script src="./src/systems/armyProgression.js?v=14" defer></script>
 <script type="module" src="./src/systems/campBgm.js?v=192"></script>
 <script type="module" src="./src/systems/campGameWarmup.js?v=212"></script>
-<script type="module" src="./src/bootstrap111.js?v=221"></script>
+<script type="module" src="./src/bootstrap111.js?v=222"></script>
 </body>
 </html>
