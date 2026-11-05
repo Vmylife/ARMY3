@@ -299,13 +299,13 @@ export class BattlePerks{
   const n=this.level('彈簧棉被');
   if(n&&combat.kills%5===0&&this.healedWave!==combat.wave){
    this.healedWave=combat.wave;
-   const old=combat.hp;combat.hp=Math.min(100,combat.hp+[0,3,5,8][n]);
+   const old=combat.hp;combat.hp=Math.min(combat.maxHp||100,combat.hp+[0,3,5,8][n]);
    if(combat.hp>old){combat.refreshHUD(true);this.message('彈簧棉被：恢復 '+Math.ceil(combat.hp-old)+' HP')}
   }
  }
  damageMultiplier(combat,kind,bullet=null){
   const rage=this.level('起床氣');
-  let factor=rage&&combat.hp<40?1+rage*.10:1;
+  let factor=rage&&combat.hp<(combat.maxHp||100)*.4?1+rage*.10:1;
   const reloadPenalty=this.level('被角纏腳');
   if(reloadPenalty){
    const current=combat.time<this.reloadPenaltyUntil
@@ -348,7 +348,7 @@ export class BattlePerks{
    this.message('已讀不回：護盾抵擋');return 0;
   }
   let d=amount*(1-[0,.08,.15,.22][this.level('金鐘罩')]);
-  if(combat.hp<30)d*=1+this.level('吃土專家')*.1;
+  if(combat.hp<(combat.maxHp||100)*.3)d*=1+this.level('吃土專家')*.1;
   const reflect=[0,.10,.20,.30][this.level('反彈訊息')];
   if(kind==='bullet'&&!this.reflecting&&Math.random()<reflect){
    const target=combat.enemies.filter(n=>!n.combatDead&&!n.incoming&&

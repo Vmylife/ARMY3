@@ -1,12 +1,12 @@
 // ARMY3 enemy-wave sandbox, intentionally NOT imported by the main camp.
 // Uses the approved punch, gun, knockdown and stand-up combat mechanics.
-import {CampCombat,COMBAT_RISE_SECONDS,COMBAT_DOWN_SECONDS} from '../systems/campCombat.js?v=17';
+import {CampCombat,COMBAT_RISE_SECONDS,COMBAT_DOWN_SECONDS} from '../systems/campCombat.js?v=18';
 import {moveNpc,canOccupy,bulletClearance,bulletLineClear,meleeLineClear} from './battleCollision.js?v=1';
 import {battleRoute,battleClear} from './battleNav.js?v=3';
 import {waveEntry} from './breaches.js?v=5';
 import {insidePerimeter} from '../map/camp.js?v=093';
 import {renderBattleSettlement} from './settlement.js?v=3';
-import {BattlePerks} from './talentLab.js?v=5';
+import {BattlePerks} from './talentLab.js?v=6';
 import {BattleWeaponLevels} from './weaponLab.js?v=3';
 const $=id=>document.getElementById(id);
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
@@ -763,7 +763,8 @@ export class ArmyBattleCombat extends CampCombat{
   if(this.invincible||this.gameOver)return;
   const base=Math.max(0,Number(amount)||0);
   if(base<=0)return;
-  const damage=Math.max(0,this.perks?.damageToPlayer(this,base,kind)??base);
+  const perkDamage=Math.max(0,this.perks?.damageToPlayer(this,base,kind)??base);
+  const damage=this.mitigateRankDamage(perkDamage);
   if(damage<=0)return;
   // A non-lethal hit must NEVER call the camp's stun/knock-down handler:
   // it plays Hit_Reaction, cancels punches and blocks movement/shooting.
@@ -791,7 +792,9 @@ export class ArmyBattleCombat extends CampCombat{
   // Lethal hits still use the established falling/death animation and
   // 2.1-second delay before the full final-battle report appears.
   const wasAlive=this.playerAlive;
-  super.damagePlayer(damage,kind);
+  // Parent will apply the rank mitigation ONCE, so pass perk-adjusted
+  // damage instead of the already-mitigated damage.
+  super.damagePlayer(perkDamage,kind);
   if(wasAlive&&!this.playerAlive){
    this.battleOutcome='death';
    if(this.official)window.armyProgression?.finishOfficialBattle('death');

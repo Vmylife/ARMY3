@@ -12,7 +12,7 @@ import {initWorldMap} from '../ui/worldMap.js?v=093';
 import {setupInput} from '../ui/input.js?v=062';
 import {options} from '../systems/settings.js?v=060';
 import {createCampNPCs,updateCampNPCs} from '../systems/npcLife113.js?v=128';
-import {createArmyBattle,BATTLE_SPAWN} from './engine.js?v=23';
+import {createArmyBattle,BATTLE_SPAWN} from './engine.js?v=24';
 
 const $=id=>document.getElementById(id);
 const debug=new URLSearchParams(location.search).has('debug');
@@ -126,6 +126,7 @@ async function boot(){
    return npc;
   }
   const combat=createArmyBattle({player,allies,enemies,renderer,rifleGlb:combatRifleGlb,npcGlb,createEnemy});
+  const rankSpeed=combat.rankMovementMultiplier();
   window.armyBattleTest=combat;
   progress('玩家、5 名友軍、紅軍波次已就位');
   // The new cross-legged clip drops the hips below the original standing root.
@@ -188,11 +189,11 @@ async function boot(){
      const dx=stick.x/(stick.magnitude||1),dy=stick.y/(stick.magnitude||1);
      const c=Math.cos(camYaw),s=Math.sin(camYaw),mx=dx*c-dy*s,mz=-dx*s-dy*c;
      const before=player.pos;
-     player.pos=movePlayer(player.pos,mx*simDt*m.speed*combat.perks.movementRate(m.clip),mz*simDt*m.speed*combat.perks.movementRate(m.clip),[...allies,...enemies.filter(n=>n.assaultVisible&&!n.combatDead)]);
+     player.pos=movePlayer(player.pos,mx*simDt*m.speed*rankSpeed*combat.perks.movementRate(m.clip),mz*simDt*m.speed*rankSpeed*combat.perks.movementRate(m.clip),[...allies,...enemies.filter(n=>n.assaultVisible&&!n.combatDead)]);
      if(Math.hypot(player.pos.x-before.x,player.pos.z-before.z)>1e-5){face(player,mx,mz);mapYaw=camYaw;}
     }
     if(m.speed>0)audition=null;
-    const pose=combat.playerPose(audition||m.clip,m.rate);
+    const pose=combat.playerPose(audition||m.clip,m.rate*(m.speed>0?rankSpeed:1));
     if(player.anim.clip!==pose.clip){
      player.anim.setClip(pose.clip);
      if(['Punch_Combo_1','Hit_Reaction','falling_down','Arise'].includes(pose.clip)){

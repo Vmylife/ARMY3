@@ -285,11 +285,15 @@ function mountCampTraitNotice(){
  observer.observe(document.body,{attributes:true,attributeFilter:['class']});
  if(document.body.classList.contains('army-ready'))schedule();
 }
-// Military rank progress is a saved blueprint in this release, not live combat buffs.
+// Rank upgrade combat bonuses. Same values in the home upgrade menu and
+// actual camp / official-battle gameplay; never exceed the 15 available ranks.
 const RANK_GAIN={hp:15,defense:2,damage:3,speed:1};
-const rankBonus=level=>({hp:level*RANK_GAIN.hp,defense:level*RANK_GAIN.defense,
- damage:level*RANK_GAIN.damage,speed:level*RANK_GAIN.speed});
-// Explicit per-level weapon specifications; none are applied to the current combat engine yet.
+const rankBonus=level=>{
+ const lv=clamp(Math.trunc(Number(level)||0),0,RANKS.length-1);
+ return {hp:lv*RANK_GAIN.hp,defense:lv*RANK_GAIN.defense,
+  damage:lv*RANK_GAIN.damage,speed:lv*RANK_GAIN.speed};
+};
+// Permanent weapon tier specifications applied to the final battle.
 const WEAPON_LEVELS={
  pistol:[
   {mag:1,damage:20,reload:2.5,interval:0.50,mode:'單發'},
@@ -481,18 +485,19 @@ function mountCampStatus(combat,options={}){
   view.replaceChildren();
   if(tab==='base'){
    section('目前作戰數值');
-   cards([['生命',Math.ceil(combat.hp)+' / 100'],['防禦減傷','0%'],
+   const bonus=combat.rankBonus||rankBonus(rank);
+   const dmg=1+bonus.damage/100,move=1+bonus.speed/100;
+   cards([['生命',Math.ceil(combat.hp)+' / '+(combat.maxHp||100)],
+    ['防禦減傷',bonus.defense+'%'],
     ['目前武器',WEAPON_NAMES[combat.weapon]||'拳頭'],['軍階',RANKS[rank]]]);
-   section('攻擊力');
-   row('拳頭','10');row('手槍','25');row('步槍','40');
-   section('移動速度');
-   row('走路',fmt(options.moveSpeed??4.2)+' m/s');
-   row('跑步',fmt(options.runSpeed??6.6)+' m/s');
-   row('衝刺',fmt(options.sprintSpeed??8.3)+' m/s');
-   section('軍階增益');
-   const bonus=rankBonus(rank);
+   section('攻擊力（已包含軍階加成）');
+   row('拳頭',fmt(10*dmg));row('手槍',fmt(25*dmg));row('步槍',fmt(40*dmg));
+   section('移動速度（已包含軍階加成）');
+   row('走路',fmt((options.moveSpeed??4.2)*move)+' m/s');
+   row('跑步',fmt((options.runSpeed??6.6)*move)+' m/s');
+   row('衝刺',fmt((options.sprintSpeed??8.3)*move)+' m/s');
+   section('軍階增益（已生效）');
    cards([['生命','+'+bonus.hp+' HP'],['防禦','+'+bonus.defense+'%'],['攻擊','+'+bonus.damage+'%'],['移速','+'+bonus.speed+'%']]);
-   view.append(make('p','army-character-footnote','軍階增益目前尚未生效'));
    section('當前狀態');
    row('警戒',combat.provoked?'警戒中':'正常');
    row('角色',combat.gameOver?'陣亡':combat.playerDown>0?'倒地':combat.playerRise>0?'起身中':'正常');
@@ -506,7 +511,7 @@ function mountCampStatus(combat,options={}){
     card(WEAPON_NAMES[id],level?'Lv.'+level+'/5':'尚未解鎖',
       spec?weaponStats(spec).join(' · '):'前往首頁升級以解鎖');
    }
-   view.append(make('p','army-character-footnote','武器升級數值目前尚未生效'));
+   view.append(make('p','army-character-footnote','已購買的武器等級會在正式最終戰役生效。'));
   }else if(tab==='training'){
    const owned=TRAINING.filter(t=>clamp(s.training[t.id]||0,0,3)>0);
    section('已學習 · '+owned.length+'/12');

@@ -17,7 +17,7 @@ import {initWorldMap} from './ui/worldMap.js?v=093';
 import {setupInput} from './ui/input.js?v=062';
 import {options} from './systems/settings.js?v=060';
 import {createCampNPCs,updateCampNPCs,squadDebug} from './systems/npcSquads113.js?v=128';
-import {createCampCombat} from './systems/campCombat.js?v=12';
+import {createCampCombat} from './systems/campCombat.js?v=18';
 
 const $=id=>document.getElementById(id);
 const debug=new URLSearchParams(location.search).has('debug');
@@ -127,6 +127,9 @@ async function boot(){
     }
   }
   const combat=createCampCombat({player,npcs,renderer,rifleGlb:combatRifleGlb,npcGlb});
+  // Rank speed improves both real walking distance and animation cadence.
+  // This applies to the full camp, not just the battle stage.
+  const rankSpeed=combat.rankMovementMultiplier();
   window.armyCampCombat=combat;
   window.armyProgression?.mountCampStatus(combat,options);
   combat.animationStatus={
@@ -232,11 +235,11 @@ async function boot(){
      const dx=stick.x/(stick.magnitude||1),dy=stick.y/(stick.magnitude||1);
      const c=Math.cos(camYaw),s=Math.sin(camYaw),mx=dx*c-dy*s,mz=-dx*s-dy*c;
      const before=player.pos;
-     player.pos=movePlayer(player.pos,mx*simDt*m.speed,mz*simDt*m.speed,npcs);
+     player.pos=movePlayer(player.pos,mx*simDt*m.speed*rankSpeed,mz*simDt*m.speed*rankSpeed,npcs);
      if(Math.hypot(player.pos.x-before.x,player.pos.z-before.z)>1e-5){face(player,mx,mz);mapYaw=camYaw;}
     }
     if(m.speed>0)audition=null;
-    const pose=combat.playerPose(audition||m.clip,m.rate);
+    const pose=combat.playerPose(audition||m.clip,m.rate*(m.speed>0?rankSpeed:1));
     if(player.anim.clip!==pose.clip){
      player.anim.setClip(pose.clip);
      if(['Punch_Combo_1','Hit_Reaction','falling_down','Arise'].includes(pose.clip)){

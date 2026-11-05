@@ -109,7 +109,15 @@ function shotSound(rifle=false,level=1){
 
 export class CampCombat{
  constructor({player,npcs,renderer,rifleGlb,npcGlb}){
-  this.player=player;this.npcs=npcs;this.renderer=renderer;this.hp=100;this.kills=0;
+  this.player=player;this.npcs=npcs;this.renderer=renderer;
+  // Persisted military rank is loaded before both the main camp and the
+  // official final battle create this combat controller. No test-only boost.
+  const progression=window.armyProgression;
+  this.rankLevel=Math.max(0,Math.min(15,Math.trunc(Number(progression?.state?.()?.rank)||0)));
+  this.rankBonus=progression?.rankBonus?.(this.rankLevel)||
+   {hp:0,defense:0,damage:0,speed:0};
+  this.maxHp=100+this.rankBonus.hp;
+  this.hp=this.maxHp;this.kills=0;
   this.weapon='fists';this.provoked=false;this.gameOver=false;this.time=0;
   this.interactionMode=true;this.onInteract=null;
   this.playerAttack=0;this.playerAttackApplied=false;this.playerCooldown=0;this.attackKeyboard=false;this.attackPointer=null;
@@ -352,7 +360,7 @@ export class CampCombat{
   const cur=[this.hp,this.kills,this.weapon,this.interactionMode,this.gameOver].join('/');
   if(!force&&this.lastState===cur)return;
   this.lastState=cur;
-  $('campHealth').textContent='HP '+Math.ceil(this.hp);
+  $('campHealth').textContent='HP '+Math.ceil(this.hp)+'/'+this.maxHp;
   $('campKills').textContent='擊殺 '+this.kills;
   $('campAlert').textContent=this.kills>=10?'全營追擊':this.kills>=5?'步槍警戒':this.kills>=1?'手槍警戒':this.provoked?'徒手警戒':'正常操課';
   if(this.interactionMode){
@@ -479,6 +487,11 @@ export class CampCombat{
  meleeLineClear(a,b,padding=.11){return lineClear(a,b,padding)}
  shotClearance(pos){return staticClearance(pos)}
  aimToleranceDegrees(){return 7.5}
+ // Saved soldier-rank buffs increase every player hit: fists, bullets,
+ // grenade splash, reflected shots. Friendly NPC bullets are excluded.
+ rankAttackMultiplier(){return 1+(this.rankBonus?.damage||0)/100}
+ rankMovementMultiplier(){return 1+(this.rankBonus?.speed||0)/100}
+ mitigateRankDamage(amount){return Math.max(0,amount)*(1-(this.rankBonus?.defense||0)/100)}
  // Overridden by the independent battle lab; normal camp gunplay is unchanged.
  playerBulletDamage(){return this.weapon==='rifle'?40:25}
  playerShotInterval(){return this.weapon==='rifle'?.125:.25}
@@ -533,6 +546,9 @@ export class CampCombat{
   // Provoking ANY soldier of a five-person training squad alerts all surviving
   // squadmates immediately, even on the other side of the camp.
   this.engageWithSquad(n);
+  // In the final battle friendly AI shots also call super.damageNPC.
+  // Soldier upgrades belong only to the player, not all five allies.
+  if(!this.friendlyHit)damage*=this.rankAttackMultiplier();
   const grounded=n.combatDown>0||n.combatRise>0;
   n.combatHP=Math.max(0,n.combatHP-damage);
   const dead=n.combatHP<=0;
@@ -619,6 +635,8 @@ export class CampCombat{
  }
  damagePlayer(amount,kind='bullet'){
   if(this.gameOver)return;
+  amount=this.mitigateRankDamage(amount);
+  if(amount<=0)return;
   const grounded=this.playerDown>0||this.playerRise>0;
   this.hp=Math.max(0,this.hp-amount);
   const dead=this.hp<=0;
