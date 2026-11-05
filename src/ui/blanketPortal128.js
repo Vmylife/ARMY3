@@ -84,15 +84,15 @@ export function createBlanketPortal(renderer,{onTrainingStart=()=>{},resuming=fa
   swipeDraw=makeGroundRing(renderer,SWIPE_PORTAL),
   weedDraw=makeGroundRing(renderer,WEED_PORTAL),
   singingDraw=makeGroundRing(renderer,SINGING_PORTAL);
- const blanket=createPortalMenu({position:BLANKET_PORTAL,kind:'blanket',panelId:'blanketPortalMenu',startId:'blanketPortalStart',cancelId:'blanketPortalCancel',destination:'./blanket-stack.html?v=196',onStart:()=>onTrainingStart('blanket'),initialDismissed:resuming,isAlerted});
- const grenade=createPortalMenu({position:GRENADE_PORTAL,kind:'grenade',panelId:'grenadePortalMenu',startId:'grenadePortalStart',cancelId:'grenadePortalCancel',destination:'./grenade-workshop-test.html?v=196',onStart:()=>onTrainingStart('grenade'),initialDismissed:resuming,isAlerted});
- const shooting=createPortalMenu({position:SHOOTING_PORTAL,kind:'shooting',panelId:'shootingPortalMenu',startId:'shootingPortalStart',cancelId:'shootingPortalCancel',destination:'./shooting-paper-range.html?v=197',onStart:()=>onTrainingStart('shooting'),initialDismissed:resuming,isAlerted});
+ const blanket=createPortalMenu({position:BLANKET_PORTAL,kind:'blanket',panelId:'blanketPortalMenu',startId:'blanketPortalStart',cancelId:'blanketPortalCancel',destination:'./blanket-stack.html?v=197',onStart:()=>onTrainingStart('blanket'),initialDismissed:resuming,isAlerted});
+ const grenade=createPortalMenu({position:GRENADE_PORTAL,kind:'grenade',panelId:'grenadePortalMenu',startId:'grenadePortalStart',cancelId:'grenadePortalCancel',destination:'./grenade-workshop-test.html?v=197',onStart:()=>onTrainingStart('grenade'),initialDismissed:resuming,isAlerted});
+ const shooting=createPortalMenu({position:SHOOTING_PORTAL,kind:'shooting',panelId:'shootingPortalMenu',startId:'shootingPortalStart',cancelId:'shootingPortalCancel',destination:'./shooting-paper-range.html?v=198',onStart:()=>onTrainingStart('shooting'),initialDismissed:resuming,isAlerted});
  const swipe=createPortalMenu({position:SWIPE_PORTAL,kind:'swipe',panelId:'swipePortalMenu',startId:'swipePortalStart',cancelId:'swipePortalCancel',
-  destination:'/Don-t-like-your-mom/army-test/index.html?v=7',onStart:()=>onTrainingStart('swipe'),initialDismissed:resuming,isAlerted});
+  destination:'/Don-t-like-your-mom/army-test/index.html?v=8',onStart:()=>onTrainingStart('swipe'),initialDismissed:resuming,isAlerted});
  const weed=createPortalMenu({position:WEED_PORTAL,kind:'weed',panelId:'weedPortalMenu',startId:'weedPortalStart',cancelId:'weedPortalCancel',
-  destination:'./weed-pulling.html?v=198',onStart:()=>onTrainingStart('weed'),initialDismissed:resuming,isAlerted});
+  destination:'./weed-pulling.html?v=199',onStart:()=>onTrainingStart('weed'),initialDismissed:resuming,isAlerted});
  const singing=createPortalMenu({position:SINGING_PORTAL,kind:'singing',panelId:'singingPortalMenu',startId:'singingPortalStart',cancelId:'singingPortalCancel',
-  destination:'./singing-memory-test.html?v=18',onStart:()=>onTrainingStart('singing'),initialDismissed:resuming,isAlerted});
+  destination:'./singing-memory-test.html?v=19',onStart:()=>onTrainingStart('singing'),initialDismissed:resuming,isAlerted});
  const portals=[
   {position:BLANKET_PORTAL,menu:blanket,kind:'blanket'},
   {position:GRENADE_PORTAL,menu:grenade,kind:'grenade'},

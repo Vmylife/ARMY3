@@ -4,6 +4,7 @@
 (()=>{
 'use strict';
 const STORE='ARMY3_progression_v1',RUN='ARMY3_progression_run_v1';
+const PENDING_TRAIT='ARMY3_pending_camp_trait_notice_v1';
 const $=id=>document.getElementById(id);
 const RANKS=['新兵','二等兵','一等兵','上等兵','下士','中士','上士','少尉','中尉','上尉','少校','中校','上校','少將','中將','上將'];
 const NAMES={blanket:'棉被疊疊樂',shooting:'實彈射擊',grenade:'手榴彈投擲',weed:'拔草鑑測',swipe:'中山室滑手機',singing:'唱軍歌'};
@@ -121,7 +122,39 @@ const trainingLimit=kind=>{
   available:!!NAMES[kind]&&count<6&&used<3&&!r.battle?.outcome};
 };
 const canPlayTraining=kind=>trainingLimit(kind).available;
-function beginRun(){const r=freshRun();write(RUN,r);return r}
+// Rewards are earned at settlement, but revealed ONLY after returning
+// to the real camp. Session storage is shared with same-origin iframe games
+// and survives navigation back to the existing camp checkpoint.
+function queuedTraitNotice(){
+ try{
+  const item=JSON.parse(sessionStorage.getItem(PENDING_TRAIT)||'null');
+  if(item?.runId!==run().id||!Array.isArray(item.items))return null;
+  return item.items[0]||null;
+ }catch{return null}
+}
+function queueTraitNotice(r,reward){
+ try{
+  const prev=JSON.parse(sessionStorage.getItem(PENDING_TRAIT)||'null');
+  const list=prev?.runId===r.id&&Array.isArray(prev.items)?prev.items:[];
+  const token=r.id+':'+reward.kind+':'+reward.attempt;
+  if(list.some(item=>item.token===token))return;
+  const items=[...list,{...reward,token}];
+  sessionStorage.setItem(PENDING_TRAIT,JSON.stringify({runId:r.id,items}));
+ }catch(error){console.warn('[軍功簿] 戰鬥天賦通知暫存失敗',error)}
+}
+function acknowledgeTraitNotice(token){
+ try{
+  const record=JSON.parse(sessionStorage.getItem(PENDING_TRAIT)||'null');
+  if(!record||record.runId!==run().id)return;
+  const items=(record.items||[]).filter(x=>x?.token!==token);
+  if(items.length)sessionStorage.setItem(PENDING_TRAIT,JSON.stringify({...record,items}));
+  else sessionStorage.removeItem(PENDING_TRAIT);
+ }catch(error){console.warn('[軍功簿] 戰鬥天賦通知確認失敗',error)}
+}
+function beginRun(){
+ try{sessionStorage.removeItem(PENDING_TRAIT)}catch{}
+ const r=freshRun();write(RUN,r);return r;
+}
 function awardTraining(kind,score){
  if(!NAMES[kind]||!Number.isFinite(Number(score)))return null;
  const r=run(),previous=r.trainings[kind]||[];
@@ -138,6 +171,7 @@ function awardTraining(kind,score){
  const stateBefore=state();
  if(!write(RUN,r))return null;
  stateBefore.medals+=reward.medals;write(STORE,stateBefore);
+ queueTraitNotice(r,reward);
  return reward;
 }
 function finishOfficialBattle(outcome){
@@ -181,22 +215,75 @@ function buy(category,id){
 function make(tag,cls,text){
  const el=document.createElement(tag);if(cls)el.className=cls;if(text!==undefined)el.textContent=String(text);return el;
 }
+// Do not show the trait in the mini-game result screen. Its score/medals
+// and achievements remain intact; the camp popup owns the reveal.
+const rewardedScreenKinds=new Set();
 function rewardPanel(kind,score,anchor){
- if(!anchor||!anchor.parentNode)return null;
- // Guard duplicate completion events from the same results screen.
- const id='armyTrainingReward-'+kind;
- let box=document.getElementById(id);
- if(box?.dataset?.rewardShown==='1'&&Date.now()-Number(box.dataset.rewardShownAt||0)<1800)return null;
- const record=awardTraining(kind,score);if(!record)return null;
- if(box)box.remove();
- box=make('details','army-reward');box.id=id;box.dataset.rewardShown='1';box.dataset.rewardShownAt=String(Date.now());
- const summary=make('summary','army-reward__summary','第 '+record.attempt+'/3 次　🎖 +'+record.medals+'　'+(record.positive?'正面':'負面')+'：'+record.name+' Lv.'+record.level);
- box.append(summary);
- const detail=make('div','army-reward__desc',record.description);
- const foot=make('div','army-reward__foot','本輪訓練 '+trainingCount()+'/6 · 同一項最多完成三次，天賦不重複');
- box.append(detail,foot);
- anchor.insertAdjacentElement('afterend',box);
+ if(!anchor||!anchor.parentNode||rewardedScreenKinds.has(kind))return null;
+ const record=awardTraining(kind,score);
+ if(record)rewardedScreenKinds.add(kind); // Ignore repeated result events.
  return record;
+}
+function mountCampTraitNotice(){
+ // This script also runs in every mini-game; install the UI ONLY in camp.
+ if(!$('armyHome')||$('armyTrainingRewardNotice'))return;
+ const layer=make('section','army-trait-notice');
+ layer.id='armyTrainingRewardNotice';layer.hidden=true;
+ layer.setAttribute('role','dialog');
+ layer.setAttribute('aria-modal','true');
+ layer.setAttribute('aria-label','獲得戰鬥天賦');
+ const card=make('div','army-trait-notice__panel');
+ const emblem=make('div','army-trait-notice__emblem','✦');
+ emblem.setAttribute('aria-hidden','true');
+ const heading=make('div','army-trait-notice__heading','獲得戰鬥天賦');
+ const kindLabel=make('div','army-trait-notice__kind');
+ const title=make('h2','army-trait-notice__name');
+ const level=make('div','army-trait-notice__level');
+ const effect=make('p','army-trait-notice__effect');
+ const button=make('button','army-trait-notice__confirm','知道了');
+ button.type='button';
+ card.append(emblem,heading,kindLabel,title,level,effect,button);
+ layer.append(card);document.body.append(layer);
+ let currentToken=null;
+ function display(){
+  if(!layer.hidden||!document.body.classList.contains('army-ready')||
+     window.armyMinigameActive||window.armyFinalBattleActive||
+     window.armyCharacterStatusOpen)return;
+  const record=queuedTraitNotice();
+  if(!record)return;
+  const trait=refreshTraitText(record);
+  currentToken=record.token;
+  layer.classList.toggle('army-trait-notice--bad',!trait.positive);
+  emblem.textContent=trait.positive?'✦':'!';
+  kindLabel.textContent=trait.positive?'正面天賦':'負面天賦';
+  title.textContent=trait.name;
+  level.textContent='Lv.'+clamp(trait.level||1,1,3);
+  effect.textContent=trait.description||'請前往角色狀態查看天賦內容';
+  layer.hidden=false;window.armyTrainingRewardOpen=true;
+  try{button.focus({preventScroll:true})}catch{}
+ }
+ function close(){
+  if(layer.hidden)return;
+  const token=currentToken;currentToken=null;
+  layer.hidden=true;window.armyTrainingRewardOpen=false;
+  if(token)acknowledgeTraitNotice(token);
+  // If the player somehow earned multiple pending traits, display them
+  // in sequence, never lose one and never display them on a result page.
+  if(queuedTraitNotice())queueMicrotask(display);
+ }
+ button.addEventListener('click',close);
+ document.addEventListener('keydown',event=>{
+  if(layer.hidden)return;
+  if(event.key==='Escape'||event.key==='Enter'){
+   event.preventDefault();event.stopImmediatePropagation();close();
+  }else event.stopImmediatePropagation();
+ },true);
+ const schedule=()=>setTimeout(display,140);
+ window.addEventListener('army:training-return',schedule);
+ window.addEventListener('pageshow',schedule);
+ const observer=new MutationObserver(()=>{if(document.body.classList.contains('army-ready'))schedule()});
+ observer.observe(document.body,{attributes:true,attributeFilter:['class']});
+ if(document.body.classList.contains('army-ready'))schedule();
 }
 // Military rank progress is a saved blueprint in this release, not live combat buffs.
 const RANK_GAIN={hp:15,defense:2,damage:3,speed:1};
@@ -493,6 +580,7 @@ window.addEventListener('army:shooting:result',e=>{
  const anchor=$('shootScore')?.closest('.shootScorebox')||$('shootScore');
  if(anchor)rewardPanel('shooting',e.detail?.score,anchor);
 });
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',upgradeUI,{once:true});
-else upgradeUI();
+function installCampUI(){upgradeUI();mountCampTraitNotice()}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installCampUI,{once:true});
+else installCampUI();
 })();
