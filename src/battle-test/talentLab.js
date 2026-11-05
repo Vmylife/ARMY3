@@ -1,6 +1,6 @@
 // ARMY3 final-battle talent runtime & in-lab selector. Never changes the
 // official trait awards, honor wallet or any other minigame.
-import {TRAITS,GROUPS} from './traitCatalog.js?v=3';
+import {TRAITS,GROUPS} from './traitCatalog.js?v=4';
 import {insidePerimeter} from '../map/camp.js?v=093';
 const KEY='ARMY3_battle_test_selected_traits_v1';
 const $=id=>document.getElementById(id);
@@ -188,8 +188,8 @@ export class BattlePerks{
   }
   const jam=[0,.15,.25,.35][this.level('卡彈之王')];
   if(jam&&Math.random()<jam){
-   this.gunLockUntil=combat.time+2*this.level('卡彈之王');
-   this.message('卡彈！'+2*this.level('卡彈之王')+' 秒');return false;
+   this.gunLockUntil=combat.time+2;
+   this.message('卡彈！2 秒');return false;
   }
   return true;
  }

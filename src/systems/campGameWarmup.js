@@ -5,12 +5,12 @@ import './shootingRangeLauncher.js?v=100';
 import {clearCampSession} from './campSession.js?v=144';
 const ROOT = new URL('../../', import.meta.url);
 const urls = {
- blanket:'blanket-stack.html?v=197',
- grenade:'grenade-workshop-test.html?v=197',
- shooting:'shooting-paper-range.html?v=198',
- swipe:'/Don-t-like-your-mom/army-test/index.html?v=8',
- weed:'weed-pulling.html?v=199',
- singing:'singing-memory-test.html?v=19'
+ blanket:'blanket-stack.html?v=198',
+ grenade:'grenade-workshop-test.html?v=198',
+ shooting:'shooting-paper-range.html?v=199',
+ swipe:'/Don-t-like-your-mom/army-test/index.html?v=9',
+ weed:'weed-pulling.html?v=200',
+ singing:'singing-memory-test.html?v=20'
 };
 const nearbyAssets={
  blanket:[
