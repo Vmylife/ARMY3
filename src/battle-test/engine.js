@@ -149,8 +149,9 @@ export class ArmyBattleCombat extends CampCombat{
   if(!fired){this.cancelRifleBurst();return}
   burst.remaining--;
   if(burst.remaining>0){
-   burst.nextAt=this.time+.11;
-   this.playerCooldown=.11;
+   // Lv.2 shots use its actual 0.35-second interval, slower than Lv.3.
+   burst.nextAt=this.time+this.playerShotInterval();
+   this.playerCooldown=this.playerShotInterval();
   }else{
    this.cancelRifleBurst();
    this.playerCooldown=this.playerShotInterval();
@@ -175,8 +176,8 @@ export class ArmyBattleCombat extends CampCombat{
   }
   if(result&&this.weapon==='rifle'&&this.weaponLab?.level('rifle')===2&&!this.rifleBurstShot){
    // The first round uses the normal sound/recoil/muzzle/physical bullet path.
-   this.rifleBurst={remaining:2,nextAt:this.time+.11};
-   this.playerCooldown=.11;
+   this.rifleBurst={remaining:2,nextAt:this.time+this.playerShotInterval()};
+   this.playerCooldown=this.playerShotInterval();
   }
   this.provoked=false;return result;
  }
