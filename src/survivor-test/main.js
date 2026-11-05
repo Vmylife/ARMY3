@@ -238,8 +238,8 @@ async function boot(){
      if(!npc.assaultVisible||(npc.combatDead&&!npc.combatDeathClip))continue;
      if(!renderer.isActorVisible(npc.pos))continue;
      const dx=npc.pos.x-player.pos.x,dz=npc.pos.z-player.pos.z;
-     const close=(dx*dx+dz*dz<100&&detailed<36)||npc.combatDown>0||npc.combatRise>0||
-      npc.combatHurt>0||npc.combatDeathClip||npc.combatAttack>0;
+     const close=((dx*dx+dz*dz<100||npc.combatAttack>0)&&detailed<36)||
+      npc.combatDown>0||npc.combatRise>0||npc.combatHurt>0||npc.combatDeathClip;
      if(close){npc.anim.evaluate(simDt);renderer.drawActor('lifeRecruit',npc);detailed++;}
      else (npc.id%2?crowdA:crowdB).push(npc);
     }
