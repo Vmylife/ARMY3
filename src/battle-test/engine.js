@@ -2,7 +2,7 @@
 // Uses the approved punch, gun, knockdown and stand-up combat mechanics.
 import {CampCombat,lineClear,COMBAT_RISE_SECONDS,COMBAT_DOWN_SECONDS} from '../systems/campCombat.js?v=12';
 import {moveNpc,staticClearance,canOccupy} from '../map/navCollision109.js?v=124';
-import {battleRoute} from './battleNav.js?v=1';
+import {battleRoute,battleClear} from './battleNav.js?v=2';
 import {waveEntry} from './breaches.js?v=5';
 import {insidePerimeter} from '../map/camp.js?v=093';
 const $=id=>document.getElementById(id);
@@ -151,7 +151,8 @@ export class ArmyBattleCombat extends CampCombat{
    n.combatPush=null;n.combatWeapon=weapons[i];
    n.battleSight=null;n.assaultTarget=null;n.assaultGoalTarget=null;
    n.battlePath=null;n.battlePathIndex=0;n.battlePathGoal=null;n.battleNextPlan=0;
-   n.combatStall=0;n.route=null;n.routeGoal=null;n.routeIndex=0;n.replanAt=0;n.squadEscape=null;
+   n.combatStall=0;n.battleEscape=null;n.battleEscapeUntil=0;n.battleEscapeCount=0;
+   n.route=null;n.routeGoal=null;n.routeIndex=0;n.replanAt=0;n.squadEscape=null;
    n.anim.setClip('Running',{restart:true});n.anim.speed=1.2;n.anim.rifleAim=0;
   }
   this.totalSpawns+=pool.length;
@@ -293,6 +294,33 @@ export class ArmyBattleCombat extends CampCombat{
   }
   this.updateBattleHUD();
  }
+ // Static posts and crowded lanes can trap a soldier just short of a
+ // waypoint. Choose a reachable lateral detour away from nearby actors.
+ findBattleEscape(n,goal){
+  const dx=goal.x-n.pos.x,dz=goal.z-n.pos.z;
+  const heading=Math.atan2(dz,dx),sign=((n.id+(n.battleEscapeCount||0))%2===0?1:-1);
+  const angles=[sign*1.57,-sign*1.57,sign*.87,-sign*.87,sign*2.2,-sign*2.2,Math.PI,0];
+  const others=[...this.enemies,...this.allies];
+  let chosen=null,best=-Infinity;
+  for(const radius of [1.55,2.5,3.4]){
+   for(const a of angles){
+    const theta=heading+a,probe={x:n.pos.x+Math.cos(theta)*radius,
+                                z:n.pos.z+Math.sin(theta)*radius};
+    if(!canOccupy(probe,.43)||!battleClear(n.pos,probe,.33))continue;
+    let spacing=3.5;
+    for(const o of others){
+     if(o===n||o.combatDead||o.incoming)continue;
+     spacing=Math.min(spacing,dist(probe,o.pos));
+    }
+    if(spacing<.72||dist(probe,this.player.pos)<.70)continue;
+    const forward=dist(n.pos,goal)-dist(probe,goal);
+    const score=forward*.45+Math.min(2,spacing)*.35-radius*.04+
+      (a*sign>0?.08:0);
+    if(score>best){best=score;chosen=probe}
+   }
+  }
+  return chosen;
+ }
  // Choose the closest LIVING defender for ALL red attacks and movement.
  nearestTarget(n){
   let target=this.playerAlive&&this.playerDown<=0&&this.playerRise<=0?this.player:null;
@@ -413,7 +441,12 @@ export class ArmyBattleCombat extends CampCombat{
     const base=n.battleStageDone?target.pos:n.battleApproach;
     const off=n.battleStageDone&&d>10?n.battleAttackOffset:null;
     const flank=off?{x:base.x+off.x,z:base.z+off.z}:base;
-    const goal=canOccupy(flank,.40)?flank:base;
+    let goal=canOccupy(flank,.40)?flank:base;
+    if(n.battleEscape){
+     if(dist(n.pos,n.battleEscape)<.55||this.time>=n.battleEscapeUntil){
+      n.battleEscape=null;n.battlePath=null;
+     }else goal=n.battleEscape;
+    }
     if(!n.battlePath||!n.battlePathGoal||n.assaultGoalTarget!==target||
        dist(n.battlePathGoal,goal)>2.2||this.time>=n.battleNextPlan){
      n.assaultGoalTarget=target;n.battlePathGoal={...goal};
@@ -421,8 +454,11 @@ export class ArmyBattleCombat extends CampCombat{
      n.battleNextPlan=this.time+1.45+(n.id%4)*.24;
     }
     let waypoint=n.battlePath?.[n.battlePathIndex]||goal;
+    // Do not skip a nearby grid anchor if that shortcut would cut THROUGH
+    // a hurdle post. The old rule only considered waypoint distance.
     while(n.battlePath&&n.battlePathIndex<n.battlePath.length-1&&
-          dist(n.pos,waypoint)<.65)
+          dist(n.pos,waypoint)<.65&&
+          battleClear(n.pos,n.battlePath[n.battlePathIndex+1],.33))
      waypoint=n.battlePath[++n.battlePathIndex];
     const before={...n.pos};
     const distanceToPoint=dist(before,waypoint);
@@ -433,19 +469,24 @@ export class ArmyBattleCombat extends CampCombat{
        [...this.allies,...this.enemies],this.player.pos);
      n.pos=next;
     }
-    const moved=dist(before,n.pos);
+    const moved=dist(before,n.pos),progress=distanceToPoint-dist(n.pos,waypoint);
     if(moved>.008){
      actualMove={x:n.pos.x-before.x,z:n.pos.z-before.z};
-     n.combatStall=0;
      if(n.anim.clip!=='Running')n.anim.setClip('Running');
      n.anim.speed=clamp(moved/Math.max(dt,.001)/2.18,.65,1.3);
     }else{
-     n.combatStall=(n.combatStall||0)+dt;
      if(n.anim.clip!=='Idle')n.anim.setClip('Idle');
      n.anim.speed=1;
     }
-    // A crowded front re-plans around people instead of waiting in a road queue.
-    if(n.combatStall>1.15){
+    // Sliding left and right next to a hurdle is NOT forward progress.
+    n.combatStall=Math.max(0,(n.combatStall||0)+
+      (moved<.008||progress<dt*.18?dt:-dt*1.8));
+    if(n.combatStall>1.05){
+     // Try a short, obstacle-safe side-step instead of recalculating the
+     // same blocked path forever. Never teleport through the hurdle.
+     const escape=this.findBattleEscape(n,goal);
+     n.battleEscape=escape;n.battleEscapeUntil=this.time+2.2;
+     n.battleEscapeCount=(n.battleEscapeCount||0)+1;
      n.battlePath=null;n.battleNextPlan=0;n.combatStall=0;
     }
    }else if(n.combatAttack>0&&n.anim.hasClip('Punch_Combo_1')){
