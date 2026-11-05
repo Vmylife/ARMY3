@@ -1,12 +1,12 @@
 // ARMY3 enemy-wave sandbox, intentionally NOT imported by the main camp.
 // Uses the approved punch, gun, knockdown and stand-up combat mechanics.
-import {CampCombat,COMBAT_RISE_SECONDS,COMBAT_DOWN_SECONDS} from '../systems/campCombat.js?v=14';
+import {CampCombat,COMBAT_RISE_SECONDS,COMBAT_DOWN_SECONDS} from '../systems/campCombat.js?v=15';
 import {moveNpc,canOccupy,bulletClearance,bulletLineClear,meleeLineClear} from './battleCollision.js?v=1';
 import {battleRoute,battleClear} from './battleNav.js?v=3';
 import {waveEntry} from './breaches.js?v=5';
 import {insidePerimeter} from '../map/camp.js?v=093';
 import {renderBattleSettlement} from './settlement.js?v=3';
-import {BattlePerks} from './talentLab.js?v=1';
+import {BattlePerks} from './talentLab.js?v=2';
 const $=id=>document.getElementById(id);
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
@@ -75,11 +75,14 @@ export class ArmyBattleCombat extends CampCombat{
   if(god){god.addEventListener('click',()=>this.setInvincible(!this.invincible));this.setInvincible(false)}
   $('battleReportNow')?.addEventListener('click',()=>this.endForReport());
   $('battleGrenade')?.addEventListener('click',()=>this.perks.useGrenade(this));
+  $('battleReload')?.addEventListener('click',()=>this.perks.reload(this));
   window.addEventListener('keydown',event=>{
-   if(event.code!=='KeyG'||this.gameOver||!this.running||this.wheelOpen||
-      document.getElementById('battleTalentLab')?.open||
+   if(!['KeyG','KeyR'].includes(event.code)||this.gameOver||!this.running||
+      this.wheelOpen||document.getElementById('battleTalentLab')?.open||
       /INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName||''))return;
-   event.preventDefault();this.perks.useGrenade(this);
+   event.preventDefault();
+   if(event.code==='KeyG')this.perks.useGrenade(this);
+   else this.perks.reload(this);
   });
  }
  get liveEnemies(){return this.enemies.filter(n=>n.assaultVisible&&!n.combatDead)}
@@ -140,23 +143,20 @@ export class ArmyBattleCombat extends CampCombat{
   for(const {n,d}of targets){
    const face=((n.pos.x-p.x)*dir.x+(n.pos.z-p.z)*dir.z)/Math.max(.01,d);
    if(face<.22||!this.meleeLineClear(p,n.pos,.1))continue;
+   // A failed pull substitutes a real self-hit for the whole punch.
+   if(hit===0&&this.perks?.backfirePunch(this))return;
    this.damageNPC(n,10,'punch');if(++hit>=max)break;
   }
  }
- damageNPC(n,amount,kind='bullet'){
+ damageNPC(n,amount,kind='bullet',bullet=null){
   if(n.combatDead||amount<=0)return;
   const wasDead=n.combatDead,wasDown=n.combatDown;
-  if(kind==='punch'){
-   amount=this.perks?.punchDamage(this,amount)??amount;
-   if(this.perks&&this.time<this.perks.switchUntil)
-    amount*=1-this.perks.level('被角纏腳')*.1;
-  }
+  // Rage and reload debuff apply once to fists, gunshots, grenades,
+  // shockwaves and reflected projectiles, never friendly AI gunfire.
+  amount*=this.perks?.damageMultiplier(this,kind,bullet)??1;
   super.damageNPC(n,amount,kind);
   if(wasDown<=0&&n.combatDown>0)n.talentLandDone=false;
-  if(kind==='punch')this.perks?.pullTarget(this,n);
   if(!n.combatDead&&(kind==='punch'||kind==='bullet'))this.perks.focus=n;
-  if(kind==='bullet'&&!this.perks?.splitting&&!this.perks?.reflecting)
-   this.perks?.splitHit(this,n,amount);
   if(!wasDead&&n.combatDead)this.perks?.onKill(this);
   this.provoked=false;
  }
@@ -718,6 +718,15 @@ export class ArmyBattleCombat extends CampCombat{
    this.battleOutcome='death';
    renderBattleSettlement(this,{outcome:'death'});
    $('battleReportNow').hidden=true;
+  }
+ }
+ drawWeapons(now){
+  super.drawWeapons(now);
+  const layer=$('campProjectileLayer');if(!layer)return;
+  for(const bullet of this.bullets){
+   if(!bullet.splitDepth&&!bullet.bounces)continue;
+   const el=layer.querySelector('[data-bullet="'+bullet.id+'"]');
+   if(el)el.classList.add(bullet.splitDepth?'talentSplit':'talentRicochet');
   }
  }
  drawAllyWeapons(now){

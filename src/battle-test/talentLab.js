@@ -1,6 +1,6 @@
 // ARMY3 final-battle talent runtime & in-lab selector. Never changes the
 // official trait awards, honor wallet or any other minigame.
-import {TRAITS,GROUPS} from './traitCatalog.js?v=1';
+import {TRAITS,GROUPS} from './traitCatalog.js?v=2';
 import {insidePerimeter} from '../map/camp.js?v=093';
 const KEY='ARMY3_battle_test_selected_traits_v1';
 const $=id=>document.getElementById(id);
@@ -18,9 +18,13 @@ export class BattlePerks{
   this.values=readPrefs();this.combat=null;this.lastWeapon='';
   this.shield=0;this.shieldNext=0;this.rootSaved=-1;this.invincibleUntil=0;
   this.healedWave=-1;this.gloveCount=0;this.gloveUntil=0;
-  this.gunLockUntil=0;this.switchUntil=0;this.bonusShots=0;
+  this.gunLockUntil=0;this.reloadPenaltyUntil=0;
+  // Independent real magazines. Reloading always costs time, even with
+  // positive traits enabled; magic split projectiles cost one base round.
+  this.capacity={pistol:12,rifle:30};this.ammo={pistol:12,rifle:30};
+  this.reloadWeapon=null;this.reloadAt=0;this.bonusShots={pistol:0,rifle:0};
   this.waitRelease=false;this.secondPressReady=false;this.grenadeAt=0;
-  this.events=[];this.ricochetQueue=[];this.focus=null;this.splitting=false;this.reflecting=false;
+  this.events=[];this.ricochetQueue=[];this.focus=null;this.reflecting=false;
   this.flashAt=-10;this.announceUntil=0;
  }
  level(name){return this.values[name]||0}
@@ -91,13 +95,18 @@ export class BattlePerks{
   if(this.waitRelease&&!combat.attackPointer&&!combat.attackKeyboard){
    this.waitRelease=false;this.secondPressReady=true;
   }
-  if(this.lastWeapon!==combat.weapon){
-   this.lastWeapon=combat.weapon;this.switchUntil=combat.time+2;
-   if(combat.weapon!=='fists'){
-    this.bonusShots=this.level('極限手速');
-    const risk=[0,.15,.25,.35][this.level('推播轟炸')];
-    if(Math.random()<risk){this.gunLockUntil=Math.max(this.gunLockUntil,combat.time+1.2);this.message('推播轟炸：暫時無法射擊')}
-   }
+  if(this.lastWeapon!==combat.weapon)this.lastWeapon=combat.weapon;
+  if(this.reloadWeapon&&combat.time>=this.reloadAt){
+   const gun=this.reloadWeapon;
+   this.ammo[gun]=this.capacity[gun];this.reloadWeapon=null;
+   // Penalty and bonus both start ONLY when a real reload finishes.
+   this.reloadPenaltyUntil=combat.time+2;
+   this.bonusShots[gun]=this.level('極限手速');
+   const risk=[0,.25,.40,.55][this.level('推播轟炸')];
+   if(Math.random()<risk){
+    this.gunLockUntil=Math.max(this.gunLockUntil,combat.time+1.2);
+    this.message('推播轟炸：換彈後卡住射擊');
+   }else this.message('換彈完成：'+this.ammo[gun]+' 發');
   }
   const shieldLv=this.level('已讀不回');
   if(shieldLv&&this.shield<2){
@@ -112,13 +121,22 @@ export class BattlePerks{
   this.updateIndicator(combat);
  }
  updateIndicator(combat){
-  const badge=$('battleTalentStatus'),btn=$('battleGrenade');
+  const badge=$('battleTalentStatus'),btn=$('battleGrenade'),reload=$('battleReload');
+  const gun=combat.weapon,isGun=gun==='pistol'||gun==='rifle';
   if(badge){
-   const items=['天賦 '+this.count()];
+   const items=[];
+   if(isGun)items.push('彈匣 '+this.ammo[gun]+'/'+this.capacity[gun]);
+   if(this.count())items.push('天賦 '+this.count());
    if(this.level('已讀不回'))items.push('護盾 '+this.shield+'/2');
    if(this.invincibleUntil>combat.time)items.push('免死 '+Math.ceil(this.invincibleUntil-combat.time)+'s');
    if(this.gunLockUntil>combat.time)items.push('卡彈');
-   badge.textContent=this.count()?items.join(' · '):'';
+   badge.textContent=items.join(' · ');
+  }
+  if(reload&&!reload.hidden){
+   const waiting=this.reloadWeapon!==null;
+   const remaining=Math.max(0,this.reloadAt-combat.time);
+   reload.textContent=waiting?'換彈 '+remaining.toFixed(1)+'s':'換彈';
+   reload.disabled=!isGun||waiting||this.ammo[gun]>=this.capacity[gun]||combat.gameOver||!combat.running;
   }
   if(btn&&!btn.hidden){
    const left=Math.max(0,this.grenadeAt-combat.time);
@@ -126,19 +144,35 @@ export class BattlePerks{
    btn.disabled=left>0||combat.gameOver||!combat.running;
   }
  }
+ beginReload(combat,manual=false){
+  const gun=combat.weapon;
+  if(!['pistol','rifle'].includes(gun)||this.reloadWeapon||combat.gameOver||!combat.running)return false;
+  if(this.ammo[gun]>=this.capacity[gun]){
+   if(manual)this.message('彈匣已滿');return false;
+  }
+  this.reloadWeapon=gun;this.reloadAt=combat.time+(gun==='rifle'?1.6:1.3);
+  this.message(gun==='rifle'?'更換步槍彈匣…':'更換手槍彈匣…');
+  this.updateIndicator(combat);return true;
+ }
+ reload(combat){return this.beginReload(combat,true)}
  beforeAttack(combat){
   if(combat.weapon==='fists'){
    if(combat.time<this.gloveUntil){this.message('手套破洞：拳頭短暫失效');return false}
    return true;
   }
+  if(this.reloadWeapon===combat.weapon){this.message('正在換彈');return false}
+  if(this.ammo[combat.weapon]===0){
+   this.beginReload(combat);return false;
+  }
   if(combat.time<this.gunLockUntil){this.message('射擊受阻');return false}
   if(this.waitRelease)return false;
   if(this.secondPressReady){this.secondPressReady=false;return true}
-  const tie=[0,.08,.16,.24][this.level('拇指打結')];
+  const tie=[0,.20,.35,.50][this.level('拇指打結')];
   if(Math.random()<tie){
    this.waitRelease=true;this.message('拇指打結！放開再按一次');return false;
   }
-  if(this.level('卡彈之王')&&Math.random()<.08){
+  const jam=[0,.15,.25,.35][this.level('卡彈之王')];
+  if(jam&&Math.random()<jam){
    this.gunLockUntil=combat.time+2*this.level('卡彈之王');
    this.message('卡彈！'+2*this.level('卡彈之王')+' 秒');return false;
   }
@@ -155,18 +189,20 @@ export class BattlePerks{
   }
  }
  onShot(combat,bullet){
-  if(!bullet)return;
-  const step=bullet.damage;
-  if(combat.time<this.switchUntil)
-   bullet.damage*=1-this.level('被角纏腳')*.1;
-  const blank=[0,.08,.15,.22][this.level('空包彈專家')];
+  if(!bullet||!this.capacity[combat.weapon])return;
+  const gun=combat.weapon;
+  // A successful trigger ALWAYS uses one real cartridge.
+  this.ammo[gun]=Math.max(0,this.ammo[gun]-1);
+  bullet.reloadPenalty=combat.time<this.reloadPenaltyUntil
+   ?1-[0,.20,.30,.50][this.level('被角纏腳')]:1;
+  const blank=[0,.15,.30,.45][this.level('空包彈專家')];
   if(Math.random()<blank){bullet.damage=0;bullet.blank=true;this.message('空包彈！')}
-  const off=[0,.10,.20,.30][this.level('描邊大師')];
+  const off=[0,.20,.35,.50][this.level('描邊大師')];
   if(Math.random()<off){
    const heading=Math.atan2(bullet.dx,bullet.dz)+(Math.random()<.5?-1:1)*.65;
    this.pointBullet(bullet,heading);bullet.targetId=null;
   }else{
-   const wrong=[0,.10,.20,.30][this.level('滑錯邊')];
+   const wrong=[0,.20,.35,.50][this.level('滑錯邊')];
    if(Math.random()<wrong){
     const pool=combat.enemies.filter(n=>!n.combatDead&&!n.incoming&&n.id!==bullet.targetId&&
       combat.shotLineClear(combat.player.pos,n.pos,.1)&&dist(combat.player.pos,n.pos)<25);
@@ -177,17 +213,50 @@ export class BattlePerks{
    }
   }
   bullet.bounces=0;
-  if(this.bonusShots>0){
-   const count=this.bonusShots;this.bonusShots=0;
-   const heading=Math.atan2(bullet.dx,bullet.dz);
-   for(let i=0;i<count;i++){
-    const clone={...bullet,id:combat.seq++,range:bullet.range,
-     angle:heading+(i-(count-1)/2)*.035};
-    this.pointBullet(clone,clone.angle);
-    combat.bullets.push(clone);
+  // Visible, real projectiles: one glowing branch per DIFFERENT opponent.
+  // Unlike the former invisible instant-damage chain, these must actually fly
+  // and hit, obeying walls, character collisions and projectile life cycles.
+  if(!bullet.blank&&this.level('分裂子彈')){
+   const original=bullet.targetId,used=new Set(original==null?[]:[original]);
+   const candidates=combat.enemies.filter(n=>!n.combatDead&&!n.incoming&&!used.has(n.id)&&
+    dist(combat.player.pos,n.pos)<=26&&combat.shotLineClear(combat.player.pos,n.pos,.10))
+    .sort((a,b)=>{
+     const aAngle=Math.atan2(a.pos.x-bullet.x,a.pos.z-bullet.z);
+     const bAngle=Math.atan2(b.pos.x-bullet.x,b.pos.z-bullet.z);
+     const heading=Math.atan2(bullet.dx,bullet.dz);
+     const delta=a=>Math.abs(Math.atan2(Math.sin(a-heading),Math.cos(a-heading)));
+     return delta(aAngle)-delta(bAngle)||dist(bullet,a.pos)-dist(bullet,b.pos);
+    });
+   let emitted=0;
+   for(const target of candidates){
+    if(emitted>=this.level('分裂子彈'))break;
+    const heading=Math.atan2(target.pos.x-bullet.x,target.pos.z-bullet.z);
+    const extra={...bullet,id:combat.seq++,targetId:target.id,splitTargetId:target.id,
+     splitDepth:1,range:bullet.range,speed:36,
+     damage:bullet.damage*Math.pow(.75,emitted+1)};
+    extra.x+=Math.cos(heading)*(.10+emitted*.08);
+    extra.z-=Math.sin(heading)*(.10+emitted*.08);
+    this.pointBullet(extra,heading);
+    combat.bullets.push(extra);used.add(target.id);emitted++;
    }
-   this.message('極限手速：追加 '+count+' 發');
+   if(emitted)this.message('分裂子彈：'+(emitted+1)+' 道彈線');
   }
+  // Extreme quick hands consumes real additional cartridges, unlike splits.
+  const extraCount=Math.min(this.bonusShots[gun],this.ammo[gun]);
+  this.bonusShots[gun]=0;
+  if(extraCount>0){
+   const heading=Math.atan2(bullet.dx,bullet.dz);
+   for(let i=0;i<extraCount;i++){
+    const clone={...bullet,id:combat.seq++,targetId:bullet.targetId,
+     splitDepth:0,splitTargetId:null};
+    this.pointBullet(clone,heading+(i-(extraCount-1)/2)*.085);
+    combat.bullets.push(clone);
+    this.ammo[gun]--;
+   }
+   this.message('極限手速：追加 '+extraCount+' 發（耗彈）');
+  }
+  if(this.ammo[gun]===0)this.beginReload(combat);
+  this.updateIndicator(combat);
  }
  pointBullet(b,angle){b.angle=angle;b.dx=Math.sin(angle);b.dz=Math.cos(angle)}
  onBlockedBullet(combat,b,impact){
@@ -199,7 +268,10 @@ export class BattlePerks{
   if(!targets.length)return;
   const target=targets[0],heading=Math.atan2(target.pos.x-impact.x,target.pos.z-impact.z);
   const bullet={...b,id:combat.seq++,x:impact.x,z:impact.z,bounces:(b.bounces||0)+1,
-    damage:Math.max(1,b.damage*.77),targetId:target.id,range:Math.min(22,b.range)};
+    damage:Math.max(1,b.damage*.77),targetId:target.id,
+    // A ricochet from a split bullet must update its exclusive target.
+    splitTargetId:b.splitTargetId==null?null:target.id,
+    range:Math.min(22,b.range)};
   this.pointBullet(bullet,heading);
   // Parent bullet update replaces its active array at frame end; queue the
   // ricochet until that update is complete to avoid silently losing it.
@@ -207,22 +279,6 @@ export class BattlePerks{
  }
  flushRicochets(combat){
   if(this.ricochetQueue.length)combat.bullets.push(...this.ricochetQueue.splice(0));
- }
- splitHit(combat,first,base){
-  const maxTargets=this.level('分裂子彈')+1;
-  if(maxTargets<=1||this.splitting||!first||first.combatDead&&base<=0)return;
-  this.splitting=true;
-  try{
-   const used=new Set([first.id]);let origin=first.pos;
-   for(let i=1;i<maxTargets;i++){
-    const target=combat.enemies.filter(n=>!n.combatDead&&!n.incoming&&!used.has(n.id)&&
-      dist(n.pos,origin)<=5.5&&combat.shotLineClear(origin,n.pos,.1))
-      .sort((a,b)=>dist(a.pos,origin)-dist(b.pos,origin))[0];
-    if(!target)break;
-    used.add(target.id);origin=target.pos;
-    combat.damageNPC(target,Math.max(1,Math.round(base*Math.pow(.72,i))),'bullet');
-   }
-  }finally{this.splitting=false}
  }
  onKill(combat){
   const n=this.level('彈簧棉被');
@@ -232,19 +288,26 @@ export class BattlePerks{
    if(combat.hp>old){combat.refreshHUD(true);this.message('彈簧棉被：恢復 '+Math.ceil(combat.hp-old)+' HP')}
   }
  }
- punchDamage(combat,damage){
-  return this.level('起床氣')&&combat.hp<40
-   ?damage*(1+this.level('起床氣')*.1):damage;
+ damageMultiplier(combat,kind,bullet=null){
+  const rage=this.level('起床氣');
+  let factor=rage&&combat.hp<40?1+rage*.10:1;
+  const reloadPenalty=this.level('被角纏腳');
+  if(reloadPenalty){
+   const current=combat.time<this.reloadPenaltyUntil
+    ?1-[0,.20,.30,.50][reloadPenalty]:1;
+   // Bullet remembers its penalty at the instant of FIRING, not impact.
+   factor*=kind==='bullet'&&bullet?.reloadPenalty!==undefined
+    ?bullet.reloadPenalty:current;
+  }
+  return factor;
  }
- pullTarget(combat,target){
-  const p=[0,.10,.20,.30][this.level('拔錯根')];
-  if(!p||Math.random()>=p||target.combatDead)return;
-  const a=combat.player.pos,d=dist(a,target.pos);
-  if(d<.85)return;
-  const amount=Math.min(.85,d-.85);
-  const next=combat.moveTalentEnemy(target,(a.x-target.pos.x)/d*amount,
-    (a.z-target.pos.z)/d*amount);
-  target.pos=next;
+ backfirePunch(combat){
+  const level=this.level('拔錯根');
+  if(!level||Math.random()>=[0,.20,.35,.50][level])return false;
+  // Player suffers the hit instead of the intended red soldier.
+  this.message('拔錯根！拳頭打到自己');
+  combat.damagePlayer([0,6,9,12][level],'self');
+  return true;
  }
  landed(combat,n){
   const lvl=this.level('力大無窮');
@@ -261,6 +324,9 @@ export class BattlePerks{
  }
  damageToPlayer(combat,amount,kind){
   if(this.invincibleUntil>combat.time)return 0;
+  // Failed punches are self-inflicted. They must not be reduced by the
+  // ENEMY-only 金鐘罩 armor or absorbed by the incoming-bullet shield.
+  if(kind==='self')return amount;
   const shieldLevel=this.level('已讀不回');
   if(shieldLevel&&this.shield>0){
    this.shield--;this.shieldNext=combat.time+[0,15,10,6][shieldLevel];
@@ -268,7 +334,7 @@ export class BattlePerks{
   }
   let d=amount*(1-[0,.08,.15,.22][this.level('金鐘罩')]);
   if(combat.hp<30)d*=1+this.level('吃土專家')*.1;
-  const reflect=[0,.10,.20,.30][this.level('反彈訊息')];
+  const reflect=[0,.25,.40,.60][this.level('反彈訊息')];
   if(kind==='bullet'&&!this.reflecting&&Math.random()<reflect){
    const target=combat.enemies.filter(n=>!n.combatDead&&!n.incoming&&
     dist(n.pos,combat.player.pos)<20&&combat.shotLineClear(combat.player.pos,n.pos,.12))
@@ -277,7 +343,8 @@ export class BattlePerks{
     this.reflecting=true;
     try{combat.damageNPC(target,Math.max(1,Math.round(d)),'reflect')}
     finally{this.reflecting=false}
-    this.message('反彈訊息！');
+    this.message('反彈訊息：彈回敵軍！');
+    return 0; // A truly reflected bullet no longer hurts the player.
    }
   }
   const level=this.level('雜草的根性');
@@ -312,7 +379,7 @@ export class BattlePerks{
   const due=this.events.filter(e=>e.at<=combat.time);
   this.events=this.events.filter(e=>e.at>combat.time);
   for(const e of due){
-   if(e.kind==='main'&&Math.random()<([0,.08,.16,.24][this.level('啞彈大師')])){
+   if(e.kind==='main'&&Math.random()<([0,.20,.35,.50][this.level('啞彈大師')])){
     combat.spawnFx({...e.pos,y:1.2},'campHitBurst','啞彈',420);this.message('啞彈！');continue;
    }
    const area=1+[0,.25,.50,.80][this.level('爆炸藝術家')];

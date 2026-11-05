@@ -712,7 +712,9 @@ export class CampCombat{
     if(b.owner==='player'){
      for(const n of this.npcs){
       if(n.combatDead)continue;
-      if(distance(at,n.pos)<.47){this.damageNPC(n,b.damage,'bullet');alive=false;break}
+      if((b.splitTargetId==null||n.id===b.splitTargetId)&&distance(at,n.pos)<.47){
+       this.damageNPC(n,b.damage,'bullet',b);alive=false;break
+      }
      }
     }else if(distance(at,this.player.pos)<.38){
      this.damagePlayer(b.damage,'bullet');alive=false;
