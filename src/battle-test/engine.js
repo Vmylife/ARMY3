@@ -1,8 +1,8 @@
 // ARMY3 enemy-wave sandbox, intentionally NOT imported by the main camp.
 // Uses the approved punch, gun, knockdown and stand-up combat mechanics.
-import {CampCombat,lineClear,COMBAT_RISE_SECONDS,COMBAT_DOWN_SECONDS} from '../systems/campCombat.js?v=12';
-import {moveNpc,staticClearance,canOccupy} from '../map/navCollision109.js?v=124';
-import {battleRoute,battleClear} from './battleNav.js?v=2';
+import {CampCombat,COMBAT_RISE_SECONDS,COMBAT_DOWN_SECONDS} from '../systems/campCombat.js?v=13';
+import {moveNpc,canOccupy,bulletClearance,bulletLineClear,meleeLineClear} from './battleCollision.js?v=1';
+import {battleRoute,battleClear} from './battleNav.js?v=3';
 import {waveEntry} from './breaches.js?v=5';
 import {insidePerimeter} from '../map/camp.js?v=093';
 import {renderBattleSettlement} from './settlement.js?v=3';
@@ -99,6 +99,9 @@ export class ArmyBattleCombat extends CampCombat{
  }
  // Run the established player's combat engine but keep its training-camp
  // "all NPCs must chase the player" code disabled in this battle sandbox.
+ shotLineClear(a,b,padding=.11){return bulletLineClear(a,b,padding)}
+ meleeLineClear(a,b,padding=.11){return meleeLineClear(a,b,padding)}
+ shotClearance(pos){return bulletClearance(pos)}
  tryAttack(){const result=super.tryAttack();this.provoked=false;return result}
  damageNPC(n,damage,kind='bullet'){super.damageNPC(n,damage,kind);this.provoked=false}
  // Allied bullets must never contribute to the player's floating damage or HIT COMBO.
@@ -177,7 +180,7 @@ export class ArmyBattleCombat extends CampCombat{
   let currentDist=Infinity;
   if(current&&!current.combatDead&&!current.incoming&&insidePerimeter(current.pos)){
    currentDist=dist(a.pos,current.pos);
-   if(currentDist>24||!lineClear(a.pos,current.pos,.12))currentDist=Infinity;
+   if(currentDist>24||!this.shotLineClear(a.pos,current.pos,.12))currentDist=Infinity;
   }
   const scanDue=this.time>=(a.battleScanAt||0)||!Number.isFinite(currentDist);
   if(!scanDue)return Number.isFinite(currentDist)?current:null;
@@ -187,7 +190,7 @@ export class ArmyBattleCombat extends CampCombat{
    if(n.combatDead||n.incoming||!insidePerimeter(n.pos))continue;
    const d=dist(a.pos,n.pos);
    if(d>=24||d>=nearestDist)continue;
-   if(!lineClear(a.pos,n.pos,.12))continue;
+   if(!this.shotLineClear(a.pos,n.pos,.12))continue;
    nearest=n;nearestDist=d;
   }
   const keepCurrent=Number.isFinite(currentDist)&&
@@ -342,13 +345,14 @@ export class ArmyBattleCombat extends CampCombat{
   }
   return target;
  }
- seesTarget(n,target){
+ seesTarget(n,target,melee=false){
   if(!target)return false;
   const cached=n.battleSight;
-  if(cached&&cached.target===target&&this.time-cached.at<.19&&
+  if(cached&&cached.target===target&&cached.melee===melee&&this.time-cached.at<.19&&
      dist(cached.npos,n.pos)<.5&&dist(cached.tpos,target.pos)<.5)return cached.visible;
-  const visible=lineClear(n.pos,target.pos,.13);
-  n.battleSight={target,at:this.time,npos:{...n.pos},tpos:{...target.pos},visible};
+  const visible=melee?this.meleeLineClear(n.pos,target.pos,.13):
+                       this.shotLineClear(n.pos,target.pos,.13);
+  n.battleSight={target,melee,at:this.time,npos:{...n.pos},tpos:{...target.pos},visible};
   return visible;
  }
  fireNPC(n,target=this.nearestTarget(n)){
@@ -383,7 +387,7 @@ export class ArmyBattleCombat extends CampCombat{
     if(!n.combatStrikeApplied&&n.combatAttack<=.41){
      n.combatStrikeApplied=true;
      const victim=this.nearestTarget(n);
-     if(victim&&dist(n.pos,victim.pos)<1.93&&this.seesTarget(n,victim)){
+     if(victim&&dist(n.pos,victim.pos)<1.93&&this.seesTarget(n,victim,true)){
       if(victim===this.player)this.damagePlayer(9,'punch');
       else this.damageAlly(victim,9);
      }
@@ -425,8 +429,8 @@ export class ArmyBattleCombat extends CampCombat{
    const target=this.nearestTarget(n);
    if(!target){n.anim.setClip('Idle');n.anim.rifleAim=0;continue}
    n.assaultTarget=target;n.activity='攻擊最近目標';n.home.job='life';n.state='combat';
-   const d=dist(n.pos,target.pos),visible=d<21&&this.seesTarget(n,target);
-   const fist=n.combatWeapon==='fists';
+   const d=dist(n.pos,target.pos),fist=n.combatWeapon==='fists';
+   const visible=d<21&&this.seesTarget(n,target,fist);
    n.anim.rifleAim=fist?0:Math.min(1,(n.anim.rifleAim||0)+dt*7);
    if(fist&&d<=1.64&&visible){
     if(n.combatCooldown<=0&&n.combatAttack<=0){
@@ -439,7 +443,7 @@ export class ArmyBattleCombat extends CampCombat{
     }
    }
    const ranged=!fist&&d<20&&visible&&shooterSet.has(n);
-   const chase=n.combatAttack<=0&&(!ranged||d>9)&&d>(fist?1.4:5);
+   const chase=n.combatAttack<=0&&(!ranged||d>9)&&(fist?(d>1.4||!visible):d>5);
    // Orient running soldiers toward their REAL displacement, never the moving
    // target behind them. This prevents side-sliding while routing around props.
    let actualMove=null;
@@ -526,7 +530,7 @@ export class ArmyBattleCombat extends CampCombat{
    let travel=Math.min(b.range,b.speed*dt),alive=true;
    while(travel>.0001&&alive){
     const step=Math.min(.095,travel),next={x:b.x+b.dx*step,z:b.z+b.dz*step};
-    if(!insidePerimeter(next)||staticClearance(next)<.065){alive=false;break}
+    if(!insidePerimeter(next)||this.shotClearance(next)<.065){alive=false;break}
     // Same collision shape as real gunfire; buildings always stop the projectile.
     // The base bullet system handles player bullets against enemy actors.
     b.x=next.x;b.z=next.z;b.range-=step;travel-=step;

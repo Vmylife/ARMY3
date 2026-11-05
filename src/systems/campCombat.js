@@ -473,6 +473,11 @@ export class CampCombat{
    return {clip:'Punch_Combo_1',speed:(this.player.anim.clips.Punch_Combo_1.duration||1.3)/(.72*1.45)};
   return {clip:normalClip,speed:normalSpeed};
  }
+ // Battle overrides only these projectile and melee collision policies.
+ // All other camp callers receive the previous line/clearance behavior.
+ shotLineClear(a,b,padding=.11){return lineClear(a,b,padding)}
+ meleeLineClear(a,b,padding=.11){return lineClear(a,b,padding)}
+ shotClearance(pos){return staticClearance(pos)}
  tryAttack(){
   if(this.gameOver||this.interactionMode||this.wheelOpen||this.playerDown>0||this.playerRise>0||
      this.playerHurt>0||window.armyMinigameActive||this.playerCooldown>0)return false;
@@ -489,7 +494,7 @@ export class CampCombat{
    if(d>26||d<.01)continue;
    const dot=(dx*forward.x+dz*forward.z)/d;
    if(dot<Math.cos(7.5*Math.PI/180))continue;
-   if(!lineClear(p,n.pos,.10))continue;
+   if(!this.shotLineClear(p,n.pos,.10))continue;
    if(d<min){min=d;target=n}
   }
   if(target)aim=Math.atan2(target.pos.x-p.x,target.pos.z-p.z);
@@ -512,7 +517,7 @@ export class CampCombat{
   for(const {n,d} of nearby){
    if(d>1.85)break;
    const vx=(n.pos.x-p.x)/Math.max(.01,d),vz=(n.pos.z-p.z)/Math.max(.01,d);
-   if(vx*direction.x+vz*direction.z<.22||!lineClear(p,n.pos,.1))continue;
+   if(vx*direction.x+vz*direction.z<.22||!this.meleeLineClear(p,n.pos,.1))continue;
    this.damageNPC(n,10,'punch');return;
   }
  }
@@ -649,7 +654,7 @@ export class CampCombat{
  canSeeNPC(n){
   const p=this.player.pos,c=n.combatSight;
   if(c&&this.time-c.time<.18&&distance(n.pos,c.from)<.65&&distance(p,c.to)<.65)return c.visible;
-  const visible=lineClear(n.pos,p,.13);
+  const visible=this.shotLineClear(n.pos,p,.13);
   n.combatSight={time:this.time,from:{...n.pos},to:{...p},visible};
   return visible;
  }
@@ -663,7 +668,7 @@ export class CampCombat{
  fireNPC(n){
   if(this.playerDown>0||this.playerRise>0||this.gameOver)return;
   const origin=n.pos,p=this.player.pos;
-  if(!lineClear(origin,p,.13))return;
+  if(!this.shotLineClear(origin,p,.13))return;
   const dx=p.x-origin.x,dz=p.z-origin.z,d=Math.hypot(dx,dz);
   if(d<.01)return;
   const precision=n.combatWeapon==='rifle'?.095:.13;
@@ -685,7 +690,7 @@ export class CampCombat{
    // run across the camp. Locks stop when a building blocks the view.
    if(b.owner==='player'&&b.targetId!=null){
     const tracked=this.npcs.find(n=>n.id===b.targetId&&!n.combatDead);
-    if(tracked&&lineClear({x:b.x,z:b.z},tracked.pos,.10)){
+    if(tracked&&this.shotLineClear({x:b.x,z:b.z},tracked.pos,.10)){
      const desired=Math.atan2(tracked.pos.x-b.x,tracked.pos.z-b.z);
      const current=Math.atan2(b.dx,b.dz);
      const delta=Math.atan2(Math.sin(desired-current),Math.cos(desired-current));
@@ -698,7 +703,7 @@ export class CampCombat{
     const segment=Math.min(travel,.095);
     const x=b.x+b.dx*segment,z=b.z+b.dz*segment,at={x,z};
     // A real bullet disappears at the first collision; no through-wall hits.
-    if(!insidePerimeter(at)||staticClearance(at)<.065){alive=false;break}
+    if(!insidePerimeter(at)||this.shotClearance(at)<.065){alive=false;break}
     b.x=x;b.z=z;b.range-=segment;travel-=segment;
     if(b.owner==='player'){
      for(const n of this.npcs){

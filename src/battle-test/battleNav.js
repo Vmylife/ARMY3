@@ -1,6 +1,6 @@
 // Independent assault navigation: all traversable grass and pavement cost the
 // same. Buildings, fixtures and the real camp boundary still block movement.
-import {canOccupy} from '../map/navCollision109.js?v=124';
+import {canOccupy} from './battleCollision.js?v=1';
 const STEP=1,LEFT=-46,BOTTOM=-21,NX=92,NZ=48,COUNT=NX*NZ;
 const RADIUS=.40,MAX_SEARCH=COUNT;
 const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));

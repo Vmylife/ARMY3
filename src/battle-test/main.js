@@ -6,13 +6,13 @@ import {ArmyRenderer} from './renderer.js?v=1';
 import {RigAnimator} from '../characters/rigAnimator.js?v=121';
 import {installUserCombatClips} from '../fight-lab/uploadedHitAnimations.js?v=1';
 import {CAMP} from '../map/camp.js?v=093';
-import {movePlayer} from '../map/navCollision109.js?v=124';
+import {movePlayer} from './battleCollision.js?v=1';
 import {drawMinimap} from '../ui/minimap.js?v=093';
 import {initWorldMap} from '../ui/worldMap.js?v=093';
 import {setupInput} from '../ui/input.js?v=062';
 import {options} from '../systems/settings.js?v=060';
 import {createCampNPCs,updateCampNPCs} from '../systems/npcLife113.js?v=128';
-import {createArmyBattle,BATTLE_SPAWN} from './engine.js?v=15';
+import {createArmyBattle,BATTLE_SPAWN} from './engine.js?v=16';
 
 const $=id=>document.getElementById(id);
 const debug=new URLSearchParams(location.search).has('debug');

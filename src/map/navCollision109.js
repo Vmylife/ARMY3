@@ -58,38 +58,56 @@ export function buildingDistance(p,b){
  const o=buildingFootprint(b);return boxDistance(p,o,o.hx,o.hz);
 }
 const blockers=PROPS.filter(p=>Object.hasOwn(CFG,p.type));
-export function staticClearance(pos){
+const LOW_COVER=new Set(['sandbag','hurdle','crate']);
+// Optional battle-only policy. Omitted options preserve ordinary camp physics.
+export function staticClearance(pos,options=null){
  let min=Infinity;
  for(const b of BUILDINGS){if(Math.abs(pos.x-b.x)>b.w+3||Math.abs(pos.z-b.z)>b.d+3)continue;
   min=Math.min(min,buildingDistance(pos,b));}
  for(const p of blockers){if(Math.abs(pos.x-p.x)>4.8||Math.abs(pos.z-p.z)>4.8)continue;
-  min=Math.min(min,propDistance(pos,p));}
+  if(options?.ignoreLowCover&&LOW_COVER.has(p.type))continue;
+  const value=options?.solidHurdles&&p.type==='hurdle'
+   ?boxDistance(pos,p,.78*scaleOf(p),.16*scaleOf(p))
+   :propDistance(pos,p);
+  min=Math.min(min,value);}
  return min;
 }
-export function canOccupy(pos,radius=NPC_RADIUS){
+export function canOccupy(pos,radius=NPC_RADIUS,options=null){
  return Number.isFinite(pos.x)&&Number.isFinite(pos.z)&&insidePerimeter(pos)&&
-  staticClearance(pos)>=radius;
+  staticClearance(pos,options)>=radius;
 }
-function canAdvance(prev,next,radius){
+function canAdvance(prev,next,radius,options=null){
  if(!insidePerimeter(next))return false;
- // An actor in an invalid/overlapping position is allowed to move *outward*.
- const before=staticClearance(prev),after=staticClearance(next);
- return after>=radius||after>before+1e-4;
+ if(!options?.solidHurdles){
+  const before=staticClearance(prev,options),after=staticClearance(next,options);
+  return after>=radius||after>before+1e-4;
+ }
+ // Sweep long steps so mobile characters cannot skip through a hurdle beam.
+ const steps=Math.max(1,Math.ceil(Math.hypot(next.x-prev.x,next.z-prev.z)/.10));
+ let previousClearance=staticClearance(prev,options);
+ for(let i=1;i<=steps;i++){
+  const t=i/steps,point={x:prev.x+(next.x-prev.x)*t,z:prev.z+(next.z-prev.z)*t};
+  if(!insidePerimeter(point))return false;
+  const clearance=staticClearance(point,options);
+  if(clearance<radius&&clearance<=previousClearance+1e-4)return false;
+  previousClearance=clearance;
+ }
+ return true;
 }
-export function moveWithCollision(pos,dx,dz,radius=PLAYER_RADIUS){
+export function moveWithCollision(pos,dx,dz,radius=PLAYER_RADIUS,options=null){
  if(!Number.isFinite(dx)||!Number.isFinite(dz))return pos;
  const one=(order)=>{
   let p=pos;
   for(const axis of order){const to=clampPos({x:p.x+(axis==='x'?dx:0),z:p.z+(axis==='z'?dz:0)});
-   if(canAdvance(p,to,radius))p=to;}
+   if(canAdvance(p,to,radius,options))p=to;}
   return p;
  };
  const a=one(['x','z']),b=one(['z','x']);
  const tx=pos.x+dx,tz=pos.z+dz;
  return sq(a.x-tx,a.z-tz)<=sq(b.x-tx,b.z-tz)?a:b;
 }
-export function movePlayer(pos,dx,dz,npcs){
- const next=moveWithCollision(pos,dx,dz,PLAYER_RADIUS);
+export function movePlayer(pos,dx,dz,npcs,options=null){
+ const next=moveWithCollision(pos,dx,dz,PLAYER_RADIUS,options);
  const distance=Math.hypot(next.x-pos.x,next.z-pos.z);
  if(distance<1e-6)return pos;
  for(const n of npcs){
@@ -102,14 +120,14 @@ export function movePlayer(pos,dx,dz,npcs){
   // Players have priority; recruit yields, but never gets pushed through walls.
   const vx=dist>.001?-a/dist:dx/(Math.hypot(dx,dz)||1),vz=dist>.001?-b/dist:dz/(Math.hypot(dx,dz)||1);
   const shift=Math.min(.21,min-dist+.04);
-  const pushed=moveWithCollision(n.pos,vx*shift,vz*shift,NPC_RADIUS);
+  const pushed=moveWithCollision(n.pos,vx*shift,vz*shift,NPC_RADIUS,options);
   const fits=npcs.every(o=>o===n||o.combatDead||Math.hypot(pushed.x-o.pos.x,pushed.z-o.pos.z)>NPC_RADIUS*2-.03);
   if(fits&&Math.hypot(pushed.x-n.pos.x,pushed.z-n.pos.z)>.001){n.pos=pushed;n.route=null;}
   else return pos;
  }
  return next;
 }
-export function moveNpc(n,dx,dz,npcs,playerPos){
+export function moveNpc(n,dx,dz,npcs,playerPos,options=null){
  const pos=n.pos,speed=Math.hypot(dx,dz);
  if(speed<1e-8)return pos;
  let ux=dx/speed,uz=dz/speed;
@@ -135,7 +153,7 @@ export function moveNpc(n,dx,dz,npcs,playerPos){
                             :[0,-.48,.48,-.95,.95,-1.4,1.4,Math.PI];
  let best=pos,bestScore=-Infinity;
  for(const angle of headings){const co=Math.cos(angle),si=Math.sin(angle),xx=ux*co-uz*si,zz=ux*si+uz*co;
-  const moved=moveWithCollision(pos,xx*speed,zz*speed,NPC_RADIUS);
+  const moved=moveWithCollision(pos,xx*speed,zz*speed,NPC_RADIUS,options);
   const actual=Math.hypot(moved.x-pos.x,moved.z-pos.z);
   if(actual<speed*.12)continue;
   // When two recruits are already overlapping, accept a step only if it
