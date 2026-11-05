@@ -1,6 +1,6 @@
 // Army v0.10.10: keep the approved 3D camp; add autonomous NPC utility decisions, social interactions, and action labels.
 import {CampBuildings,BUILDING_MODELS} from '../buildings/buildingRenderer.js?v=112';
-import {CampProps,PROP_MODELS} from './props.js?v=3';
+import {CampProps,PROP_MODELS} from './props.js?v=4';
 import {loadGlb} from '../core/glb111.js?v=111';
 import {ArmyRenderer} from './renderer.js?v=1';
 import {RigAnimator} from '../characters/rigAnimator.js?v=121';
@@ -12,7 +12,7 @@ import {initWorldMap} from '../ui/worldMap.js?v=093';
 import {setupInput} from '../ui/input.js?v=062';
 import {options} from '../systems/settings.js?v=060';
 import {createCampNPCs,updateCampNPCs} from '../systems/npcLife113.js?v=128';
-import {createArmyBattle,BATTLE_SPAWN} from './engine.js?v=7';
+import {createArmyBattle,BATTLE_SPAWN} from './engine.js?v=9';
 
 const $=id=>document.getElementById(id);
 const debug=new URLSearchParams(location.search).has('debug');
@@ -99,14 +99,33 @@ async function boot(){
   await Promise.all(Array.from({length:Math.min(2,jobs.length)},worker));
   progress('模型完成，正在準備第一個畫面…');
 
-  // Independent battle pool: 5 green defenders and 30 reusable red soldiers.
+  // 5 defenders, 30 initial enemies; expand the red pool on demand so
+  // living soldiers are NEVER overwritten by a later timed wave.
   const player={pos:{...BATTLE_SPAWN.player},angle:0,anim:new RigAnimator(heroGlb)};
   delete player.anim.clips.Jump_Over_Obstacle_2;
   installUserCombatClips(player.anim);
   player.anim.setClip('Idle');player.anim.evaluate(0);
   const npcs=createCampNPCs(npcGlb,player.anim);
   const allies=npcs.slice(0,5),enemies=npcs.slice(5);
-  const combat=createArmyBattle({player,allies,enemies,renderer,rifleGlb:combatRifleGlb,npcGlb});
+  const template=enemies[0];let nextRedId=Math.max(...npcs.map(n=>n.id))+1;
+  function createEnemy(){
+   // The same immutable animation clips are shared by all recruits. Only
+   // per-soldier clocks, bone matrices and world transforms are allocated.
+   const anim=Object.assign(Object.create(Object.getPrototypeOf(template.anim)),template.anim);
+   anim.bones=new Float32Array(template.anim.bones.length);
+   anim.globals=new Map();anim.clip='Idle';anim.clock=0;anim.prevClip=null;
+   anim.prevTime=0;anim.transition=0;anim.completed=false;
+   anim.rifleAim=0;anim.recoil=0;anim.speed=1;anim.evaluate(0);
+   const id=nextRedId++;
+   const npc={...template,id,name:'紅軍'+id,pos:{x:200+id,z:200},
+    angle:0,anim,home:{job:'life',x:0,z:0},state:'combat',activity:'待命',
+    task:null,reservation:null,clock:0,route:null,routeGoal:null,routeIndex:0,
+    squadEscape:null,trafficHeading:null,isEnemy:true,faction:'enemy',
+    assaultVisible:false,incoming:false,combatDead:true,combatActive:false};
+   npcs.push(npc);enemies.push(npc);
+   return npc;
+  }
+  const combat=createArmyBattle({player,allies,enemies,renderer,rifleGlb:combatRifleGlb,npcGlb,createEnemy});
   window.armyBattleTest=combat;
   progress('玩家、5 名友軍、紅軍波次已就位');
   // The new cross-legged clip drops the hips below the original standing root.
@@ -184,7 +203,7 @@ async function boot(){
        combat.playerHurt>0||combat.weapon==='fists')?0:1;
     player.anim.rifleAim+=(targetAim-player.anim.rifleAim)*Math.min(1,simDt*10);
     player.anim.evaluate(simDt);
-    // Sync battle collision targets without running any of the 35 civilian life schedules.
+    // Sync collision targets without running any civilian life schedules.
     updateCampNPCs([],0,now,player.pos,npcs);
     combat.update(simDt,now,{blocked:mapOpen});
     // Camera feedback is visual only: never mutate the user's saved camera orientation.

@@ -3,7 +3,7 @@
 import {CampCombat,lineClear,COMBAT_RISE_SECONDS,COMBAT_DOWN_SECONDS} from '../systems/campCombat.js?v=12';
 import {moveNpc,staticClearance,canOccupy} from '../map/navCollision109.js?v=124';
 import {battleRoute} from './battleNav.js?v=1';
-import {waveEntry} from './breaches.js?v=3';
+import {waveEntry} from './breaches.js?v=4';
 import {insidePerimeter} from '../map/camp.js?v=093';
 const $=id=>document.getElementById(id);
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
@@ -11,14 +11,35 @@ const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 export const BATTLE_SPAWN={player:{x:22.4,z:13.2},allies:[
  {x:16.6,z:14.1},{x:19.3,z:13.5},{x:22.0,z:11.0},{x:24.9,z:13.6},{x:27.1,z:11.7}
 ]};
-// First wave has 10 enemies; later waves continue increasing.
-export const WAVE_SIZE=wave=>Math.min(24,10+Math.ceil(Math.max(0,wave-1)*2.5));
+// Every wave arrives on schedule, irrespective of survivors.
+export const WAVE_INTERVAL=15;
+export function waveLoadout(wave){
+ if(wave===1)return {fists:10,pistol:0,rifle:0};
+ if(wave===2)return {fists:7,pistol:5,rifle:0};
+ if(wave===3)return {fists:5,pistol:5,rifle:4};
+ if(wave===4)return {fists:5,pistol:5,rifle:6};
+ if(wave===5)return {fists:3,pistol:5,rifle:10};
+ return {fists:2,pistol:6,rifle:Math.min(16,10+(wave-5)*2)};
+}
+export const WAVE_SIZE=wave=>Object.values(waveLoadout(wave)).reduce((a,b)=>a+b,0);
+export function waveWeapons(wave){
+ const remain={...waveLoadout(wave)},used={fists:0,pistol:0,rifle:0};
+ const total=WAVE_SIZE(wave),weapons=[],order=['fists','pistol','rifle'];
+ for(let i=0;i<total;i++){
+  const type=order.filter(k=>remain[k]>0)
+   .sort((a,b)=>(waveLoadout(wave)[b]*(i+1)/total-used[b])-
+                (waveLoadout(wave)[a]*(i+1)/total-used[a]))[0];
+  weapons.push(type);remain[type]--;used[type]++;
+ }
+ return weapons;
+}
 export class ArmyBattleCombat extends CampCombat{
- constructor({player,enemies,allies,renderer,rifleGlb,npcGlb}){
+ constructor({player,enemies,allies,renderer,rifleGlb,npcGlb,createEnemy}){
   super({player,npcs:enemies,renderer,rifleGlb,npcGlb});
   this.allies=allies;
-  this.wave=0;this.waveActive=false;this.waveDelay=1.8;this.running=false;
+  this.wave=0;this.waveTimer=1.8;this.running=false;
   this.totalSpawns=0;this.defenderKills=0;this.enemies=enemies;
+  this.createEnemy=createEnemy;
   this.nameplateState='';this.lastWaveCount=-1;
   this.interactionMode=false;this.weapon='rifle';this.provoked=false;
   this.invincible=false;this.maxShooters=7;
@@ -104,29 +125,38 @@ export class ArmyBattleCombat extends CampCombat{
  }
  spawnWave(){
   this.wave++;
-  const count=Math.min(this.enemies.length,WAVE_SIZE(this.wave)),pool=this.enemies.slice(0,count);
-  this.waveDelay=0;this.waveActive=true;
+  const weapons=waveWeapons(this.wave),wanted=weapons.length;
+  // Preserve ALL survivors from previous waves. Recycle only finished dead
+  // actors; allocate lightweight extra rigs when the 30 initial reds run out.
+  const pool=this.enemies.filter(n=>n.combatDead&&!n.incoming&&
+   (!n.assaultVisible||this.time-(n.combatDeathAt||0)>COMBAT_DOWN_SECONDS+1))
+   .slice(0,wanted);
+  while(pool.length<wanted){
+   if(typeof this.createEnemy!=='function')break;
+   const fresh=this.createEnemy();
+   if(!fresh)break;
+   pool.push(fresh);
+  }
   for(let i=0;i<pool.length;i++){
-   const n=pool[i],entry=waveEntry(i,count);
+   const n=pool[i],entry=waveEntry(i,pool.length,this.wave);
    n.pos={...entry.start};n.entryTarget={...entry.entry};n.entrySide=entry.side;
+   n.battleApproach={...entry.approach};n.battleStageDone=false;
+   n.battleAttackOffset={...entry.flank};
    n.angle=Math.atan2(entry.entry.x-n.pos.x,entry.entry.z-n.pos.z);
-   n.assaultVisible=true;n.incoming=true;
+   n.assaultVisible=true;n.incoming=true;n.waveNumber=this.wave;
    n.combatDead=false;n.combatActive=false;n.combatHP=100;n.combatDamageSinceFall=0;
    n.combatDown=0;n.combatRise=0;n.combatFall=0;n.combatDeathClip=false;n.combatRestLift=undefined;
    n.combatHurt=0;n.combatHurtFull=0;n.combatCooldown=.45+(i%4)*.18;
    n.combatAttack=0;n.combatStrikeApplied=true;n.combatGoal=null;n.combatNextMove=0;n.combatLastMove=-100;
-   n.combatPush=null;n.combatWeapon=this.wave>=3?'rifle':this.wave>=2?'pistol':'fists';
+   n.combatPush=null;n.combatWeapon=weapons[i];
    n.battleSight=null;n.assaultTarget=null;n.assaultGoalTarget=null;
    n.battlePath=null;n.battlePathIndex=0;n.battlePathGoal=null;n.battleNextPlan=0;
-   n.battleFlank=((i%7)-3)*1.30;n.combatStall=0;
-   n.route=null;n.routeGoal=null;n.routeIndex=0;n.replanAt=0;n.squadEscape=null;
-   n.anim.setClip('Running',{restart:true});n.anim.speed=1.20;n.anim.rifleAim=0;
+   n.combatStall=0;n.route=null;n.routeGoal=null;n.routeIndex=0;n.replanAt=0;n.squadEscape=null;
+   n.anim.setClip('Running',{restart:true});n.anim.speed=1.2;n.anim.rifleAim=0;
   }
-  for(const n of this.enemies.slice(count)){
-   n.assaultVisible=false;n.combatDead=true;n.combatActive=false;n.incoming=false;n.pos={x:200+n.id,z:200}
-  }
-  this.totalSpawns+=count;
-  this.showIntroBanner('第 '+this.wave+' 波 · '+count+' 名紅軍從圍牆外多路突破！',2200);
+  this.totalSpawns+=pool.length;
+  const set=waveLoadout(this.wave);
+  this.showIntroBanner('第 '+this.wave+' 波：拳 '+set.fists+' · 手槍 '+set.pistol+' · 步槍 '+set.rifle,2000);
   this.updateBattleHUD();
  }
 
@@ -376,9 +406,14 @@ export class ArmyBattleCombat extends CampCombat{
    // target behind them. This prevents side-sliding while routing around props.
    let actualMove=null;
    if(chase){
-    // Keep the line spread out until close, then converge on the nearest defender.
-    const flank=d>10?{x:target.pos.x+n.battleFlank,z:target.pos.z-1.1}:target.pos;
-    const goal=canOccupy(flank,.40)?flank:target.pos;
+    // Attackers approach through their assigned sector rather than
+    // immediately choosing the shortest path via the canteen road.
+    if(!n.battleStageDone&&(dist(n.pos,n.battleApproach)<2.2||
+       (d<11&&visible)))n.battleStageDone=true;
+    const base=n.battleStageDone?target.pos:n.battleApproach;
+    const off=n.battleStageDone&&d>10?n.battleAttackOffset:null;
+    const flank=off?{x:base.x+off.x,z:base.z+off.z}:base;
+    const goal=canOccupy(flank,.40)?flank:base;
     if(!n.battlePath||!n.battlePathGoal||n.assaultGoalTarget!==target||
        dist(n.battlePathGoal,goal)>2.2||this.time>=n.battleNextPlan){
      n.assaultGoalTarget=target;n.battlePathGoal={...goal};
@@ -481,9 +516,11 @@ export class ArmyBattleCombat extends CampCombat{
   if(blocked||window.armyMinigameActive)return;
   if(this.gameOver){super.update(dt,now,{blocked});return}
   dt=clamp(dt,0,.05);
-  if(!this.waveActive){
-   this.waveDelay-=dt;
-   if(this.waveDelay<=0){this.spawnWave();this.running=true}
+  // One new wave every fifteen seconds, even if the last wave is alive.
+  this.waveTimer-=dt;
+  if(this.waveTimer<=0){
+   this.spawnWave();this.running=true;
+   this.waveTimer+=WAVE_INTERVAL;
   }
   this.updateIncoming(dt);
   // Normal shooting/knockdown/recoil still run, without player-only camp aggro.
@@ -491,10 +528,7 @@ export class ArmyBattleCombat extends CampCombat{
   super.update(dt,now,{blocked});
   this.updateEnemyAI(dt,now);
   this.updateAllies(dt);
-  if(this.running&&this.waveActive&&this.liveEnemies.length===0){
-   this.waveActive=false;this.waveDelay=3.4;
-   this.showIntroBanner('第 '+this.wave+' 波守住了！',2000);
-  }
+  // Never wait for the live-enemy count to reach zero before the next wave.
   this.updateBattleHUD();
  }
 
