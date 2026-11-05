@@ -198,7 +198,7 @@ body[data-army-minigame="weed"] #bossStats{
   <div id="achGrid" class="achGrid"></div>
   <details id="achGallery" class="achGallery"><summary id="achGallerySummary">🏅 查看全部成就</summary><div id="achGalleryList" class="achGrid achGalleryList"></div></details>
   <div class="officerComment"><small>班長講評</small><p id="report">等待班長鑑定……</p></div>
-  <button id="again" class="primary reportAgain">再挑戰一次</button>
+  <button id="resultBack" class="primary reportAgain">返回軍營</button>
 </div></div>
 
 <script>
@@ -399,7 +399,12 @@ function showResults(won){
   window.armyProgression?.rewardPanel('weed',score,document.querySelector('.reportScore'));
 }
 stageUI.start.addEventListener('click',startGame);
-document.getElementById('again').addEventListener('click',startGame);
+document.getElementById('resultBack').addEventListener('click',()=>{
+ const exit=document.getElementById('armyQuickExit');
+ if(exit)exit.click();
+ else if(window.parent!==window)window.parent.postMessage({type:'ARMY3_RETURN_TO_CAMP'},location.origin);
+ else location.href='./index.html';
+});
 
 function setTool(next){if(pointer)pointer=null;tool=next;UI.hand.classList.toggle('selected',tool==='hand');UI.shovel.classList.toggle('selected',tool==='shovel');UI.guide.textContent='目前：'+(tool==='shovel'?'鏟子':'手');UI.tip.textContent=tool==='shovel'?'每點一下鏟一次；滑動不會連鏟，對準草根才會鬆草':'抓住草往上拉；相連的鬆土可以連根拔起'}
 UI.hand.addEventListener('click',()=>setTool('hand'));UI.shovel.addEventListener('click',()=>setTool('shovel'));

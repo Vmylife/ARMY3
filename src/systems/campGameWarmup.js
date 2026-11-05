@@ -5,26 +5,26 @@ import './shootingRangeLauncher.js?v=100';
 import {clearCampSession} from './campSession.js?v=144';
 const ROOT = new URL('../../', import.meta.url);
 const urls = {
- blanket:'blanket-stack.html?v=195',
- grenade:'grenade-workshop-test.html?v=195',
- shooting:'shooting-paper-range.html?v=196',
+ blanket:'blanket-stack.html?v=196',
+ grenade:'grenade-workshop-test.html?v=196',
+ shooting:'shooting-paper-range.html?v=197',
  swipe:'/Don-t-like-your-mom/army-test/index.html?v=7',
- weed:'weed-pulling.html?v=197',
- singing:'singing-memory-test.html?v=17'
+ weed:'weed-pulling.html?v=198',
+ singing:'singing-memory-test.html?v=18'
 };
 const nearbyAssets={
  blanket:[
-  urls.blanket,'blanket-stack.js?v=153','blanket-stack-scene.json?v=153',
+  urls.blanket,'blanket-stack.js?v=159','blanket-stack-scene.json?v=153',
   'assets/audio/minigames/blanket-parade-loop.mp3','src/systems/blanketSfx.js?v=170'
  ],
  grenade:[
-  urls.grenade,'grenade-user-play.html?embedded=1&v=195',
+  urls.grenade,'grenade-user-play.html?embedded=1&v=196',
   'grenade-user-scene.json?v=130','grenade-user-play-3d.js?v=138',
   'src/systems/grenadeEarlyAudio.js?v=190'
  ],
  shooting:[
-  urls.shooting,'shooting-paper.css?v=155','shooting-paper.js?v=155',
-  'shooting-paper-report.js?v=155','shooting-paper-world.js?v=149'
+  urls.shooting,'shooting-paper.css?v=156','shooting-paper.js?v=156',
+  'shooting-paper-report.js?v=156','shooting-paper-world.js?v=149'
  ],
  swipe:[
   urls.swipe,'/Don-t-like-your-mom/army-test/game.js?v=3',
@@ -32,12 +32,13 @@ const nearbyAssets={
  ],
  weed:[urls.weed],
  singing:[
-  urls.singing,'singing-memory-test.css?v=15','singing-memory-test.js?v=14',
-  'singing-settlement.js?v=15','singing-samples/junji-backing-from-start-v10.mp3'
+  urls.singing,'singing-memory-test.css?v=16','singing-memory-test.js?v=14',
+  'singing-settlement.js?v=16','singing-samples/junji-backing-from-start-v10.mp3'
  ]
 };
 const status = {blanket:{},grenade:{},shooting:{},swipe:{},weed:{},singing:{}};
 let enabled=false, active=null, warming=null, prefetching=false;
+let enterWatchdog=null;
 const seen = new Set();
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const isIdle=()=>document.body.classList.contains('army-ready')&&!document.hidden&&!active;
@@ -124,6 +125,7 @@ function warm(kind,{force=false}={}){
  frame.addEventListener('load',()=>{
   if(s.frame!==frame)return;
   s.loaded=true;
+  if(active===kind){clearTimeout(enterWatchdog);enterWatchdog=null}
   if(kind==='grenade'){
    try{
     // Workshop has the ability to preload its nested 3D scene without starting the challenge.
@@ -141,7 +143,12 @@ function warm(kind,{force=false}={}){
    }catch(e){console.debug('手榴彈預建投擲場',e)}
   }
  },{once:true});
- frame.addEventListener('error',()=>{if(s.frame===frame)discard(kind)},{once:true});
+ frame.addEventListener('error',()=>{
+  if(s.frame!==frame)return;
+  // A failed iframe must never keep the parent locked in "mini-game active".
+  if(active===kind)exit();
+  else discard(kind);
+ },{once:true});
  frame.addEventListener('load',()=>{
   // An older cached return handler may navigate only the iframe. Recover safely.
   try{if(s.frame===frame&&active===kind&&/\/index\.html$/.test(frame.contentWindow.location.pathname))exit()}catch{}
@@ -176,15 +183,25 @@ function enter(kind){
  s.frame.style.visibility='visible';s.frame.style.opacity='1';s.frame.style.pointerEvents='auto';
  s.frame.setAttribute('aria-hidden','false');
  s.frame.contentWindow?.focus?.();
+ // iOS sometimes leaves an iframe waiting forever after an interrupted load.
+ // Release the blocked camp and let the same circle be used again.
+ clearTimeout(enterWatchdog);
+ if(!s.loaded)enterWatchdog=setTimeout(()=>{
+  if(active!==kind||s.loaded)return;
+  console.warn('[營區小遊戲] 預載逾時，已解鎖原地重試：'+kind);
+  exit();
+ },25000);
  return true;
 }
 function exit(){
  if(!active)return;
- const kind=active;active=null;rewarmAfter=performance.now()+3500;
+ const kind=active;active=null;rewarmAfter=performance.now()+850;
+ clearTimeout(enterWatchdog);enterWatchdog=null;
  document.body.classList.remove('army-in-minigame');
  window.armyMinigameActive=false;
  clearCampSession();
  discard(kind);
+ window.dispatchEvent(new CustomEvent('army:training-return',{detail:{kind}}));
  // No global prefetch after exit: next approach decides which game needs files.
 }
 window.addEventListener('message',event=>{

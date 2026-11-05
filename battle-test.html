@@ -17,6 +17,21 @@ body.battle-official #battleGodToggle,
 body.battle-official #battleTalentLab,
 body.battle-official #battleWeaponLab,
 body.battle-official .battle-back{display:none!important}
+body.battle-official .battle-intro-kicker,
+body.battle-official .battle-intro-sub,
+body.battle-official .battle-intro-card p,
+body.battle-official #battleStart,
+body.battle-official #battleLoading{display:none!important}
+body.battle-official .battle-intro-card{
+ background:transparent;border:0;box-shadow:none;padding:0;width:auto;max-width:100%
+}
+body.battle-official .battle-intro-card h1{
+ margin:0;font-size:clamp(26px,7vw,38px);letter-spacing:.035em
+}
+/* Hide the game HUD while the official attack is still loading. */
+body.battle-official:not(.battle-loaded) #battleExit,
+body.battle-official:not(.battle-loaded) #minimap,
+body.battle-official:not(.battle-loaded) #battleReportNow{display:none!important}
 </style>
 <link rel="stylesheet" href="./src/ui/gameTouchGuard.css?v=1">
 <script src="./src/ui/gameTouchGuard.js?v=1" defer></script>
@@ -69,6 +84,6 @@ body.battle-official .battle-back{display:none!important}
 
 <button id="battleExit" type="button" aria-label="退出戰場">← 退出</button>
 <button id="battleReportNow" type="button" aria-label="結束防守並查看戰報" hidden>結算</button>
-<script type="module" src="./src/battle-test/bootstrap.js?v=23"></script>
+<script type="module" src="./src/battle-test/bootstrap.js?v=25"></script>
 </body>
 </html>

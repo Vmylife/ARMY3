@@ -299,3 +299,6 @@ body[data-army-minigame="singing"] .top .brand{white-space:nowrap}
  .sgr-achcard{min-height:52px}
  .sgr-actions a,.sgr-actions button{min-height:37px}
 }
+
+/* One completion per report; replay is only available through the camp. */
+#singResultOverlay .sgr-actions{grid-template-columns:1fr!important}

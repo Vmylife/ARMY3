@@ -272,7 +272,6 @@ function showRun(input={}){
  $('shootScore').textContent=score;$('shootGrade').textContent=grade+' 級';
  $('shootHistoryBest').textContent='歷史最高 '+progress.bestRun+' 分';
  $('resultHits').textContent=hits;$('resultShots').textContent=shots;$('resultRate').textContent=run.accuracy+'%';
- $('againBtn').textContent='重新挑戰';
  const rows=$('shootRunRows');
  if(rows)rows.replaceChildren();
  for(let i=1;i<=5;i++){

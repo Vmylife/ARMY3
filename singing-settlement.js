@@ -176,12 +176,7 @@
   const desc=document.createElement('span');desc.textContent=ach.desc;
   panel.append(title,desc);panel.hidden=false;
  });
- $('singReportAgain').addEventListener('click',()=>{
-  if(!current)return;
-  const run=current;current=null;++comparisonToken;
-  $('singResultOverlay').hidden=true;
-  run.restart();
- });
+
  $('singReportGalleryToggle').addEventListener('click',()=>{
   const gallery=$('singReportGallery');gallery.hidden=!gallery.hidden;
  });

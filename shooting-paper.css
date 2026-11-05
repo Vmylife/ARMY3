@@ -252,3 +252,7 @@ p{margin:8px 0 14px;font-size:13px;line-height:1.6;color:#dce5d5}
  #resultScreen .shootRunRow{grid-template-columns:46px 52px minmax(0,1fr);gap:4px;padding:4px}
  #resultScreen .shootAchCard strong{font-size:9px}
 }
+
+/* Results end with one clear action; no in-result restart shortcut. */
+#resultScreen .shootResultActions{grid-template-columns:1fr!important}
+#resultScreen .shootResultActions .backBtn{grid-column:1/-1!important}

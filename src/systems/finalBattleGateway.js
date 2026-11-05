@@ -54,8 +54,6 @@ export function createFinalBattleGateway(renderer){
    mission.classList.toggle('army-mission-alert',count>=6&&!finished);
    mission.querySelector('strong').textContent=finished?
     (won?'防禦成功':'本輪結束'):count>=6?'敵軍來襲':'完成訓練（'+count+'/6）';
-   mission.querySelector('small').textContent=finished?
-    '返回首頁準備新的一輪':count>=6?'前往彈藥庫集結':'每項訓練最多三次';
    mission.setAttribute('aria-label',count>=6&&!finished?'敵軍來襲，前往彈藥庫集結':
     '訓練進度 '+count+'/6');
   }

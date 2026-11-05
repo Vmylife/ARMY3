@@ -567,7 +567,7 @@ function showResult(){setState('result');$('actions').hidden=true;$('hud').hidde
  const result=document.createElement('div');result.id='scores';result.innerHTML=roundResults.map((r,i)=>`<div><small>第 ${i+1} 輪</small>${r.layers} 層</div>`).join('');t.append(result);
  if(totalCrushed||totalBuildings||totalMines){const p=document.createElement('p');p.textContent=`友軍 ${totalCrushed}　建築 ${totalBuildings}　地雷 ${totalMines}`;t.append(p)}
  const back=document.createElement('button');back.textContent='返回軍營';back.onclick=()=>returnToCamp();t.append(back);
- const again=document.createElement('button');again.className='secondary';again.textContent='再玩一次';again.onclick=()=>{round=1;roundResults=[];totalCrushed=0;totalBuildings=0;totalMines=0;$('overlay').hidden=true;startRound(true)};t.append(again);
+
  $('overlay').hidden=false;
 }
 function worldToScreen(x,y,z,vp){

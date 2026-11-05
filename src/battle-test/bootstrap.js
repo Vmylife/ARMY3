@@ -18,9 +18,11 @@ if(OFFICIAL){
    attemptId:'final-'+run.id+'-'+Date.now().toString(36)
   };
   document.body.classList.add('battle-official');
-  $('battleIntro').querySelector('.battle-intro-kicker').textContent='正式最終戰役';
-  $('battleIntro').querySelector('.battle-intro-sub').textContent=
-   '本輪六項訓練天賦和已購買的武器等級已自動裝備。擊殺勳章將正式存入軍功簿。';
+  // One confirmation is enough: the user already joined at the ammo depot.
+  // Keep the official loading overlay to ONE simple sentence.
+  $('battleIntro').querySelector('h1').textContent='敵軍來襲中';
+  $('battleIntro').querySelector('.battle-intro-kicker').textContent='';
+  $('battleIntro').querySelector('.battle-intro-sub').textContent='';
   $('battleStart').textContent='開始保衛軍營';
   $('battleReportNow').textContent='投降';
   // Same-origin frame shares sessionStorage with the live camp; award every
@@ -59,6 +61,7 @@ $('battleStart').addEventListener('click',async()=>{
   $('battleLoadBar').style.width=Math.max(1,Math.min(99,Math.round(done/Math.max(1,total)*100)))+'%';
  };
  window.armyLoadComplete=()=>{
+  document.body.classList.add('battle-loaded');
   $('battleLoadBar').style.width='100%';
   $('battleIntro').hidden=true;$('battleHUD').hidden=false;
   $('battleReportNow').hidden=false;$('battleGrenade').hidden=false;
@@ -72,3 +75,5 @@ $('battleStart').addEventListener('click',async()=>{
  try{await import('./main.js?v=23')}
  catch(error){console.error('軍營保衛戰載入失敗',error);window.armyLoadFailure(error)}
 });
+// Official battle starts immediately after authorisation; no second button.
+if(OFFICIAL&&authorised)queueMicrotask(()=>$('battleStart')?.click());

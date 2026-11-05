@@ -34,7 +34,16 @@ function createPortalMenu({position,kind,panelId,startId,cancelId,destination,on
  const panel=document.getElementById(panelId),start=document.getElementById(startId),cancel=document.getElementById(cancelId);
  if(!panel||!start||!cancel)throw new Error('Missing portal menu: '+panelId);
  let dismissed=initialDismissed,wasNear=false;
- cancel.addEventListener('click',()=>{dismissed=true;panel.hidden=true});
+ // Returning from a prewarmed mini-game leaves the player standing right
+ // inside the same yellow circle. Without resetting the prior dismissal,
+ // it appears that the entrance has stopped responding.
+ let reopenAt=initialDismissed?performance.now()+550:0;
+ window.addEventListener('army:training-return',event=>{
+  if(event.detail?.kind!==kind)return;
+  dismissed=false;wasNear=false;panel.hidden=true;
+  reopenAt=performance.now()+280;
+ });
+ cancel.addEventListener('click',()=>{dismissed=true;reopenAt=0;panel.hidden=true});
  start.addEventListener('click',()=>{
   if(isAlerted()||!canTrain(kind)){panel.hidden=true;return}
   try{onStart?.()}catch(error){console.error('軍營進度儲存失敗',error);alert('目前無法保存軍營位置，請重試。');return}
@@ -47,19 +56,22 @@ function createPortalMenu({position,kind,panelId,startId,cancelId,destination,on
    const distance=Math.hypot(playerPos.x-position.x,playerPos.z-position.z);
    if(!blocked&&!isAlerted())window.armyGameWarmup?.approach(kind,distance);
    if(isAlerted()||!canTrain(kind)){panel.hidden=true;return}
-   if(distance>RESET_RADIUS){dismissed=false;wasNear=false;panel.hidden=true;return}
+   if(distance>RESET_RADIUS){dismissed=false;wasNear=false;reopenAt=0;panel.hidden=true;return}
    const near=distance<=OPEN_RADIUS||(wasNear&&distance<=RESET_RADIUS);
    if(!near){panel.hidden=true;return}
-   // Entering the yellow circle never opens the menu on its own.
-   // Only a press on the dedicated interaction button may reveal it.
    wasNear=true;
+   // After the mini-game closes, make the same portal usable immediately;
+   // no need to walk outside the ring and enter it a second time.
+   if(!blocked&&reopenAt&&performance.now()>=reopenAt){
+    reopenAt=0;dismissed=false;panel.hidden=false;
+   }
    if(blocked)panel.hidden=true;
   },
   interact(playerPos,blocked=false){
    if(blocked||isAlerted()||!canTrain(kind))return false;
    const distance=Math.hypot(playerPos.x-position.x,playerPos.z-position.z);
    if(distance>OPEN_RADIUS)return false;
-   dismissed=false;wasNear=true;panel.hidden=false;
+   dismissed=false;wasNear=true;reopenAt=0;panel.hidden=false;
    return true;
   },
   hide(){panel.hidden=true}
@@ -72,15 +84,15 @@ export function createBlanketPortal(renderer,{onTrainingStart=()=>{},resuming=fa
   swipeDraw=makeGroundRing(renderer,SWIPE_PORTAL),
   weedDraw=makeGroundRing(renderer,WEED_PORTAL),
   singingDraw=makeGroundRing(renderer,SINGING_PORTAL);
- const blanket=createPortalMenu({position:BLANKET_PORTAL,kind:'blanket',panelId:'blanketPortalMenu',startId:'blanketPortalStart',cancelId:'blanketPortalCancel',destination:'./blanket-stack.html?v=195',onStart:()=>onTrainingStart('blanket'),initialDismissed:resuming,isAlerted});
- const grenade=createPortalMenu({position:GRENADE_PORTAL,kind:'grenade',panelId:'grenadePortalMenu',startId:'grenadePortalStart',cancelId:'grenadePortalCancel',destination:'./grenade-workshop-test.html?v=195',onStart:()=>onTrainingStart('grenade'),initialDismissed:resuming,isAlerted});
- const shooting=createPortalMenu({position:SHOOTING_PORTAL,kind:'shooting',panelId:'shootingPortalMenu',startId:'shootingPortalStart',cancelId:'shootingPortalCancel',destination:'./shooting-paper-range.html?v=196',onStart:()=>onTrainingStart('shooting'),initialDismissed:resuming,isAlerted});
+ const blanket=createPortalMenu({position:BLANKET_PORTAL,kind:'blanket',panelId:'blanketPortalMenu',startId:'blanketPortalStart',cancelId:'blanketPortalCancel',destination:'./blanket-stack.html?v=196',onStart:()=>onTrainingStart('blanket'),initialDismissed:resuming,isAlerted});
+ const grenade=createPortalMenu({position:GRENADE_PORTAL,kind:'grenade',panelId:'grenadePortalMenu',startId:'grenadePortalStart',cancelId:'grenadePortalCancel',destination:'./grenade-workshop-test.html?v=196',onStart:()=>onTrainingStart('grenade'),initialDismissed:resuming,isAlerted});
+ const shooting=createPortalMenu({position:SHOOTING_PORTAL,kind:'shooting',panelId:'shootingPortalMenu',startId:'shootingPortalStart',cancelId:'shootingPortalCancel',destination:'./shooting-paper-range.html?v=197',onStart:()=>onTrainingStart('shooting'),initialDismissed:resuming,isAlerted});
  const swipe=createPortalMenu({position:SWIPE_PORTAL,kind:'swipe',panelId:'swipePortalMenu',startId:'swipePortalStart',cancelId:'swipePortalCancel',
   destination:'/Don-t-like-your-mom/army-test/index.html?v=7',onStart:()=>onTrainingStart('swipe'),initialDismissed:resuming,isAlerted});
  const weed=createPortalMenu({position:WEED_PORTAL,kind:'weed',panelId:'weedPortalMenu',startId:'weedPortalStart',cancelId:'weedPortalCancel',
-  destination:'./weed-pulling.html?v=197',onStart:()=>onTrainingStart('weed'),initialDismissed:resuming,isAlerted});
+  destination:'./weed-pulling.html?v=198',onStart:()=>onTrainingStart('weed'),initialDismissed:resuming,isAlerted});
  const singing=createPortalMenu({position:SINGING_PORTAL,kind:'singing',panelId:'singingPortalMenu',startId:'singingPortalStart',cancelId:'singingPortalCancel',
-  destination:'./singing-memory-test.html?v=17',onStart:()=>onTrainingStart('singing'),initialDismissed:resuming,isAlerted});
+  destination:'./singing-memory-test.html?v=18',onStart:()=>onTrainingStart('singing'),initialDismissed:resuming,isAlerted});
  const portals=[
   {position:BLANKET_PORTAL,menu:blanket,kind:'blanket'},
   {position:GRENADE_PORTAL,menu:grenade,kind:'grenade'},
