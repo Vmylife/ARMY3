@@ -1,0 +1,32 @@
+/* ARMY3 survivor crowd stress mode. Standalone page only. */
+#battleHUD,#battleWaveBanner,#battleAmmoHud,#battleReload,#battleWeaponLab,
+#battleTalentLab,#battleTalentToast,#battleTalentStatus,#battleReportNow,
+#campWeaponSwitch,#campCombatStatus,#campWheel,#campCombatWheel,
+#campCombatRestart{display:none!important}
+#stressPanel{position:fixed;z-index:18;top:calc(env(safe-area-inset-top) + 8px);
+ right:max(8px,env(safe-area-inset-right));width:min(256px,calc(100vw - 153px));
+ box-sizing:border-box;padding:10px 11px;border-radius:13px;
+ background:#133b2def;color:#f5e9ce;border:1px solid #dfc78986;
+ box-shadow:0 4px 20px #06160ab3;font-family:system-ui,-apple-system,'PingFang TC',sans-serif;
+ user-select:none;-webkit-user-select:none}
+#stressPanel[hidden]{display:none!important}
+.stressHeading{display:flex;gap:8px;align-items:center;justify-content:space-between;font-size:12px}
+#stressFps{font-size:16px;font-weight:950;color:#baf1c4;font-variant-numeric:tabular-nums}
+#stressFps[data-level=fair]{color:#f8d389}
+#stressFps[data-level=slow]{color:#ff9891}
+.stressChoices{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin:9px 0}
+.stressChoices button{min-width:0;min-height:32px;padding:4px 2px;border-radius:8px;
+ background:#2f5848;border:1px solid #abc4a876;color:#e8e8d2;
+ font-size:11px;font-weight:850;touch-action:manipulation}
+.stressChoices button.active{background:#f0d38a;color:#244231;border-color:#f8e0a9}
+.stressLine{font-size:10px;line-height:1.45;color:#d3e5d4;white-space:normal;font-variant-numeric:tabular-nums}
+.stressLine.muted{color:#abc7b3}
+#battleGodToggle{top:calc(env(safe-area-inset-top) + 156px)}
+#campCombatTip{bottom:calc(env(safe-area-inset-bottom) + 150px)}
+@media(max-width:390px){#stressPanel{width:min(228px,calc(100vw - 145px));padding:8px 9px}
+ .stressChoices{gap:3px}.stressChoices button{font-size:10px;min-height:29px}
+ .stressHeading{font-size:11px}#stressFps{font-size:14px}}
+@media(orientation:landscape) and (max-height:530px){
+ #stressPanel{top:calc(env(safe-area-inset-top) + 5px);width:245px}
+ #battleGodToggle{top:calc(env(safe-area-inset-top) + 148px)}
+}

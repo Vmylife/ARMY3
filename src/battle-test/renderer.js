@@ -3,13 +3,13 @@ const rotateX=rad=>{const c=Math.cos(rad),sn=Math.sin(rad);return new Float32Arr
 const CORPSE_ROTATE_X=new Float32Array([1,0,0,0,0,0,-1,0,0,1,0,0,0,0,0,1]);
 const CORPSE_PIVOT=mul(translation(0,.75,0),mul(CORPSE_ROTATE_X,translation(0,-.75,0)));
 import {makeEnvironment} from '../map/campGeometry.js?v=092';
-const SKIN_VS=`#version 300 es
+export const SKIN_VS=`#version 300 es
 precision highp float;
 layout(location=0) in vec3 p;layout(location=1) in vec3 n;layout(location=2) in vec2 uv;layout(location=3) in vec4 j;layout(location=4) in vec4 w;
 uniform mat4 uVP,uModel;uniform mat4 uBones[44];
 out vec2 vUV;out vec3 vN;out vec3 vPos;
 void main(){ivec4 ji=ivec4(j+0.5);mat4 skin=uBones[ji.x]*w.x+uBones[ji.y]*w.y+uBones[ji.z]*w.z+uBones[ji.w]*w.w;vec4 wp=uModel*skin*vec4(p,1.0);gl_Position=uVP*wp;vUV=uv;vN=normalize(mat3(uModel)*mat3(skin)*n);vPos=wp.xyz;}`;
-const SKIN_FS=`#version 300 es
+export const SKIN_FS=`#version 300 es
 precision highp float;in vec2 vUV;in vec3 vN;in vec3 vPos;uniform sampler2D uTexture;
 uniform float uEnemyTint;out vec4 frag;
 void main(){vec3 base=texture(uTexture,vUV).rgb;

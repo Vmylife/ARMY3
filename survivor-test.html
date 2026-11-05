@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#b7c9b2">
+<title>ARMY3｜3D 倖存者壓力測試</title>
+<link rel="preload" as="fetch" href="./assets/characters/cadet/cadet-green.glb?v=120" crossorigin="anonymous">
+<link rel="stylesheet" href="./src/ui/playtest.css?v=077">
+<link rel="stylesheet" href="./src/ui/campCombat.css?v=8">
+<link rel="stylesheet" href="./src/battle-test/battle.css?v=3">
+<link rel="stylesheet" href="./src/battle-test/talentLab.css?v=3">
+<link rel="stylesheet" href="./src/battle-test/weaponLab.css?v=1">
+<link rel="stylesheet" href="./src/battle-test/settlement.css?v=4">
+<link rel="stylesheet" href="./src/survivor-test/stress.css?v=1">
+<style>
+body.battle-official #battleGodToggle,
+body.battle-official #battleTalentLab,
+body.battle-official #battleWeaponLab,
+body.battle-official .battle-back{display:none!important}
+body.battle-official .battle-intro-kicker,
+body.battle-official .battle-intro-sub,
+body.battle-official .battle-intro-card p,
+body.battle-official #battleStart,
+body.battle-official #battleLoading{display:none!important}
+body.battle-official .battle-intro-card{
+ background:transparent;border:0;box-shadow:none;padding:0;width:auto;max-width:100%
+}
+body.battle-official .battle-intro-card h1{
+ margin:0;font-size:clamp(26px,7vw,38px);letter-spacing:.035em
+}
+/* Hide the game HUD while the official attack is still loading. */
+body.battle-official:not(.battle-loaded) #battleExit,
+body.battle-official:not(.battle-loaded) #minimap,
+body.battle-official:not(.battle-loaded) #battleReportNow{display:none!important}
+</style>
+<link rel="stylesheet" href="./src/ui/gameTouchGuard.css?v=1">
+<script src="./src/ui/gameTouchGuard.js?v=1" defer></script>
+</head>
+<body class="battle-test">
+<canvas id="world" aria-label="軍營保衛戰 3D 場景"></canvas>
+<button id="minimap" type="button" aria-label="開啟軍營地圖"><canvas id="miniCanvas" width="224" height="224"></canvas></button>
+<section id="worldMap" class="world-map" role="dialog" aria-label="軍營地圖" aria-modal="true" hidden>
+ <div class="world-map-panel">
+  <header class="world-map-header"><div><strong>軍營保衛戰</strong><small>彈藥庫防線 · 藍色箭頭代表玩家</small></div>
+   <button id="closeWorldMap" type="button" aria-label="關閉地圖">✕</button>
+  </header>
+  <div class="world-map-body"><div class="map-canvas-holder"><canvas id="worldMapCanvas" aria-label="軍營平面地圖"></canvas></div></div>
+ </div>
+</section>
+<div id="floatingStick" aria-hidden="true"><div class="stick-base"><div id="stickThumb" class="stick-thumb"></div></div></div>
+<div id="notice" role="status" hidden></div>
+<div id="debug" hidden></div>
+<div id="fatal" role="alert" hidden><strong>測試版載入失敗</strong><p id="errorText"></p><button id="retry" type="button">重新載入</button></div>
+<div id="battleHUD" hidden>
+ <span id="battleWave">第 1 波</span>
+ <small id="battleWaveTimer" aria-label="下一波倒數">00:25</small>
+</div>
+<button id="battleGodToggle" type="button" aria-pressed="false" hidden>無敵：關</button>
+<div id="battleIntro" role="dialog" aria-label="軍營保衛戰">
+ <div class="battle-intro-card">
+  <div class="battle-intro-kicker">ARMY3 · 3D 倖存者測試</div>
+  <h1>百人敵軍壓力測試</h1>
+  <p>軍營原地圖、原本的射擊手感。測試 50～200 名紅軍同時追擊玩家，擊倒後會補上新敵軍。</p>
+  <div class="battle-intro-sub">固定步槍 · 無限彈藥 · 不用換彈 · 預設無敵，方便專注測 FPS。</div>
+  <button id="battleStart" type="button">開始壓力測試</button>
+  <div id="battleLoading" hidden><span id="battleLoadText">準備軍營場景…</span><div class="battle-progress"><i id="battleLoadBar"></i></div></div>
+  <a href="./index.html?armyHome=1" class="battle-back">返回遊戲首頁</a>
+ </div>
+</div>
+<div id="battleWaveBanner" hidden aria-live="polite"></div>
+<details id="battleWeaponLab" aria-label="武器升級測試選單" hidden>
+ <summary>武器等級測試 <span id="battleWeaponSummary">手槍 5 · 步槍 5</span></summary>
+ <div id="battleWeaponBody"></div>
+</details>
+<details id="battleTalentLab" aria-label="戰鬥天賦實驗室">
+ <summary>天賦測試 <span id="battleTalentCount" class="btl-count">0 / 36</span></summary>
+ <div id="battleTalentBody" class="btl-inner"></div>
+</details>
+<div id="battleAmmoHud" role="status" aria-label="彈匣剩餘" hidden></div>
+<div id="battleTalentToast" class="btl-announce" role="status" hidden></div>
+<button id="battleReload" type="button" aria-label="手動更換彈匣" hidden>換彈</button>
+
+<button id="battleExit" type="button" aria-label="退出戰場">← 退出</button>
+<button id="battleReportNow" type="button" aria-label="結束防守並查看戰報" hidden>結算</button>
+<aside id="stressPanel" hidden aria-label="效能壓力測試控制台">
+ <div class="stressHeading"><strong>紅軍數量</strong><span id="stressFps" data-level="fair">— FPS</span></div>
+ <div class="stressChoices" role="group" aria-label="同場敵軍數量">
+  <button type="button" data-enemies="50" class="active">50</button>
+  <button type="button" data-enemies="100">100</button>
+  <button type="button" data-enemies="150">150</button>
+  <button type="button" data-enemies="200">200</button>
+ </div>
+ <div id="stressNumbers" class="stressLine">敵軍準備中…</div>
+ <div id="stressCpu" class="stressLine muted">戰鬥與 AI — ms</div>
+</aside>
+<script type="module" src="./src/survivor-test/bootstrap.js?v=1"></script>
+</body>
+</html>
