@@ -26,7 +26,7 @@ function yellowGroundRing(renderer){
  }
  const vao=gl.createVertexArray();gl.bindVertexArray(vao);
  for(const [idx,data] of [[0,coords],[1,colors],[2,normals]]){
-  const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER);
+  const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
   gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(data),gl.STATIC_DRAW);
   gl.enableVertexAttribArray(idx);
   gl.vertexAttribPointer(idx,3,gl.FLOAT,false,0,0);
