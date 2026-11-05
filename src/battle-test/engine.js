@@ -5,8 +5,8 @@ import {moveNpc,canOccupy,bulletClearance,bulletLineClear,meleeLineClear} from '
 import {battleRoute,battleClear} from './battleNav.js?v=3';
 import {waveEntry} from './breaches.js?v=5';
 import {insidePerimeter} from '../map/camp.js?v=093';
-import {renderBattleSettlement} from './settlement.js?v=3';
-import {BattlePerks} from './talentLab.js?v=6';
+import {renderBattleSettlement} from './settlement.js?v=4';
+import {BattlePerks} from './talentLab.js?v=7';
 import {BattleWeaponLevels} from './weaponLab.js?v=3';
 const $=id=>document.getElementById(id);
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
@@ -96,7 +96,6 @@ export class ArmyBattleCombat extends CampCombat{
    n.combatDead=true;n.combatActive=false;
    n.pos={x:200+n.id,z:200};n.home.job='life';
   }
-  this.showIntroBanner('圍牆外紅軍集結！南側、西側與餐廳東側來襲',1900);
   const god=$('battleGodToggle');
   if(god&&!this.official){
    god.addEventListener('click',()=>this.setInvincible(!this.invincible));
@@ -299,8 +298,7 @@ export class ArmyBattleCombat extends CampCombat{
   }
   this.totalSpawns+=pool.length;
   this.perks?.onWave(this);
-  const set=waveLoadout(this.wave);
-  this.showIntroBanner('第 '+this.wave+' 波：拳 '+set.fists+' · 手槍 '+set.pistol+' · 步槍 '+set.rifle,2000);
+  this.showIntroBanner('第 '+this.wave+' 波',1600);
   this.updateBattleHUD();
  }
 
@@ -439,8 +437,7 @@ export class ArmyBattleCombat extends CampCombat{
    a.combatDeathClip=this.playCombatClip(a,'falling_down',2.3);
    if(!a.combatDeathClip){a.anim.setClip('Idle',{restart:true});a.anim.speed=1}
    a.combatDown=0;a.combatRise=0;a.combatFall=0;
-   this.showIntroBanner('友軍陣亡！剩餘 '+this.liveAllies.length+' 人',1250);
-  }else{
+   }else{
    a.combatHurt=.25;a.combatHurtFull=.25;
    if(a.anim.hasClip('Hit_Reaction'))this.playCombatClip(a,'Hit_Reaction',.35);
   }
@@ -699,13 +696,21 @@ export class ArmyBattleCombat extends CampCombat{
   super.notice(msg);
  }
  updateBattleHUD(){
-  const live=this.liveEnemies.length,allies=this.liveAllies.length;
-  const code=this.wave+'/'+live+'/'+allies;
-  if(this.nameplateState===code)return;
-  this.nameplateState=code;
-  if($('battleWave'))$('battleWave').textContent='第 '+Math.max(1,this.wave)+' 波';
-  if($('battleRemaining'))$('battleRemaining').textContent='敵軍 '+live;
-  if($('battleAllies'))$('battleAllies').textContent='友軍 '+allies+' / '+this.allies.length;
+  // Only the wave number and the time until the next wave: no loadout,
+  // enemy counts, ally counts or direction annotations in the HUD.
+  if(this.nameplateState!==this.wave){
+   this.nameplateState=this.wave;
+   if($('battleWave'))$('battleWave').textContent='第 '+Math.max(1,this.wave)+' 波';
+  }
+  const countdown=$('battleWaveTimer');
+  if(countdown){
+   countdown.hidden=this.wave>=FINAL_WAVE||this.gameOver;
+   if(!countdown.hidden){
+    const remaining=Math.ceil(Math.max(0,this.waveTimer));
+    const next='00:'+String(remaining).padStart(2,'0');
+    if(countdown.textContent!==next)countdown.textContent=next;
+   }
+  }
  }
  update(dt,now,{blocked=false}={}){
   // Use real frame time for the wave clock, NOT hit-stop-scaled animation dt.

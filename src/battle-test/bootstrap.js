@@ -1,5 +1,5 @@
 // Shared 3D battle scene: sandbox laboratory OR official campaign mission.
-import {initTalentLab} from './talentLab.js?v=6';
+import {initTalentLab} from './talentLab.js?v=7';
 import {initWeaponLab} from './weaponLab.js?v=3';
 import {needsTemporaryPistol} from '../systems/temporaryPistol.js?v=1';
 const $=id=>document.getElementById(id);
@@ -76,7 +76,7 @@ $('battleStart').addEventListener('click',async()=>{
   $('battleIntro').hidden=true;$('errorText').textContent=String(error?.message||error);
   $('fatal').hidden=false;
  };
- try{await import('./main.js?v=27')}
+ try{await import('./main.js?v=28')}
  catch(error){console.error('軍營保衛戰載入失敗',error);window.armyLoadFailure(error)}
 });
 // Official battle starts immediately after authorisation; no second button.

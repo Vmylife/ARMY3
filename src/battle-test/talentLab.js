@@ -137,6 +137,11 @@ export class BattlePerks{
  updateIndicator(combat){
   const badge=$('battleTalentStatus'),btn=$('battleGrenade'),reload=$('battleReload');
   const gun=combat.weapon,isGun=gun==='pistol'||gun==='rifle';
+  const ammoHud=$('battleAmmoHud');
+  if(ammoHud){
+   ammoHud.hidden=!isGun;
+   if(isGun)ammoHud.textContent=this.ammo[gun]+' / '+this.capacity[gun];
+  }
   if(badge){
    const items=[];
    if(isGun)items.push('彈匣 '+this.ammo[gun]+'/'+this.capacity[gun]);

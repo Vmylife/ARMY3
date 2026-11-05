@@ -191,8 +191,19 @@ export function renderBattleSettlement(combat,{outcome='death',manual=false}={})
  if(combat.official){
   const back=make('button','btr-home','返回首頁');
   back.type='button';
-  back.addEventListener('click',()=>window.parent.postMessage({
-   type:'ARMY3_OFFICIAL_BATTLE_CLOSE',outcome},location.origin));
+  back.addEventListener('click',event=>{
+   event.preventDefault();
+   try{
+    if(window.parent!==window&&typeof window.parent.armyFinalBattleReturnHome==='function'){
+     window.parent.armyFinalBattleReturnHome();return;
+    }
+   }catch(error){console.warn('直接返回首頁失敗',error)}
+   // Older embeds can still return home without a working message handler.
+   try{sessionStorage.removeItem('ARMY3_camp_resume_v1')}catch{}
+   const home=new URL('./index.html?armyHome=1&v=24',document.baseURI);
+   try{window.top.location.replace(home.href)}
+   catch{window.location.replace(home.href)}
+  });
   actions.append(back);
  }else{
   const home=make('a','btr-home','返回軍營');home.href='./index.html';

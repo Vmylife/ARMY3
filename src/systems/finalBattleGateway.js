@@ -63,14 +63,17 @@ export function createFinalBattleGateway(renderer){
   return cached;
  }
  function goHome(){
-  if(frame){frame.remove();frame=null}
-  loan.hidden=true;
-  window.armyMinigameActive=false;window.armyFinalBattleActive=false;
-  // Clear the camp checkpoint so the homepage does not auto-resume the
-  // old round. All medals/upgrades remain in persistent progression storage.
+  // Clear state before removing the caller iframe (Safari may tear it down).
   clearCampSession();
-  location.replace(new URL('./index.html?armyHome=1&v=23',document.baseURI).href);
+  window.armyMinigameActive=false;window.armyFinalBattleActive=false;
+  loan.hidden=true;
+  if(frame){frame.remove();frame=null}
+  document.body.classList.remove('army-in-final-battle');
+  location.replace(new URL('./index.html?armyHome=1&v=24',document.baseURI).href);
  }
+ // Same-origin child report can invoke the real gateway without waiting
+ // for an iframe message. The message listener remains as a fallback.
+ window.armyFinalBattleReturnHome=goHome;
  function begin(){
   if(!status(true).ready||frame)return;
   menu.hidden=true;loan.hidden=true;dismissed=true;

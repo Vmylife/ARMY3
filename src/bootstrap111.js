@@ -4,7 +4,7 @@ import {getReturningCampSession} from './systems/campSession.js?v=144';
 const $=id=>document.getElementById(id);
 const button=$('armyStart'),loading=$('armyLoading'),bar=$('armyBar');
 let highestPercentage=0;
-const sourceURL=new URL('./src/main111.js?v=173',location.href);
+const sourceURL=new URL('./src/main111.js?v=174',location.href);
 let sourcePromise=null;
 const getCampSource=()=>{
  if(!sourcePromise)sourcePromise=fetch(sourceURL,{cache:'default'}).then(response=>{

@@ -166,3 +166,6 @@ body.battle-report-open #battleExit,
 body.battle-report-open #battleGodToggle,
 body.battle-report-open #battleReportNow,
 body.battle-report-open #minimap{display:none!important}
+
+/* The report's home control must remain tappable above the battle HUD. */
+#campCombatFinish.btr-active .btr-actions button{position:relative;z-index:3;pointer-events:auto;touch-action:manipulation;cursor:pointer}

@@ -8,10 +8,10 @@
 <link rel="preload" as="fetch" href="./assets/characters/cadet/cadet-green.glb?v=120" crossorigin="anonymous">
 <link rel="stylesheet" href="./src/ui/playtest.css?v=077">
 <link rel="stylesheet" href="./src/ui/campCombat.css?v=8">
-<link rel="stylesheet" href="./src/battle-test/battle.css?v=2">
+<link rel="stylesheet" href="./src/battle-test/battle.css?v=3">
 <link rel="stylesheet" href="./src/battle-test/talentLab.css?v=3">
 <link rel="stylesheet" href="./src/battle-test/weaponLab.css?v=1">
-<link rel="stylesheet" href="./src/battle-test/settlement.css?v=3">
+<link rel="stylesheet" href="./src/battle-test/settlement.css?v=4">
 <style>
 body.battle-official #battleGodToggle,
 body.battle-official #battleTalentLab,
@@ -53,8 +53,7 @@ body.battle-official:not(.battle-loaded) #battleReportNow{display:none!important
 <div id="fatal" role="alert" hidden><strong>測試版載入失敗</strong><p id="errorText"></p><button id="retry" type="button">重新載入</button></div>
 <div id="battleHUD" hidden>
  <span id="battleWave">第 1 波</span>
- <span id="battleRemaining">敵軍 0</span>
- <span id="battleAllies">友軍 5 / 5</span>
+ <small id="battleWaveTimer" aria-label="下一波倒數">00:25</small>
 </div>
 <button id="battleGodToggle" type="button" aria-pressed="false" hidden>無敵：關</button>
 <div id="battleIntro" role="dialog" aria-label="軍營保衛戰">
@@ -77,12 +76,12 @@ body.battle-official:not(.battle-loaded) #battleReportNow{display:none!important
  <summary>天賦測試 <span id="battleTalentCount" class="btl-count">0 / 36</span></summary>
  <div id="battleTalentBody" class="btl-inner"></div>
 </details>
-<div id="battleTalentStatus" aria-live="polite"></div>
+<div id="battleAmmoHud" role="status" aria-label="彈匣剩餘" hidden></div>
 <div id="battleTalentToast" class="btl-announce" role="status" hidden></div>
 <button id="battleReload" type="button" aria-label="手動更換彈匣" hidden>換彈</button>
 
 <button id="battleExit" type="button" aria-label="退出戰場">← 退出</button>
 <button id="battleReportNow" type="button" aria-label="結束防守並查看戰報" hidden>結算</button>
-<script type="module" src="./src/battle-test/bootstrap.js?v=31"></script>
+<script type="module" src="./src/battle-test/bootstrap.js?v=32"></script>
 </body>
 </html>
