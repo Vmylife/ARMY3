@@ -96,6 +96,10 @@ export function renderBattleSettlement(combat,{outcome='death',manual=false}={})
  if(root.dataset.reportDone==='1')return null;
  root.dataset.reportDone='1';
  const s=calculateBattleStats(combat,outcome==='surrender');
+ if(combat.official){
+  const total=window.armyProgression?.run()?.battle?.medals||0;
+  s.medals=Math.max(0,total-(combat.officialMedalsStart||0));
+ }
  const known=safelyLoad(),earned=ACHIEVEMENTS.filter(a=>a.check(s));
  const fresh=earned.filter(a=>!known.has(a.id));
  for(const a of earned)known.add(a.id);
@@ -177,13 +181,24 @@ export function renderBattleSettlement(combat,{outcome='death',manual=false}={})
  }
  gallery.append(book);contents.append(gallery);
  const foot=make('footer','btr-foot');
- const note=make('p','btr-note','測試戰報 · 勳章僅供試算，不影響正式軍旅進度。');
+ const note=make('p','btr-note',combat.official?
+  '正式戰報 · 擊殺獲得的榮譽勳章已存入軍功簿。':
+  '測試戰報 · 勳章僅供試算，不影響正式軍旅進度。');
  foot.append(note);
  const actions=make('div','btr-actions');
  restart.textContent='重新挑戰';
  restart.classList.add('btr-restart');
- const home=make('a','btr-home','返回軍營');home.href='./index.html';
- actions.append(restart,home);foot.append(actions);
+ if(combat.official){
+  const back=make('button','btr-restart','返回軍營');
+  back.type='button';
+  back.addEventListener('click',()=>window.parent.postMessage({
+   type:'ARMY3_OFFICIAL_BATTLE_CLOSE',outcome},location.origin));
+  actions.append(back);
+ }else{
+  const home=make('a','btr-home','返回軍營');home.href='./index.html';
+  actions.append(restart,home);
+ }
+ foot.append(actions);
  shell.append(head,contents,foot);
  root.classList.add('btr-active');
  document.body.classList.add('battle-report-open');

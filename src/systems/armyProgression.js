@@ -123,6 +123,13 @@ function awardTraining(kind,score){
  write(STORE,s);
  return reward;
 }
+function finishOfficialBattle(outcome){
+ const result=['success','death','surrender'].includes(outcome)?outcome:null;
+ if(!result)return false;
+ const r=run();if(r.battle.outcome==='success')return true;
+ r.battle.outcome=result;r.battle.finishedAt=Date.now();
+ return write(RUN,r);
+}
 function enemyKill(id){
  // Friendly camp NPCs are NEVER eligible for medal rewards.
  if(id==null)return 0;
@@ -450,7 +457,7 @@ function renderBattleSummary(){
  let el=$('armyBattleMedalSummary');if(!el){el=make('div','army-battle-summary');el.id='armyBattleMedalSummary';const btn=$('campCombatRestart');btn?.insertAdjacentElement('beforebegin',el)}
  if(el)el.textContent='🎖 本輪訓練 +'+s.trainingMedals+'　·　敵軍擊殺 +'+s.battleMedals+'　·　合計 '+(s.trainingMedals+s.battleMedals);
 }
-window.armyProgression={NAMES,TRAINING,TRAITS,RANKS,scoreTier,medalsForScore,beginRun,awardTraining,enemyKill,buy,state,run,battleSummary,rewardPanel,renderBattleSummary,mountCampStatus,RANK_GAIN,rankBonus,WEAPON_LEVELS};
+window.armyProgression={NAMES,TRAINING,TRAITS,RANKS,scoreTier,medalsForScore,beginRun,awardTraining,enemyKill,finishOfficialBattle,buy,state,run,battleSummary,rewardPanel,renderBattleSummary,mountCampStatus,RANK_GAIN,rankBonus,WEAPON_LEVELS};
 window.addEventListener('army:blanket:finished',e=>{
  const anchor=document.getElementById('modal')?.querySelector('.big');
  if(anchor)rewardPanel('blanket',e.detail?.score,anchor);

@@ -1,13 +1,13 @@
 // ARMY3 enemy-wave sandbox, intentionally NOT imported by the main camp.
 // Uses the approved punch, gun, knockdown and stand-up combat mechanics.
-import {CampCombat,COMBAT_RISE_SECONDS,COMBAT_DOWN_SECONDS} from '../systems/campCombat.js?v=16';
+import {CampCombat,COMBAT_RISE_SECONDS,COMBAT_DOWN_SECONDS} from '../systems/campCombat.js?v=17';
 import {moveNpc,canOccupy,bulletClearance,bulletLineClear,meleeLineClear} from './battleCollision.js?v=1';
 import {battleRoute,battleClear} from './battleNav.js?v=3';
 import {waveEntry} from './breaches.js?v=5';
 import {insidePerimeter} from '../map/camp.js?v=093';
 import {renderBattleSettlement} from './settlement.js?v=3';
-import {BattlePerks} from './talentLab.js?v=3';
-import {BattleWeaponLevels} from './weaponLab.js?v=2';
+import {BattlePerks} from './talentLab.js?v=4';
+import {BattleWeaponLevels} from './weaponLab.js?v=3';
 const $=id=>document.getElementById(id);
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
@@ -46,14 +46,36 @@ export class ArmyBattleCombat extends CampCombat{
   // Normal hits never launch a reaction clip. Keep only a tiny feedback pause
   // and the already-supported red screen flash (no extra UI layer).
   this.lastPlayerHitFlashAt=-Infinity;
-  this.perks=window.armyBattleTalents||new BattlePerks();
-  this.weaponLab=window.armyBattleWeapons||new BattleWeaponLevels();
+  this.official=!!window.armyBattleOfficial;
+  const officialLoadout=this.official?window.armyBattleOfficialLoadout||{}:null;
+  this.perks=this.official?new BattlePerks(officialLoadout.traits||{}):
+   window.armyBattleTalents||new BattlePerks();
+  this.weaponLab=this.official?new BattleWeaponLevels(officialLoadout.weapons||{}):
+   window.armyBattleWeapons||new BattleWeaponLevels();
+  this.officialMedalsStart=this.official?
+   (window.armyProgression?.run()?.battle?.medals||0):0;
+  this.officialAttemptId=this.official?officialLoadout.attemptId||'official':null;
   this.rifleBurst=null;this.rifleBurstShot=false;
   this.totalSpawns=0;this.defenderKills=0;this.enemies=enemies;
   this.createEnemy=createEnemy;
   this.nameplateState='';this.lastWaveCount=-1;
-  this.interactionMode=false;this.weapon='rifle';this.provoked=false;
+  this.interactionMode=false;
+  this.weapon=this.official?
+   (this.weaponLab.level('rifle')>0?'rifle':
+    this.weaponLab.level('pistol')>0?'pistol':'fists'):'rifle';
+  this.provoked=false;
   this.perks.attach(this);this.weaponLab.attach(this);
+  if(this.official){
+   const originalClose=this.closeWheel;
+   this.closeWheel=take=>{
+    const old=this.weapon;
+    originalClose(take);
+    if(this.weapon!=='fists'&&this.weaponLab.level(this.weapon)===0){
+     this.weapon=old;this.refreshHUD(true);
+     this.perks.message('該武器尚未解鎖');
+    }
+   };
+  }
   this.invincible=false;this.maxShooters=7;
   this.refreshHUD(true);
   this.root.querySelector('#campModeSwitch').hidden=true;
@@ -76,7 +98,10 @@ export class ArmyBattleCombat extends CampCombat{
   }
   this.showIntroBanner('圍牆外紅軍集結！南側、西側與餐廳東側來襲',1900);
   const god=$('battleGodToggle');
-  if(god){god.addEventListener('click',()=>this.setInvincible(!this.invincible));this.setInvincible(false)}
+  if(god&&!this.official){
+   god.addEventListener('click',()=>this.setInvincible(!this.invincible));
+   this.setInvincible(false);
+  }
   $('battleReportNow')?.addEventListener('click',()=>this.endForReport());
   $('battleGrenade')?.addEventListener('click',()=>this.perks.useGrenade(this));
   $('battleReload')?.addEventListener('click',()=>this.perks.reload(this));
@@ -261,6 +286,8 @@ export class ArmyBattleCombat extends CampCombat{
    n.battleAttackOffset={...entry.flank};
    n.angle=Math.atan2(entry.entry.x-n.pos.x,entry.entry.z-n.pos.z);
    n.assaultVisible=true;n.incoming=true;n.waveNumber=this.wave;
+   // Recycled rig, new soldier. Each official kill must be rewarded once.
+   n.battleMedalId=this.officialAttemptId+'-'+this.wave+'-'+(this.totalSpawns+i+1);
    n.combatDead=false;n.combatActive=false;n.combatHP=100;n.combatDamageSinceFall=0;
    n.combatDown=0;n.combatRise=0;n.combatFall=0;n.combatDeathClip=false;n.combatRestLift=undefined;
    n.combatHurt=0;n.combatHurtFull=0;n.combatCooldown=.45+(i%4)*.18;
@@ -723,6 +750,7 @@ export class ArmyBattleCombat extends CampCombat{
   this.gameOver=true;this.attackPointer=null;this.attackKeyboard=false;
   if(this.wheelOpen)this.closeWheel(false);
   clearTimeout(this.endTimer);
+  if(this.official)window.armyProgression?.finishOfficialBattle(outcome);
   renderBattleSettlement(this,{outcome});
   $('campCombatFinish').hidden=false;
   $('battleReportNow').hidden=true;
@@ -766,6 +794,7 @@ export class ArmyBattleCombat extends CampCombat{
   super.damagePlayer(damage,kind);
   if(wasAlive&&!this.playerAlive){
    this.battleOutcome='death';
+   if(this.official)window.armyProgression?.finishOfficialBattle('death');
    renderBattleSettlement(this,{outcome:'death'});
    $('battleReportNow').hidden=true;
   }

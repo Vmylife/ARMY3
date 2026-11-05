@@ -12,6 +12,12 @@
 <link rel="stylesheet" href="./src/battle-test/talentLab.css?v=3">
 <link rel="stylesheet" href="./src/battle-test/weaponLab.css?v=1">
 <link rel="stylesheet" href="./src/battle-test/settlement.css?v=3">
+<style>
+body.battle-official #battleGodToggle,
+body.battle-official #battleTalentLab,
+body.battle-official #battleWeaponLab,
+body.battle-official .battle-back{display:none!important}
+</style>
 <link rel="stylesheet" href="./src/ui/gameTouchGuard.css?v=1">
 <script src="./src/ui/gameTouchGuard.js?v=1" defer></script>
 </head>
@@ -61,8 +67,8 @@
 <button id="battleReload" type="button" aria-label="手動更換彈匣" hidden>換彈</button>
 <button id="battleGrenade" type="button" aria-label="投擲手榴彈" hidden>榴彈</button>
 
-<button id="battleExit" type="button" aria-label="退出測試版">← 退出</button>
+<button id="battleExit" type="button" aria-label="退出戰場">← 退出</button>
 <button id="battleReportNow" type="button" aria-label="結束防守並查看戰報" hidden>結算</button>
-<script type="module" src="./src/battle-test/bootstrap.js?v=21"></script>
+<script type="module" src="./src/battle-test/bootstrap.js?v=22"></script>
 </body>
 </html>

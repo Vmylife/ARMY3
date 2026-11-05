@@ -14,8 +14,12 @@ function readPrefs(){
  }catch{return {}}
 }
 export class BattlePerks{
- constructor(){
-  this.values=readPrefs();this.combat=null;this.lastWeapon='';
+ constructor(officialValues=null){
+  this.official=officialValues!==null;
+  this.values=this.official?Object.fromEntries(
+   Object.entries(officialValues||{}).filter(([name,level])=>
+    TIERS[name]&&Number.isInteger(level)&&level>=1&&level<=3)):readPrefs();
+  this.combat=null;this.lastWeapon='';
   this.shield=0;this.shieldNext=0;this.rootSaved=-1;this.invincibleUntil=0;
   this.healedWave=-1;this.gloveCount=0;this.gloveUntil=0;
   this.gunLockUntil=0;this.reloadPenaltyUntil=0;
@@ -33,7 +37,7 @@ export class BattlePerks{
   if(!TIERS[name])return;
   level=clamp(Math.trunc(Number(level)||0),0,3);
   if(level)this.values[name]=level;else delete this.values[name];
-  try{localStorage.setItem(KEY,JSON.stringify(this.values))}catch{}
+  if(!this.official)try{localStorage.setItem(KEY,JSON.stringify(this.values))}catch{}
   if(name==='已讀不回'){this.shield=level?2:0;this.shieldNext=0}
   if(this.combat)this.updateIndicator(this.combat);
  }

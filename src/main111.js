@@ -10,7 +10,8 @@ import {CAMP} from './map/camp.js?v=093';
 import {movePlayer} from './map/navCollision109.js?v=124';
 import {createNavDebugger} from './ui/navDebug109.js?v=109';
 import {createBlanketPortal} from './ui/blanketPortal128.js?v=134';
-import {saveCampSession,getReturningCampSession,clearCampSession} from './systems/campSession.js?v=144';
+import {createFinalBattleGateway} from './systems/finalBattleGateway.js?v=1';
+import {saveCampSession,getReturningCampSession,clearCampSession,returnToCamp} from './systems/campSession.js?v=144';
 import {drawMinimap} from './ui/minimap.js?v=093';
 import {initWorldMap} from './ui/worldMap.js?v=093';
 import {setupInput} from './ui/input.js?v=062';
@@ -146,7 +147,22 @@ async function boot(){
       npcs:npcs.map(n=>({id:n.id,x:n.pos.x,z:n.pos.z,angle:n.angle}))
     },trainingId)
   });
-  combat.setInteractionHandler(()=>blanketPortal.interact(player.pos,worldMap.isOpen()));
+  const finalBattleGateway=createFinalBattleGateway(renderer,{
+   onBegin:()=>saveCampSession({
+    player:{x:player.pos.x,z:player.pos.z,angle:player.angle},
+    camera:{yaw:camYaw,pitch:camPitch,zoom:cameraZoom,targetZoom},
+    npcs:npcs.map(n=>({id:n.id,x:n.pos.x,z:n.pos.z,angle:n.angle}))
+   },'battle'),
+   onReturn:()=>{
+    // On iPhone a second WebGL context may evict the suspended camp.
+    // Cold-resume using the existing snapshot rather than starting a NEW run.
+    if(renderer.gl.isContextLost())returnToCamp();
+    else clearCampSession();
+   }
+  });
+  combat.setInteractionHandler(()=>
+   finalBattleGateway.interact(player.pos,worldMap.isOpen())||
+   blanketPortal.interact(player.pos,worldMap.isOpen()));
   progress('35 名 NPC：5 支小隊＋10 名自由活動士兵已就位…');
   const showNavDebug=debug?createNavDebugger():null;
   // The new cross-legged clip drops the hips below the original standing root.
@@ -252,6 +268,7 @@ async function boot(){
     buildings.draw(renderer.vp,player.pos);
     props.draw(renderer.vp,player.pos);
     blanketPortal.draw();
+    finalBattleGateway.draw();
     renderer.drawActor('recruit',player);
     for(const npc of npcs){
       const distance=Math.hypot(npc.pos.x-player.pos.x,npc.pos.z-player.pos.z);
@@ -290,6 +307,7 @@ async function boot(){
     }
     combat.drawWeapons(now);
     blanketPortal.update(player.pos,worldMap.isOpen()||combat.provoked);
+    finalBattleGateway.update(player.pos,worldMap.isOpen()||combat.provoked);
     showNavDebug?.(renderer.vp,player.pos,npcs,now);
     mapFacing=Math.PI-player.angle+mapYaw;
     if(now-lastMap>=16){

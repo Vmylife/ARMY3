@@ -560,7 +560,7 @@ export class CampCombat{
    this.kills++;
    // Friendly camp NPCs never grant medals: only future marked enemy-wave actors.
    if(n.isEnemy===true||n.faction==='enemy'||n.team==='enemy')
-    window.armyProgression?.enemyKill(n.id);
+    window.armyProgression?.enemyKill(n.battleMedalId??n.id);
    this.notice(this.kills===10?'全營警報！所有存活阿兵哥開始追擊！':
     this.kills===5?'步槍警戒！':this.kills===1?'手槍警戒！':'擊殺 '+this.kills);
    if(this.kills>=10)for(const alive of this.npcs)if(!alive.combatDead)this.engage(alive);

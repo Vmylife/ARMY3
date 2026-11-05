@@ -1,0 +1,36 @@
+#armyMissionObjective{position:fixed;z-index:4;top:calc(env(safe-area-inset-top,0px) + 144px);
+ left:max(12px,env(safe-area-inset-left,0px));width:157px;max-width:calc(100vw - 24px);
+ padding:8px 10px 9px;border:1px solid #ebdfad;border-radius:10px;background:#f7f7edeb;
+ box-shadow:0 4px 13px #1a352331;color:#294936;pointer-events:none;
+ display:flex;flex-direction:column;align-items:flex-start;gap:3px}
+#armyMissionObjective>span{font:850 10px/1.2 system-ui,-apple-system,"PingFang TC",sans-serif;color:#758374;letter-spacing:.08em}
+#armyMissionObjective>strong{font:900 14px/1.3 system-ui,-apple-system,"PingFang TC",sans-serif}
+#armyMissionObjective>small{font:650 10px/1.25 system-ui,-apple-system,"PingFang TC",sans-serif;color:#718171}
+#armyMissionObjective.army-mission-alert{border-color:#e5c35a;background:#fff7d9f5}
+#armyMissionObjective.army-mission-alert>strong{color:#83501b}
+#battleAssemblyMenu{position:fixed;z-index:20;left:50%;bottom:calc(env(safe-area-inset-bottom) + 14px);
+ transform:translateX(-50%);width:min(395px,calc(100vw - 24px));max-height:min(74dvh,560px);
+ overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;padding:15px 17px;
+ border:2px solid #e4cc73;border-radius:17px;background:#19382ff4;color:#fff6dc;
+ box-shadow:0 10px 32px #0c2319a8;font:12px/1.5 system-ui,-apple-system,"PingFang TC",sans-serif;text-align:center}
+#battleAssemblyMenu[hidden]{display:none!important}
+.army-assembly-eyebrow{font-size:10px;letter-spacing:.14em;color:#e7ca86;font-weight:900}
+#battleAssemblyMenu h2{font-size:23px;line-height:1.15;margin:5px 0 6px}
+#battleAssemblyMenu p{margin:0 0 9px;color:#e4dfc6}
+.army-assembly-wallet{font-size:11px;padding:7px;border-top:1px solid #8da08c85;border-bottom:1px solid #8da08c85}
+.army-assembly-weapon{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 2px;
+ border-bottom:1px solid #8da08c50;font-size:12px;font-weight:800}
+.army-assembly-weapon button{font-size:11px;font-weight:850;min-width:87px;min-height:33px;border-radius:8px;
+ color:#26412e;background:#f5e4a9;border:0;touch-action:manipulation}
+.army-assembly-weapon button:disabled{opacity:.5}
+.army-assembly-actions{display:grid;grid-template-columns:1.65fr 1fr;gap:8px;margin-top:11px}
+.army-assembly-actions button{min-height:43px;border:1px solid #f3df99;border-radius:10px;font-weight:900;touch-action:manipulation}
+#battleAssemblyStart{color:#3f3318;background:#f0d17d}
+#battleAssemblyCancel{color:#f6f3df;background:#496550}
+body.army-in-final-battle #armyMissionObjective{visibility:hidden}
+@media(orientation:landscape){
+ #armyMissionObjective{top:calc(env(safe-area-inset-top,0px) + 122px);width:153px}
+ #battleAssemblyMenu{max-height:90dvh;bottom:calc(env(safe-area-inset-bottom) + 7px);padding:10px 15px}
+ #battleAssemblyMenu h2{font-size:20px}
+}
+body:not(.army-ready) #armyMissionObjective{display:none!important}

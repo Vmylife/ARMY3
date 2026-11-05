@@ -23,16 +23,23 @@ function stored(){
  }catch{return {pistol:5,rifle:5}}
 }
 export class BattleWeaponLevels{
- constructor(){this.levels=stored();this.combat=null;this.onSelect=null}
+ constructor(officialLevels=null){
+  this.official=officialLevels!==null;
+  this.levels=this.official?{
+   pistol:Math.max(0,Math.min(5,Math.trunc(Number(officialLevels?.pistol)||0))),
+   rifle:Math.max(0,Math.min(5,Math.trunc(Number(officialLevels?.rifle)||0)))
+  }:stored();
+  this.combat=null;this.onSelect=null;
+ }
  level(gun){return this.levels[gun]||0}
  stats(gun){return WEAPON_LEVELS[gun]?.[this.level(gun)-1]||null}
  attach(combat){
   this.combat=combat;
   for(const gun of ['pistol','rifle'])
-   combat.perks?.setMagazine(gun,this.stats(gun).mag);
+   if(this.stats(gun))combat.perks?.setMagazine(gun,this.stats(gun).mag);
  }
  setLevel(gun,level){
-  if(!WEAPON_LEVELS[gun])return;
+  if(this.official||!WEAPON_LEVELS[gun])return;
   const next=sane(level);
   if(this.levels[gun]===next)return;
   this.levels[gun]=next;
